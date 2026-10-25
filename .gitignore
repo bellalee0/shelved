@@ -3,3 +3,12 @@ project-spec.md
 
 # macOS
 .DS_Store
+
+# 정답 정보를 포함하는 로컬 전용 파일
+playtest/
+backend/src/main/resources/dev-data/
+
+# 비밀 값
+.env
+.env.*
+!.env.example
