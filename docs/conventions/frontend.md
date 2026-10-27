@@ -121,15 +121,25 @@ frontend
 
 ```ts
 // features/npc/types.ts
-// 백엔드 NpcAskRequest / NpcAskResponse와 필드를 맞춘다
+// 백엔드 NpcAskRequest / NpcAskResponse와 필드를 맞춘다 (docs/api/investigation.md)
 export type NpcAskRequest = {
-  question: string;
   requestId: string;
+  question: string;
+};
+
+export type NpcMessageResponse = {
+  messageId: number;
+  senderType: 'USER' | 'NPC';
+  content: string;
+  sequenceNo: number;
+  createdAt: string;
 };
 
 export type NpcAskResponse = {
-  messageId: number;
-  content: string;
+  requestId: string;
+  suspectId: number;
+  question: NpcMessageResponse;
+  answer: NpcMessageResponse;
 };
 ```
 
@@ -256,7 +266,7 @@ export async function askNpc(roomId: number, suspectId: number, request: NpcAskR
   if (response.status === 202 && 'status' in data && data.status === 'PROCESSING') {
     return { kind: 'processing' as const, data };
   }
-  if (response.status === 200 && 'messageId' in data) {
+  if (response.status === 200 && 'answer' in data) {
     return { kind: 'completed' as const, data };
   }
   throw new Error('서버 응답 형식이 예상과 다릅니다.');

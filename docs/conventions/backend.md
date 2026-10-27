@@ -655,7 +655,7 @@ public HintResponse createHint(...) {
 
 - API 응답에 Entity를 그대로 반환하지 않고 항상 Response DTO로 변환한다.
 - 아래 필드는 플레이어용 Response DTO에 포함하지 않는다. 리빌 결과 조회 등 종료 후 API에서만 예외적으로 포함한다.
-  - `CASES`: `source_novel_title`, `source_novel_author`, `culprit_suspect_id`, `trick_summary`, `reveal_explanation`
+  - `CASES`: `source_novel_title`, `source_novel_author`, `source_novel_intro`, `culprit_suspect_id`, `trick_summary`, `reveal_explanation`
   - `SUSPECTS`: `is_culprit`, `persona_prompt`
   - `CASE_TRICK_ELEMENTS`: `grading_rubric`
   - `ACCUSATIONS`: `element_results` (플레이어에게는 `feedback`만 반환)
