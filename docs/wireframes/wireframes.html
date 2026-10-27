@@ -1,0 +1,1663 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shelved 와이어프레임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 화면 탭 → 조작 바 → 가로 스크롤되는 저충실도 프레임 → 번호별 응답 필드 표 → 명세 반영 결과 */
+:root {
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #1c222c;
+  --ink-2: #5d6676;
+  --line: #a9b0bc;
+  --line-soft: #d5d9e0;
+  --fill: #e4e7ec;
+  --fill-2: #f4f5f7;
+  --mark: #d6450c;
+  --mark-soft: #fde6dc;
+  --ok: #2d7a4c;
+  --ok-soft: #dcf0e3;
+  --warn: #9a6700;
+  --warn-soft: #fbefd0;
+  --hi: #fff3bf;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171c; --surface: #1c2027; --ink: #e5e8ee; --ink-2: #9aa3b2; --line: #5a6372; --line-soft: #343a45;
+    --fill: #2a3039; --fill-2: #222730; --mark: #ff7f4d; --mark-soft: #46261a; --ok: #6fcf97; --ok-soft: #1d3527;
+    --warn: #f0c060; --warn-soft: #3d3218; --hi: #4a4220; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171c; --surface: #1c2027; --ink: #e5e8ee; --ink-2: #9aa3b2; --line: #5a6372; --line-soft: #343a45;
+  --fill: #2a3039; --fill-2: #222730; --mark: #ff7f4d; --mark-soft: #46261a; --ok: #6fcf97; --ok-soft: #1d3527;
+  --warn: #f0c060; --warn-soft: #3d3218; --hi: #4a4220; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.55; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; }
+h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 19px; margin: 0; text-wrap: balance; }
+h3 { font-size: 15px; margin: 0; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 12.5px; }
+.lede { color: var(--ink-2); max-width: 70ch; margin-top: 6px; }
+.top { display: flex; flex-direction: column; gap: 14px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button, .seg label, .chip-btn {
+  font: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer;
+}
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+button:focus-visible, label:focus-within, select:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+section.screen { display: flex; flex-direction: column; gap: 18px; margin-top: 26px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px; padding: 12px 14px; }
+.ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctl > span { font-size: 12px; color: var(--ink-2); letter-spacing: 0.04em; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 4px 10px; font-size: 13px; }
+.seg input:checked + label { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+select { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.legend { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+/* ---------- 와이어프레임 공통 ---------- */
+.scroll { overflow-x: auto; border-radius: 10px; }
+.frame { position: relative; min-width: 1140px; background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; font-size: 13px; }
+.box { border: 1.5px solid var(--line); border-radius: 6px; background: var(--surface); }
+.ph { background: repeating-linear-gradient(135deg, var(--fill) 0 8px, var(--fill-2) 8px 16px); border: 1.5px dashed var(--line); border-radius: 6px; display: grid; place-items: center; color: var(--ink-2); font-family: var(--font-mono); font-size: 11.5px; text-align: center; }
+.wf-btn { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--ink); border-radius: 5px; padding: 3px 9px; background: var(--surface); font-size: 12.5px; white-space: nowrap; }
+.wf-btn.primary { background: var(--ink); color: var(--surface); }
+.wf-btn.ghost { border-style: dashed; border-color: var(--line); color: var(--ink-2); }
+.wf-btn.disabled, .wf-btn:disabled { opacity: .45; pointer-events: none; }
+button.wf-btn, textarea, input, select { font: inherit; }
+textarea { width: 100%; min-height: 72px; box-sizing: border-box; }
+.gaps details { padding: 8px; border: 1px solid var(--line-soft); }
+summary { cursor: pointer; }
+.overlay .card { max-height: 92%; overflow: auto; }
+.kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+.lbl { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); letter-spacing: .02em; }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; background: var(--fill-2); white-space: nowrap; }
+.pill.bad { border-color: var(--mark); color: var(--mark); background: var(--mark-soft); }
+.pill.good { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+.pill.warn { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+.line { height: 8px; border-radius: 4px; background: var(--fill); }
+.input { border: 1.5px solid var(--line); border-radius: 5px; padding: 6px 8px; color: var(--ink-2); background: var(--fill-2); font-size: 12.5px; }
+.input.area { min-height: 64px; }
+.hint-text { font-size: 11.5px; color: var(--ink-2); }
+
+/* 번호 표식 */
+.n { display: inline-grid; place-items: center; min-width: 19px; height: 19px; padding: 0 4px; border-radius: 999px; background: var(--mark); color: #fff; font: 600 11px/1 var(--font-mono); vertical-align: middle; flex: none; transition: transform .15s; }
+.n.pulse { transform: scale(1.35); box-shadow: 0 0 0 4px var(--mark-soft); }
+@media (prefers-reduced-motion: reduce) { .n { transition: none; } }
+
+/* ---------- 게임 화면 ---------- */
+.g-hud { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-bottom: 2px solid var(--ink); background: var(--fill-2); flex-wrap: nowrap; }
+.g-hud .title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.g-hud .title b { font-size: 14px; white-space: nowrap; }
+.g-hud .meters { display: flex; gap: 8px; margin-left: auto; }
+.meter { display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--ink); border-radius: 6px; padding: 3px 10px; background: var(--surface); white-space: nowrap; }
+.meter strong { font: 600 15px var(--font-mono); font-variant-numeric: tabular-nums; }
+.meter small { color: var(--ink-2); font-size: 11px; }
+.g-hud .actions { display: flex; gap: 6px; }
+.g-main { display: flex; height: 560px; }
+.g-map { position: relative; flex: 1; min-width: 0; background:
+  linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 32px 32px,
+  linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0 / 32px 32px, var(--fill-2); }
+.room { position: absolute; border: 2px solid var(--ink-2); background: color-mix(in srgb, var(--surface) 70%, transparent); border-radius: 3px; }
+.room > .lbl { position: absolute; top: 4px; left: 6px; }
+.sprite { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; }
+.sprite i { display: block; width: 22px; height: 26px; border: 2px solid var(--ink); border-radius: 5px 5px 2px 2px; background: var(--surface); }
+.sprite.player i { background: var(--ink); }
+.sprite.evi i { width: 16px; height: 16px; border-radius: 3px; transform: rotate(45deg); background: var(--warn-soft); border-color: var(--warn); }
+.sprite.evi span { margin-top: 3px; }
+.bubble { position: absolute; background: var(--surface); border: 1.5px solid var(--ink); border-radius: 6px; padding: 3px 8px; font-size: 12px; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.radius { position: absolute; border: 1.5px dashed var(--mark); border-radius: 50%; }
+.map-tag { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; align-items: center; }
+.stop-badge { position: absolute; top: 10px; left: 10px; }
+.overlay { position: absolute; inset: 0; background: color-mix(in srgb, var(--ink) 55%, transparent); display: grid; place-items: center; z-index: 3; }
+.overlay .card { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; padding: 18px 20px; width: 380px; display: flex; flex-direction: column; gap: 10px; }
+.g-note { width: 290px; flex: none; border-left: 2px solid var(--ink); display: flex; flex-direction: column; background: var(--surface); }
+.g-panel { width: 380px; flex: none; border-left: 2px solid var(--ink); display: flex; flex-direction: column; background: var(--surface); min-height: 0; }
+.p-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1.5px solid var(--line); }
+.p-head h3 { font-size: 14px; }
+.p-head .x { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.p-body { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.p-foot { border-top: 1.5px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.msg { max-width: 86%; border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; }
+.msg.me { align-self: flex-end; background: var(--fill); border-color: var(--fill); }
+.msg.npc { align-self: flex-start; }
+.msg.fail { align-self: flex-end; border: 1.5px dashed var(--mark); background: var(--mark-soft); }
+.msg .meta { display: flex; gap: 6px; align-items: center; justify-content: space-between; margin-top: 4px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row.between { justify-content: space-between; }
+.stack { display: flex; flex-direction: column; gap: 6px; }
+.portrait { width: 34px; height: 34px; }
+.npc-list { display: flex; flex-direction: column; gap: 4px; }
+.npc-item { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.npc-item.on { border-color: var(--ink); background: var(--fill-2); }
+.npc-item .portrait { width: 24px; height: 24px; }
+.hint-card { border: 1.5px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.qa { display: grid; grid-template-columns: 18px 1fr; gap: 2px 6px; font-size: 12.5px; }
+.qa b { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); padding-top: 2px; }
+.followup { border-left: 3px solid var(--line-soft); padding-left: 8px; }
+.brief-sec { display: flex; flex-direction: column; gap: 4px; }
+.note-paper { flex: 1; margin: 12px; border: 1.5px solid var(--line); border-radius: 6px; padding: 10px; background: var(--fill-2); display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; color: var(--ink-2); }
+.modal-back { position: absolute; inset: 0; background: color-mix(in srgb, var(--ink) 45%, transparent); display: grid; place-items: center; z-index: 4; }
+.modal { width: 720px; background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; display: grid; grid-template-columns: 1fr 260px; overflow: hidden; }
+.modal .m-main { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.modal .m-side { border-left: 1.5px solid var(--line); padding: 14px; background: var(--fill-2); display: flex; flex-direction: column; gap: 8px; }
+.sus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.sus { border: 1.5px solid var(--line); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; }
+.sus.on { border: 2px solid var(--ink); background: var(--fill); }
+.sus .ph { width: 100%; height: 44px; }
+.attempt { border: 1.5px solid var(--line); border-radius: 6px; padding: 7px 8px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+
+/* ---------- 관리자 화면 ---------- */
+.a-top { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 2px solid var(--ink); background: var(--fill-2); }
+.crumb { font-size: 12px; color: var(--ink-2); }
+.steps { display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 11px; }
+.steps span { border: 1.5px solid var(--line); border-radius: 4px; padding: 2px 6px; color: var(--ink-2); }
+.steps span.on { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+.steps em { color: var(--line); font-style: normal; }
+.a-sub { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1.5px solid var(--line); flex-wrap: nowrap; }
+.a-main { display: grid; grid-template-columns: 470px 1fr; height: 640px; }
+.a-chat { display: flex; flex-direction: column; border-right: 2px solid var(--ink); min-height: 0; }
+.a-memo { display: flex; flex-direction: column; min-height: 0; }
+.tool-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tool-chip { font-family: var(--font-mono); font-size: 10.5px; border: 1px solid var(--ok); color: var(--ok); background: var(--ok-soft); border-radius: 4px; padding: 0 6px; }
+.memo-tabs { display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1.5px solid var(--line); flex-wrap: nowrap; overflow-x: auto; }
+.memo-tabs button { font: inherit; font-size: 12.5px; border: 1.5px solid var(--line); border-bottom: none; background: var(--fill-2); color: var(--ink-2); padding: 5px 10px; border-radius: 6px 6px 0 0; cursor: pointer; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.memo-tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); border-color: var(--ink); position: relative; top: 1.5px; }
+.memo-tabs .cnt { font-family: var(--font-mono); font-size: 10.5px; }
+.memo-body { flex: 1; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.field { display: grid; grid-template-columns: 120px 1fr; gap: 6px 10px; align-items: start; }
+.field > .lbl { padding-top: 5px; }
+.fv { border: 1.5px solid var(--line-soft); border-radius: 5px; padding: 4px 8px; background: var(--fill-2); font-size: 12.5px; min-height: 28px; }
+.tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.ent-list { display: flex; gap: 6px; flex-wrap: wrap; }
+.ent { border: 1.5px solid var(--line); border-radius: 6px; padding: 4px 8px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; background: var(--surface); }
+.ent.on { border-color: var(--ink); background: var(--fill); }
+.ent.changed, .changed-row { background: var(--hi); }
+.ent .key { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); }
+.persona { border: 1.5px solid var(--ink); border-radius: 8px; overflow: hidden; }
+.persona-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1.5px solid var(--line); background: var(--fill-2); flex-wrap: wrap; }
+.ptable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ptable th, .ptable td { border-bottom: 1px solid var(--line-soft); padding: 6px 8px; text-align: left; vertical-align: top; }
+.ptable th { font-family: var(--font-mono); font-weight: 500; font-size: 11px; color: var(--ink-2); background: var(--fill-2); }
+.ptable td.k { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); width: 120px; }
+.ref { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.ref q { font-style: italic; }
+.issues { border: 1.5px dashed var(--warn); border-radius: 8px; padding: 8px 10px; background: var(--warn-soft); display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.rubric { display: grid; grid-template-columns: 110px 1fr 1fr 1fr; border: 1.5px solid var(--line); border-radius: 6px; overflow: hidden; font-size: 12px; }
+.rubric > div { padding: 5px 7px; border-bottom: 1px solid var(--line-soft); border-right: 1px solid var(--line-soft); }
+.rubric > .h { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); background: var(--fill-2); }
+.gloss { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.gloss th, .gloss td { border: 1px solid var(--line-soft); padding: 5px 8px; text-align: left; }
+.gloss th { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); background: var(--fill-2); font-weight: 500; }
+
+/* ---------- 필드 표 ---------- */
+.spec { display: flex; flex-direction: column; gap: 10px; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px; }
+table.fields { width: 100%; border-collapse: collapse; min-width: 780px; }
+table.fields th, table.fields td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: top; }
+table.fields th { font-size: 12px; color: var(--ink-2); font-weight: 500; letter-spacing: .03em; background: var(--fill-2); position: sticky; top: 0; }
+table.fields td:nth-child(1) { width: 44px; }
+table.fields td:nth-child(2) { width: 170px; font-weight: 500; }
+table.fields td:nth-child(3) code { word-break: break-word; }
+table.fields td:nth-child(4) { width: 230px; }
+table.fields td:nth-child(5) { width: 86px; }
+table.fields tr.dim td { opacity: .38; }
+table.fields tr:hover td { background: var(--fill-2); }
+table.fields tr.grp td { background: var(--fill); font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); padding-block: 5px; opacity: 1; }
+.gaps { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.gaps ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 95ch; }
+.gaps li b { font-weight: 600; }
+.note-line { font-size: 12.5px; color: var(--ink-2); }
+
+/* ---------- 추가 화면 공통 ---------- */
+.frame.narrow { min-width: 940px; }
+.page { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 2px solid var(--ink); background: var(--fill-2); }
+.logo { font-weight: 700; font-size: 16px; letter-spacing: .02em; }
+.topbar .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.sec-h { display: flex; align-items: center; gap: 8px; }
+.sec-h h3 { font-size: 14px; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.case-card { border: 1.5px solid var(--ink); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; background: var(--surface); position: relative; }
+.case-card .ph { border: none; border-bottom: 1.5px dashed var(--line); border-radius: 0; height: 130px; }
+.case-card .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.case-card .badge { position: absolute; top: 8px; right: 8px; }
+.list { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
+.list-row { display: grid; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
+.list-row:last-child { border-bottom: none; }
+.list-row.head { background: var(--fill-2); font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.thumb { width: 52px; height: 34px; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tile { border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.tile strong { font: 600 20px var(--font-mono); font-variant-numeric: tabular-nums; }
+.dialog { position: absolute; inset: 0; background: color-mix(in srgb, var(--ink) 45%, transparent); display: grid; place-items: center; z-index: 4; }
+.dialog .card { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; padding: 16px 18px; width: 380px; display: flex; flex-direction: column; gap: 10px; }
+.banner { border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+.banner.bad { border-color: var(--mark); background: var(--mark-soft); }
+.banner.warn { border-color: var(--warn); background: var(--warn-soft); }
+.banner.good { border-color: var(--ok); background: var(--ok-soft); }
+.progress { height: 10px; border-radius: 5px; background: var(--fill); overflow: hidden; border: 1px solid var(--line-soft); }
+.progress > i { display: block; height: 100%; background: var(--ink-2); }
+.progress > i.warn { background: var(--warn); }
+.progress > i.bad { background: var(--mark); }
+
+/* 로그인 */
+.login-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.login-grid > div { padding: 40px 36px; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; min-height: 380px; }
+.login-grid > div + div { border-left: 2px dashed var(--line); }
+.gbtn { display: inline-flex; gap: 10px; align-items: center; border: 1.5px solid var(--ink); border-radius: 999px; padding: 7px 16px; font-size: 13px; }
+.gbtn i { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--ink-2); display: inline-block; }
+
+/* 리빌 */
+.reveal { display: grid; grid-template-columns: 1fr 360px; min-height: 620px; }
+.reveal > .left { padding: 18px; display: flex; flex-direction: column; gap: 14px; border-right: 2px solid var(--ink); }
+.reveal > .right { padding: 16px; display: flex; flex-direction: column; gap: 12px; background: var(--fill-2); }
+.status-banner { border: 2px solid var(--ink); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.status-banner b { font-size: 18px; }
+.book { display: grid; grid-template-columns: 90px 1fr; gap: 14px; align-items: center; border: 1.5px solid var(--line); border-radius: 8px; padding: 12px; }
+.book .ph { height: 120px; }
+.rank-row { display: grid; grid-template-columns: 40px 1fr 70px; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; align-items: center; }
+.rank-row .mono { font-variant-numeric: tabular-nums; text-align: right; }
+.rank-row.me { background: var(--hi); font-weight: 600; }
+
+/* 관리자 맵·테스트·출시 */
+.pub-grid { display: grid; grid-template-columns: 300px 1fr 330px; min-height: 600px; }
+.pub-grid > div { padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pub-grid > div + div { border-left: 2px solid var(--ink); }
+.form-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; align-items: center; }
+.issue-list { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.lock-banner { position: absolute; inset: 0; background: color-mix(in srgb, var(--surface) 55%, transparent); z-index: 3; display: grid; place-items: start center; padding-top: 120px; }
+.lock-banner .card { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; padding: 14px 16px; width: 420px; display: flex; flex-direction: column; gap: 8px; }
+
+/* 사용량 */
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 170px; border-bottom: 1.5px solid var(--ink-2); padding-inline: 4px; }
+.bar { flex: 1; display: flex; flex-direction: column-reverse; min-width: 0; }
+.bar i { display: block; }
+.s1 { background: var(--ink-2); } .s2 { background: var(--line); } .s3 { background: var(--line-soft); } .s4 { background: var(--fill); border: 1px solid var(--line-soft); }
+.s5 { background: repeating-linear-gradient(135deg, var(--line) 0 3px, var(--fill-2) 3px 6px); }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+.axis { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); padding-inline: 4px; }
+</style>
+<style>body { margin: 0; } [hidden] { display: none !important; }</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Shelved 와이어프레임</h1>
+      <p class="lede">플레이어 화면 6개와 관리자 화면 4개의 저충실도 와이어프레임입니다. 기본 화면 탭과 기록·랭킹 전용 탭에서 이동 흐름을 확인할 수 있습니다. 빨간 번호는 아래 표의 응답 필드와 연결됩니다. 필드명은 <code>docs/api/</code> 명세를 따르고, 예시 데이터는 명세의 가상 사건 「시계탑 저택의 마지막 종소리」를 사용합니다.</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="화면">
+      <button role="tab" id="tab-login" aria-selected="true" data-screen="login">① 로그인</button>
+      <button role="tab" id="tab-main" aria-selected="false" data-screen="main">② 메인</button>
+      <button role="tab" id="tab-game" aria-selected="false" data-screen="game">③ 게임</button>
+      <button role="tab" id="tab-reveal" aria-selected="false" data-screen="reveal">④ 리빌·랭킹</button>
+      <button role="tab" id="tab-ranking" aria-selected="false" data-screen="ranking">랭킹 전용</button>
+      <button role="tab" id="tab-records" aria-selected="false" data-screen="records">수사 기록</button>
+      <button role="tab" id="tab-alist" aria-selected="false" data-screen="alist">⑤ 관리자 목록</button>
+      <button role="tab" id="tab-admin" aria-selected="false" data-screen="admin">⑥ 사건 제작</button>
+      <button role="tab" id="tab-apub" aria-selected="false" data-screen="apub">⑦ 맵·테스트·출시</button>
+      <button role="tab" id="tab-usage" aria-selected="false" data-screen="usage">⑧ AI 사용량</button>
+    </div>
+    <div class="legend">
+      <span><b class="n">3</b> 화면 요소 ↔ 표 번호 (표의 행에 마우스를 올리면 표식이 강조됩니다)</span>
+      <span><span class="pill good">명세 있음</span> docs/api에 이미 정의됨</span>
+      <span><span class="pill">제외</span> 검토 후 넣지 않기로 함</span>
+    </div>
+  </header>
+
+  <!-- ===================== 로그인 · 닉네임 ===================== -->
+  <section class="screen" id="screen-login" aria-labelledby="tab-login">
+    <div>
+      <h2>① 로그인 · 닉네임 설정</h2>
+      <p class="lede">Google 로그인 버튼은 Google Identity Services 스크립트가 그립니다. 프론트엔드는 Google에서 받은 ID 토큰만 백엔드로 보내고, 처음 로그인한 사용자는 <code>nicknameRequired=true</code>라서 오른쪽 닉네임 화면으로 이동합니다.</p>
+    </div>
+    <div class="scroll">
+      <div class="frame narrow">
+        <div class="login-grid">
+          <div>
+            <span class="lbl">로그인</span>
+            <span class="logo" style="font-size:28px">Shelved</span>
+            <p class="hint-text" style="max-width:34ch">소설 속 사건을 직접 수사하는 추리 게임</p>
+            <span class="row"><b class="n" data-n="l1">1</b><span class="gbtn"><i></i>Google 계정으로 로그인</span></span>
+            <span class="hint-text">로그인 없이도 사건 목록은 볼 수 있음 → <u>사건 둘러보기</u></span>
+            <span class="row" style="margin-top:auto"><b class="n" data-n="l2">2</b><span class="hint-text">로그인 후 닉네임이 없으면 → 닉네임 설정 / 있으면 → 메인</span></span>
+          </div>
+          <div>
+            <span class="lbl">닉네임 설정 (최초 1회)</span>
+            <h3 style="font-size:18px">랭킹에 표시될 이름을 정해 주세요</h3>
+            <div class="stack" style="width:100%;max-width:320px">
+              <div class="row"><b class="n" data-n="l3">3</b><span class="lbl">닉네임</span></div>
+              <div class="input" style="color:var(--ink);border-color:var(--mark)">셜록초보</div>
+              <span class="hint-text">2~12자, 한글·영문·숫자만</span>
+              <span class="row"><b class="n" data-n="l4">4</b><span class="pill bad">이미 사용 중인 닉네임입니다.</span></span>
+            </div>
+            <span class="wf-btn primary">시작하기</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spec">
+      <h3>로그인 · 닉네임에 필요한 응답 필드</h3>
+      <div class="table-wrap">
+        <table class="fields">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr data-n="l1"><td><b class="n">1</b></td><td>Google 로그인</td><td>요청 <code>{idToken}</code> → <code>accessToken</code>, <code>refreshToken</code>, <code>accessTokenExpiresInSec</code></td><td><code>POST /auth/google</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="l2"><td><b class="n">2</b></td><td>다음 화면 분기</td><td><code>user.{userId, nickname, role, nicknameRequired}</code></td><td><code>POST /auth/google</code> · 새로고침 시 <code>refresh</code> → <code>GET /users/me</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="l3"><td><b class="n">3</b></td><td>닉네임 입력 · 규칙 위반</td><td>요청 <code>{nickname}</code>, <code>400 INVALID_INPUT</code>의 <code>message</code></td><td><code>PATCH /users/me/nickname</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="l4"><td><b class="n">4</b></td><td>중복 안내</td><td><code>409 NICKNAME_EXIST</code></td><td><code>PATCH /users/me/nickname</code></td><td><span class="pill good">명세 있음</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>로그인 · 닉네임 · 명세 검토 결과</h3>
+        <p class="note-line">보완할 곳이 없습니다. 입력하는 동안 중복을 미리 확인하는 API는 없지만, MVP에서는 제출할 때 <code>409</code>로 알려 주는 것으로 충분합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 메인 ===================== -->
+  <section class="screen" id="screen-main" aria-labelledby="tab-main" hidden>
+    <div>
+      <h2>② 메인 · 사건 카드 목록</h2>
+      <p class="lede">사건 카드는 로그인 없이 볼 수 있고, 카드를 골라 수사를 시작할 때 로그인이 필요합니다. 로그인한 사용자에게는 진행 중인 수사와 지난 수사 목록을 함께 보여줍니다.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><span>사용자</span>
+        <select id="m-user" aria-label="사용자">
+          <option value="player">로그인 · PLAYER</option>
+          <option value="admin">로그인 · ADMIN</option>
+          <option value="guest">비로그인</option>
+        </select>
+      </div>
+      <label class="toggle"><input type="checkbox" id="m-conflict"> 진행 중 수사 안내 창 (409)</label>
+    </div>
+    <div class="scroll">
+      <div class="frame">
+        <div class="topbar">
+          <span class="logo">Shelved</span>
+          <div class="right" data-user="in">
+            <b class="n" data-n="m1">1</b><span>셜록초보</span><span class="wf-btn ghost">닉네임 변경</span><span class="wf-btn ghost" data-user="admin">관리자 화면</span><span class="wf-btn ghost">로그아웃</span>
+          </div>
+          <div class="right" data-user="guest" hidden><span class="wf-btn primary">로그인</span></div>
+        </div>
+        <div class="page">
+          <div class="stack" data-user="in">
+            <div class="sec-h"><b class="n" data-n="m2">2</b><h3>진행 중인 수사</h3></div>
+            <div class="list">
+              <div class="list-row" style="grid-template-columns:52px 1fr 80px 90px 120px 110px">
+                <div class="ph thumb"></div><b>시계탑 저택의 마지막 종소리</b><span class="pill">쉬움</span><span class="pill">일시정지</span><span class="mono">남은 12:48</span><span class="wf-btn primary" style="justify-content:center">이어하기</span>
+              </div>
+              <div class="list-row" style="grid-template-columns:52px 1fr 80px 90px 120px 110px">
+                <div class="ph thumb"></div><b>안개 낀 부두의 목격자</b><span class="pill">보통</span><span class="pill bad">채점 실패</span><span class="mono">남은 0:00</span><span class="wf-btn" style="justify-content:center">다시 채점하기</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sec-h"><b class="n" data-n="m3">3</b><h3>사건</h3></div>
+          <div class="cards">
+            <div class="case-card">
+              <div class="ph">표지 이미지</div>
+              <span class="badge row"><b class="n" data-n="m4">4</b><span class="pill warn" data-user="in">진행 중</span></span>
+              <div class="body">
+                <b>시계탑 저택의 마지막 종소리</b>
+                <div class="tags"><span class="pill good">쉬움</span><span class="pill">저택</span><span class="pill">밀실</span><span class="pill">알리바이</span></div>
+                <span class="hint-text">제한시간 20분 · 힌트 5회 · 지목 3회</span>
+                <div class="row"><span class="row"><b class="n" data-n="m7">7</b><span class="wf-btn primary">수사 시작</span></span><button class="wf-btn ghost" data-go="ranking">랭킹</button></div>
+              </div>
+            </div>
+            <div class="case-card">
+              <div class="ph">표지 이미지</div>
+              <div class="body">
+                <b>안개 낀 부두의 목격자</b>
+                <div class="tags"><span class="pill warn">보통</span><span class="pill">항구</span><span class="pill">변장</span></div>
+                <span class="hint-text">제한시간 25분 · 힌트 3회 · 지목 3회</span>
+                <div class="row"><span class="wf-btn primary">수사 시작</span><button class="wf-btn ghost" data-go="ranking">랭킹</button></div>
+              </div>
+            </div>
+            <div class="case-card">
+              <div class="ph">표지 이미지</div>
+              <div class="body">
+                <b>붉은 장갑의 밤</b>
+                <div class="tags"><span class="pill bad">어려움</span><span class="pill">황야</span><span class="pill">전설</span></div>
+                <span class="hint-text">제한시간 35분 · 힌트 1회 · 지목 3회</span>
+                <div class="row"><span class="wf-btn primary">수사 시작</span><button class="wf-btn ghost" data-go="ranking">랭킹</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stack" data-user="in">
+            <div class="sec-h"><b class="n" data-n="m5">5</b><h3>지난 수사</h3></div>
+            <div class="list">
+              <div class="list-row" style="grid-template-columns:1fr 90px 130px 120px 110px">
+                <b>시계탑 저택의 마지막 종소리</b><span class="pill good">해결</span><span class="mono">15:12 걸림</span><span class="hint-text">10/04 20:11</span><span class="wf-btn" style="justify-content:center">결과 보기</span>
+              </div>
+              <div class="list-row" style="grid-template-columns:1fr 90px 130px 120px 110px">
+                <b>붉은 장갑의 밤</b><span class="pill bad">시간 만료</span><span class="mono">35:00</span><span class="hint-text">10/02 22:40</span><span class="wf-btn" style="justify-content:center">결과 보기</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog" id="m-dialog" hidden>
+          <div class="card">
+            <div class="row"><b class="n" data-n="m6">6</b><h3>진행 중인 수사가 있습니다</h3></div>
+            <p class="hint-text">이 사건은 이미 수사 중입니다. 새로 시작하지 않고 이어서 진행합니다.</p>
+            <div class="row" style="justify-content:flex-end"><span class="wf-btn ghost">취소</span><span class="wf-btn primary">이어하기</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spec">
+      <h3>메인 화면에 필요한 응답 필드</h3>
+      <div class="table-wrap">
+        <table class="fields">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr data-n="m1"><td><b class="n">1</b></td><td>사용자 메뉴</td><td><code>nickname</code>, <code>role</code> (ADMIN이면 관리자 화면 링크)</td><td><code>GET /users/me</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="m2"><td><b class="n">2</b></td><td>진행 중인 수사</td><td><code>roomId</code>, <code>caseId</code>, <code>displayTitle</code>, <code>difficulty</code>, <code>coverImageUrl</code>, <code>status</code>, <code>remainingMs</code>, <code>pendingGradingStatus</code></td><td><code>GET /rooms?status=ACTIVE</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="m3"><td><b class="n">3</b></td><td>사건 카드</td><td><code>caseId</code>, <code>displayTitle</code>, <code>difficulty</code>, <code>keywordTags</code>, <code>coverImageUrl</code>, <code>timeLimitSec</code>, <code>hintLimit</code>, <code>accusationLimit</code></td><td><code>GET /cases</code> (로그인 불필요)</td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="m4"><td><b class="n">4</b></td><td>"진행 중" 배지</td><td>2번 목록의 <code>caseId</code>와 카드를 조인 (프론트)</td><td>—</td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="m5"><td><b class="n">5</b></td><td>지난 수사</td><td><code>status</code>, <code>displayTitle</code>, <code>endedAt</code>, <code>durationSec</code></td><td><code>GET /rooms?status=ENDED</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="m6"><td><b class="n">6</b></td><td>진행 중 수사 안내</td><td><code>409 ROOM_ALREADY_EXISTS</code>의 <code>detail.roomId</code></td><td><code>POST /rooms</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="m7"><td><b class="n">7</b></td><td>수사 시작</td><td>요청 <code>{caseId}</code> → <code>roomId</code>, <code>status=READY</code>. 비로그인이면 로그인 화면으로</td><td><code>POST /rooms</code></td><td><span class="pill good">명세 있음</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>메인 화면 · 명세 반영 결과</h3>
+        <ol><li><b>반영함 (5).</b> <code>RoomSummaryResponse</code>에 <code>endedAt</code>, <code>durationSec</code>(종료 전 <code>null</code>)를 추가했습니다.</li><li><b>API 변경 없음.</b> 비로그인 사용자가 카드를 누르면, 로그인한 뒤 고른 사건으로 돌아오는 처리는 프론트에서 합니다.</li></ol>
+      </div>
+    </div>
+  <div class="gaps"><h3>목록이 비어 있는 경우</h3><p>진행 중: 진행 중인 수사가 없습니다. 사건을 골라 시작해 보세요.</p><p>지난 수사: 아직 완료한 수사가 없습니다.</p><p>사건 조회 실패: 목록을 불러오지 못했습니다. 다시 시도를 제공합니다. 비로그인 상태에서 수사 시작을 누르면 로그인으로 이동합니다.</p></div></section>
+
+  <!-- ===================== 게임 화면 ===================== -->
+  <section class="screen" id="screen-game" aria-labelledby="tab-game" hidden>
+    <div>
+      <h2>③ 게임 화면</h2>
+      <p class="lede">맵이 기본 화면이고, 오른쪽 패널에 한 가지 내용만 표시합니다. 개인 노트는 오른쪽 패널 왼편에 나란히 열리고, 범인 지목은 화면 전체를 덮는 별도 창입니다. 위쪽 조작 바로 상태를 바꿔 보세요. 세션 상태·지목 창·노트 저장 충돌에서는 구현할 때 헷갈리기 쉬운 예외 상태(27~30번)도 볼 수 있습니다.</p>
+    </div>
+
+    <div class="controls">
+      <div class="ctl"><span>오른쪽 패널</span>
+        <div class="seg" role="radiogroup" aria-label="오른쪽 패널">
+          <input type="radio" name="gpanel" id="gp-npc" value="npc" checked><label for="gp-npc">NPC 대화</label>
+          <input type="radio" name="gpanel" id="gp-log" value="log"><label for="gp-log">대화 기록</label>
+          <input type="radio" name="gpanel" id="gp-evi" value="evidence"><label for="gp-evi">물증 설명</label>
+          <input type="radio" name="gpanel" id="gp-hint" value="hint"><label for="gp-hint">힌트</label>
+          <input type="radio" name="gpanel" id="gp-brief" value="brief"><label for="gp-brief">사전 정보</label>
+          <input type="radio" name="gpanel" id="gp-none" value="none"><label for="gp-none">닫힘</label>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="g-note" checked> 개인 노트 열기</label>
+      <label class="toggle"><input type="checkbox" id="g-accuse"> 범인 지목 창</label>
+      <div class="ctl"><span>지목 창</span>
+        <div class="seg" role="radiogroup" aria-label="지목 창 상태">
+          <input type="radio" name="gacc" id="ga-result" value="result" checked><label for="ga-result">결과 표시</label>
+          <input type="radio" name="gacc" id="ga-grading" value="grading"><label for="ga-grading">채점 중</label>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="g-conflict"> 노트 저장 충돌</label>
+      <div class="ctl"><span>세션 상태</span>
+        <select id="g-state" aria-label="세션 상태">
+          <option value="progress">IN_PROGRESS · 진행 중</option>
+          <option value="ready">READY · 수사 시작 전</option>
+          <option value="paused">PAUSED · 재접속 복원</option>
+          <option value="awaiting">시간 종료 · 채점 대기</option>
+          <option value="ended">종료 · 기록 조회만 가능</option>
+          <option value="replaced">다른 화면에서 이어하기 (연결 교체)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="scroll">
+      <div class="frame" id="g-frame">
+        <!-- HUD -->
+        <div class="g-hud">
+          <div class="title"><b class="n" data-n="g1">1</b><b>시계탑 저택의 마지막 종소리</b><span class="pill">쉬움</span><span class="pill" id="g-status-pill">진행 중</span></div>
+          <div class="meters">
+            <div class="meter"><b class="n" data-n="g2">2</b><small>남은 시간</small><strong id="g-timer">12:48</strong></div>
+            <div class="meter"><b class="n" data-n="g3">3</b><small>힌트</small><strong>3</strong><small>/ 5 · 처리 중 0</small></div>
+            <div class="meter"><b class="n" data-n="g4">4</b><small>지목</small><strong id="g-acc-remain">2</strong><small id="g-acc-sub">/ 3</small></div>
+          </div>
+          <div class="actions">
+            <span class="wf-btn">사전 정보</span>
+            <span class="wf-btn">대화 기록</span>
+            <span class="wf-btn">힌트</span>
+            <span class="wf-btn">개인 노트</span>
+            <span class="wf-btn primary">범인 지목</span>
+            <span class="wf-btn ghost"><b class="n" data-n="g5">5</b>저장 후 나가기</span>
+          </div>
+        </div>
+
+        <div class="g-main">
+          <!-- MAP -->
+          <div class="g-map">
+            <span class="stop-badge pill bad" id="g-stop">창이 열려 있어 이동 중지</span>
+            <div class="room" style="left:40px;top:50px;width:300px;height:200px"><span class="lbl">서재</span></div>
+            <div class="room" style="left:360px;top:50px;width:220px;height:200px"><span class="lbl">주방</span></div>
+            <div class="room" style="left:40px;top:270px;width:540px;height:110px"><span class="lbl">복도</span></div>
+            <div class="room" style="left:40px;top:400px;width:250px;height:130px"><span class="lbl">응접실</span></div>
+
+            <div class="sprite" style="left:420px;top:130px"><i></i><span>해리스</span></div>
+            <div class="sprite" style="left:120px;top:440px"><i></i><span>마거릿</span></div>
+            <div class="sprite" style="left:480px;top:300px"><i></i><span>정원사 톰</span></div>
+            <div class="sprite evi" style="left:110px;top:120px"><i></i><span>작은 상자</span></div>
+            <div class="sprite evi" style="left:250px;top:180px"><i></i><span>찢긴 메모</span></div>
+
+            <div class="radius" style="left:385px;top:95px;width:96px;height:96px"></div>
+            <div class="sprite player" style="left:400px;top:190px"><i></i><span>나</span></div>
+            <div class="bubble" style="left:448px;top:96px"><b class="n" data-n="g8">8</b><span class="kbd">E</span> 대화 · 해리스</div>
+
+            <div class="map-tag">
+              <b class="n" data-n="g6">6</b><span class="lbl">Phaser 캔버스 · Tiled JSON · 충돌 레이어 · 상호작용 반경</span>
+              <b class="n" data-n="g7">7</b><span class="lbl">NPC·물증 배치</span>
+            </div>
+
+            <!-- READY / PAUSED 오버레이 -->
+            <div class="overlay" id="g-ov-ready" hidden>
+              <div class="card">
+                <div class="row"><b class="n" data-n="g9">9</b><h3>수사 준비 완료</h3></div>
+                <p class="hint-text">시작 전에는 시간이 차감되지 않습니다. 사전 정보를 확인한 뒤 수사 시작을 누르세요.</p>
+                <details open><summary>사전 정보</summary><p>사건 소개: 저택의 주인이 서재에서 숨진 채 발견되었습니다.</p><p>수사 목표: 범인과 범행 방법을 밝히세요.</p><p>배경지식: 사건 당시 저택에는 집사·가정부·정원사가 있었습니다.</p></details>
+                <div class="row"><span class="pill">제한시간 20:00</span><span class="pill">힌트 5회</span><span class="pill">지목 3회</span></div>
+                <span class="wf-btn primary" style="justify-content:center">수사 시작</span>
+              </div>
+            </div>
+            <div class="overlay" id="g-ov-paused" hidden>
+              <div class="card">
+                <div class="row"><b class="n" data-n="g9">9</b><h3>수사가 일시정지되었습니다</h3></div>
+                <p class="hint-text">대화·힌트·노트·남은 시간을 복원했습니다. 캐릭터는 시작점으로 돌아갑니다.</p>
+                <div class="stack">
+                  <div class="row between"><span>남은 시간</span><span class="mono">12:48</span></div>
+                  <div class="row between"><span>남은 힌트 / 지목</span><span class="mono">3 / 2</span></div>
+                  <div class="row between"><span>처리 중·실패한 요청</span><span class="pill bad">해리스에게 보낸 질문 1건 실패</span></div>
+                  <div class="row between"><span>이 기기의 미저장 노트 초안</span><span class="pill warn">있음 · 확인하기</span></div>
+                </div>
+                <button class="wf-btn" data-go="records">수사 기록 보기 · 읽기 전용</button><span class="wf-btn primary" style="justify-content:center">수사 이어하기</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- NOTE -->
+          <aside class="g-note" id="g-note-col" style="position:relative">
+            <div class="p-head"><b class="n" data-n="g21">21</b><h3>개인 노트</h3><span class="x"><span class="kbd">Esc</span><span class="wf-btn ghost">닫기</span></span></div>
+            <div class="note-paper">
+              <span style="color:var(--ink)">해리스: 9시엔 주방에서 은식기 닦았다고 함</span>
+              <span style="color:var(--ink)">→ 근데 서재 목소리는 들었다?</span>
+              <span style="color:var(--ink)">작은 상자 = 태엽 장치. 뭐에 쓰는 거지</span>
+              <div class="line" style="width:70%"></div><div class="line" style="width:50%"></div>
+              <span class="hint-text" style="margin-top:auto">직접 입력만 가능. 대화·물증은 자동으로 들어오지 않음</span>
+            </div>
+            <div class="p-foot">
+              <div class="row between"><span class="row"><b class="n" data-n="g22">22</b><span class="pill good">저장됨 · 14:06</span></span><span class="lbl">412 / 5000자</span></div>
+              <span class="hint-text">저장 중 / 저장됨 / 저장 실패(다시 시도) / 충돌(서버 내용과 내 초안 비교)</span>
+            </div>
+            <div class="dialog" id="g-conflict-dlg" hidden>
+              <div class="card" style="width:270px">
+                <div class="row"><b class="n" data-n="g28">28</b><h3>노트가 다른 곳에서 먼저 저장됐습니다</h3></div>
+                <span class="hint-text">자동으로 덮어쓰지 않았습니다. 두 내용을 비교해 고르세요.</span>
+                <div class="stack"><span class="lbl">서버에 저장된 내용 · rev 13</span><div class="fv" style="font-size:12px">해리스: 9시엔 주방…<br>마거릿: 9시 15분에 목소리</div></div>
+                <div class="stack"><span class="lbl">이 기기의 미저장 초안</span><div class="fv" style="font-size:12px">해리스: 9시엔 주방…<br>작은 상자 = 태엽 장치</div></div>
+                <span class="wf-btn">서버 내용으로 바꾸기</span>
+                <span class="wf-btn primary">내 초안으로 덮어쓰기</span>
+                <span class="hint-text">내 초안은 복사해 둘 수 있음 · 덮어쓰기는 rev 13 기준으로 다시 저장</span>
+              </div>
+            </div>
+          </aside>
+
+          <!-- RIGHT PANEL -->
+          <aside class="g-panel" id="g-panel">
+            <!-- NPC 대화 -->
+            <div data-view="npc" class="stack" style="flex:1;min-height:0;gap:0">
+              <div class="p-head"><div class="ph portrait">NPC</div><b class="n" data-n="g10">10</b><h3>해리스</h3><span class="x"><span class="kbd">Esc</span><span class="wf-btn ghost">닫기</span></span></div>
+              <div class="p-body">
+                <b class="n" data-n="g11">11</b>
+                <div class="msg me">어젯밤 9시에 어디 계셨나요?</div>
+                <div class="msg npc">그 시간이면 주방에서 은식기를 닦고 있었습니다. 서재에서 주인님 목소리를 들은 건 기억납니다만.</div>
+                <div class="msg me">목소리는 몇 시쯤 들으셨어요?</div>
+                <div class="msg npc">9시 15분쯤이었을 겁니다.</div>
+                <div class="msg fail">서재 근처에 다른 사람은 없었나요?
+                  <div class="meta"><span class="row"><b class="n" data-n="g12">12</b><span class="hint-text">답변을 받지 못했습니다</span></span><span class="wf-btn">다시 보내기</span></div>
+                </div>
+              </div>
+              <div class="p-foot">
+                <div class="row"><b class="n" data-n="g13">13</b><span class="hint-text">"범인이 누구야?" 같은 질문은 차단 → 행적·목격·물증을 물어보라고 안내 (기록되지 않음)</span></div>
+                <div class="row"><div class="input" style="flex:1">해리스에게 질문하기 (최대 500자)</div><span class="wf-btn primary">보내기</span></div>
+                <span class="hint-text">답변 생성 중에는 보내기 비활성화 · 입력 중 WASD/E 무시</span>
+              </div>
+            </div>
+
+            <!-- 대화 기록 -->
+            <div data-view="log" class="stack" style="flex:1;min-height:0;gap:0" hidden>
+              <div class="p-head"><h3>대화 기록</h3><span class="x"><span class="kbd">Esc</span><span class="wf-btn ghost">닫기</span></span></div>
+              <div class="p-body">
+                <div class="row"><b class="n" data-n="g14">14</b><span class="lbl">대화한 NPC</span></div>
+                <div class="npc-list">
+                  <div class="npc-item on"><div class="ph portrait"></div><span>해리스</span><span class="pill" style="margin-left:auto">6개 · 14:06</span></div>
+                  <div class="npc-item"><div class="ph portrait"></div><span>마거릿</span><span class="pill" style="margin-left:auto">2개 · 13:58</span></div>
+                  <div class="npc-item" style="opacity:.5"><div class="ph portrait"></div><span>정원사 톰</span><span class="pill" style="margin-left:auto">대화 없음</span></div>
+                </div>
+                <div class="row"><b class="n" data-n="g11">11</b><span class="lbl">해리스와의 원문 (읽기 전용)</span></div>
+                <div class="msg me">어젯밤 9시에 어디 계셨나요?</div>
+                <div class="msg npc">그 시간이면 주방에서 은식기를 닦고 있었습니다…</div>
+                <div class="msg me">목소리는 몇 시쯤 들으셨어요?</div>
+                <div class="msg npc">9시 15분쯤이었을 겁니다.</div>
+              </div>
+            </div>
+
+            <!-- 물증 -->
+            <div data-view="evidence" class="stack" style="flex:1;min-height:0;gap:0" hidden>
+              <div class="p-head"><b class="n" data-n="g15">15</b><h3>서재의 작은 상자</h3><span class="x"><span class="kbd">Esc</span><span class="wf-btn ghost">닫기</span></span></div>
+              <div class="p-body">
+                                <p>책장 뒤에서 발견된 손바닥만 한 나무 상자. 안쪽에 태엽 장치가 들어 있다.</p>
+                <span class="hint-text">다시 조사해도 같은 설명. 자동 수집 목록·노트 입력 없음</span>
+              </div>
+            </div>
+
+            <!-- 힌트 -->
+            <div data-view="hint" class="stack" style="flex:1;min-height:0;gap:0" hidden>
+              <div class="p-head"><h3>힌트</h3><span class="pill"><b class="n" data-n="g16">16</b> 남은 3 / 5</span><span class="x"><span class="kbd">Esc</span><span class="wf-btn ghost">닫기</span></span></div>
+              <div class="p-body">
+                <b class="n" data-n="g17">17</b>
+                <div class="hint-card">
+                  <div class="qa"><b>Q</b><span>누구 진술부터 확인해야 할까요?</span><b>A</b><span>사람들이 피해자의 목소리를 들었다고 말한 시각을 서로 비교해 보세요.</span></div>
+                  <div class="followup qa"><b>Q+</b><span>시각을 비교한다는 게 무슨 뜻이에요?</span><b>A+</b><span>각자 "몇 시에 무엇을 들었는지"를 나란히 적어 보라는 뜻입니다.</span></div>
+                  <span class="pill" style="align-self:flex-start">보충 질문 사용함</span>
+                </div>
+                <div class="hint-card">
+                  <div class="qa"><b>Q</b><span>작은 상자는 중요한가요?</span><b>A</b><span>그 상자가 무엇을 할 수 있는 물건인지 생각해 보세요.</span></div>
+                  <div class="row"><b class="n" data-n="g18">18</b><details><summary>이 힌트에 대해 다시 묻기 · 무료 1회</summary><p class="hint-text">기존 설명을 보충합니다. 새로운 정보를 요구해 안내 답변을 받아도 무료 보충 질문 1회는 사용됩니다.</p><textarea aria-label="무료 보충 질문" maxlength="500" placeholder="이 힌트에서 이해하기 어려운 점 (최대 500자)"></textarea><p><button class="wf-btn" data-demo="followup">무료 보충 질문 보내기</button></p><p id="followup-status" role="status"></p><label>보충 요청 상태 예시 <select id="followup-example"><option value="idle">입력 가능</option><option value="processing">생성 중</option><option value="failed">실패 · 같은 질문 재시도</option><option value="done">완료 · 1회 사용함</option></select></label></details></div>
+                </div>
+                <div class="hint-card" style="border-style:dashed;border-color:var(--mark);background:var(--mark-soft)">
+                  <div class="qa"><b>Q</b><span>정원사는 왜 늦게 왔나요?</span></div>
+                  <div class="row between"><span class="row"><b class="n" data-n="g19">19</b><span class="hint-text">답변을 받지 못했습니다 · 힌트 횟수는 차감되지 않았습니다</span></span><span class="wf-btn">다시 요청</span></div>
+                </div>
+              </div>
+              <div class="p-foot">
+                <div class="input area">새 힌트 질문 (최대 500자)</div>
+                <div class="row between"><span class="hint-text">전송하면 힌트 1회를 사용합니다 (남은 3회)</span><span class="wf-btn primary">새 힌트 요청</span></div>
+              </div>
+            </div>
+
+            <!-- 사전 정보 -->
+            <div data-view="brief" class="stack" style="flex:1;min-height:0;gap:0" hidden>
+              <div class="p-head"><b class="n" data-n="g20">20</b><h3>사전 정보</h3><span class="x"><span class="kbd">Esc</span><span class="wf-btn ghost">닫기</span></span></div>
+              <div class="p-body">
+                <div class="brief-sec"><span class="lbl">사건 소개</span><p>시계탑이 있는 저택에서 주인이 서재에서 숨진 채 발견되었다…</p><div class="line"></div><div class="line" style="width:80%"></div></div>
+                <div class="brief-sec"><span class="lbl">수사 목표</span><p>범인과 범행 방법을 밝혀라.</p></div>
+                <div class="brief-sec"><span class="lbl">배경지식</span><div class="line"></div><div class="line" style="width:90%"></div><div class="line" style="width:60%"></div></div>
+                <div class="row"><span class="pill">제한시간 20분</span><span class="pill">힌트 5회</span><span class="pill">지목 3회</span></div>
+                <span class="hint-text">진행 중 다시 읽으면 시간은 흐름 · 시작 전 READY에서는 시간 차감 없음</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- 범인 지목 창 -->
+        <div class="modal-back" id="g-accuse-modal" hidden>
+          <div class="modal">
+            <div class="m-main">
+              <div class="row between"><h3>범인 지목</h3><span class="row"><span class="pill">남은 기회 2 / 3</span><span class="wf-btn ghost">닫기</span></span></div>
+              <div class="stack"><div class="row"><b class="n" data-n="g23">23</b><span class="lbl">범인 선택 (대화할 수 없는 인물도 포함)</span></div>
+                <div class="sus-grid">
+                  <div class="sus on"><div class="ph">스프라이트</div>해리스</div>
+                  <div class="sus"><div class="ph">스프라이트</div>마거릿</div>
+                  <div class="sus"><div class="ph">스프라이트</div>정원사 톰</div>
+                  <div class="sus"><div class="ph">스프라이트</div>주치의 엘리스</div>
+                </div>
+              </div>
+              <div class="stack"><div class="row"><b class="n" data-n="g24">24</b><span class="lbl">트릭 설명 (10~3000자)</span></div>
+                <div class="input area" style="min-height:110px;color:var(--ink)">해리스가 8시 50분에 서재에 녹음기를 설치해, 9시 15분에 주인 목소리가 들리게 만들었다. 실제로 주인은 그보다 먼저 숨졌다.</div>
+              </div>
+              <div class="row between" data-acc="result"><span class="hint-text">Enter로는 제출되지 않음 · 채점 중에는 다시 제출할 수 없음</span><span class="wf-btn primary">제출하기</span></div>
+              <div class="stack" data-acc="grading" hidden>
+                <div class="row between"><span class="row"><b class="n" data-n="g29">29</b><span class="pill warn">채점 중… 0:12</span></span><span class="wf-btn primary disabled">제출하기</span></div>
+                <span class="hint-text">입력과 제출이 잠깁니다. 창을 닫거나 나가도 채점은 계속되며, 돌아오면 결과를 보여줍니다. 채점 중에도 시간은 흐르지만, 정답이면 기록은 제출 순간까지만 계산됩니다.</span>
+              </div>
+              <div class="attempt" style="border-color:var(--ink)" data-acc="result">
+                <div class="row"><b class="n" data-n="g26">26</b><b>채점 결과</b><span class="pill warn">부분 정답</span></div>
+                <span>녹음기를 짚은 것은 맞아요. 어디에, 어떤 목적으로 사용했을까요? 집사의 시간 관련 진술을 참고해 보세요.</span>
+              </div>
+            </div>
+            <div class="m-side">
+              <div class="row"><b class="n" data-n="g25">25</b><span class="lbl">이전 지목</span></div>
+              <div class="attempt">
+                <div class="row between"><b>1회차 · 해리스</b><span class="pill warn">부분 정답</span></div>
+                <span class="hint-text">"집사가 녹음기를 사용했다."</span>
+                <span>녹음기를 짚은 것은 맞아요. 어디에, 어떤 목적으로…</span>
+              </div>
+              <div class="attempt" style="border-style:dashed">
+                <div class="row between"><b>채점 실패</b><span class="pill bad">ERROR</span></div>
+                <span class="hint-text">기회는 차감되지 않았습니다. 14:21:05부터 같은 답안으로 다시 채점할 수 있습니다.</span>
+                <span class="wf-btn" style="align-self:flex-start">같은 답안 다시 채점</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dialog" id="g-ov-awaiting" style="z-index:5" hidden>
+          <div class="card" style="width:420px">
+            <div class="row"><b class="n" data-n="g30">30</b><h3>제한시간이 끝났습니다</h3></div>
+            <p class="hint-text">마감 전에 제출한 답안이 있어 채점 결과를 기다립니다. 새 조사·질문·힌트·지목은 할 수 없고, 기록은 계속 볼 수 있습니다.</p>
+            <div class="attempt"><div class="row between"><b>제출한 답안 · 해리스</b><span class="pill bad">채점 실패</span></div><span class="hint-text">"해리스가 8시 50분에 서재에 녹음기를 설치해…"</span></div>
+            <div class="row between"><span class="hint-text">14:21:05부터 다시 채점 가능 · 기회는 차감되지 않았습니다</span><span class="wf-btn primary">같은 답안 다시 채점</span></div>
+            <button class="wf-btn" data-go="records">수사 기록 보기 · 읽기 전용</button><div class="row between"><span class="hint-text">계속 실패하면 나중에 다시 시도할 수 있습니다</span><span class="wf-btn ghost">메인으로</span></div>
+          </div>
+        </div>
+        <div class="dialog" id="g-ov-replaced" style="z-index:5" hidden>
+          <div class="card" style="width:420px">
+            <div class="row"><b class="n" data-n="g27">27</b><h3>다른 화면에서 수사를 이어가고 있습니다</h3></div>
+            <p class="hint-text">같은 수사는 한 화면에서만 조작할 수 있습니다. 이 화면의 조작과 시간 측정을 멈췄습니다. 저장하지 못한 노트는 이 기기에 초안으로 남아 있습니다.</p>
+            <div class="row" style="justify-content:flex-end"><span class="wf-btn ghost">메인으로</span><span class="wf-btn primary">이 화면에서 계속하기</span></div>
+            <span class="hint-text">계속하기 = 일시정지 → 기록 복원 → 이어하기 (재접속과 같은 흐름). 다른 화면은 반대로 연결이 끊깁니다.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec">
+      <h3>게임 화면에 필요한 응답 필드</h3>
+      <p class="note-line">흐린 행은 지금 와이어프레임에 보이지 않는 요소입니다. 조작 바에서 패널을 바꾸면 해당 행이 진해집니다. 모든 응답은 <code>CommonResponse</code>의 <code>data</code> 안 필드입니다.</p>
+      <div class="table-wrap">
+        <table class="fields" id="g-table">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr class="grp"><td colspan="5">상단 HUD · 세션</td></tr>
+            <tr data-n="g1"><td><b class="n">1</b></td><td>사건명 · 난이도</td><td><code>displayTitle</code>, <code>difficulty</code></td><td><code>GET /rooms/{id}/state</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g2"><td><b class="n">2</b></td><td>남은 시간 · 상태 칩</td><td><code>timer.{status, remainingMs, timeLimitSec, awaitingGrading, serverTime}</code> — 받을 때마다 클라이언트 타이머 재보정</td><td><code>state</code> · <code>heartbeat</code> · <code>start</code>/<code>resume</code>/<code>pause</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g3"><td><b class="n">3</b></td><td>남은 힌트</td><td><code>hintCount.{remaining, reserved, limit}</code> — "처리 중" 표시는 <code>reserved</code></td><td><code>state</code> · <code>GET/POST hints</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g4"><td><b class="n">4</b></td><td>남은 지목</td><td><code>accusationCount.{remaining, reserved, limit}</code>, <code>pendingAccusation</code></td><td><code>state</code> · <code>accusations</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g5"><td><b class="n">5</b></td><td>저장 후 나가기</td><td>노트 <code>PUT</code> 성공 확인 → <code>pause</code> 응답의 <code>timer.status=PAUSED</code></td><td><code>PUT notes/me</code> → <code>POST pause</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g9"><td><b class="n">9</b></td><td>시작 / 이어하기 오버레이</td><td><code>timer.status</code>, <code>startedAt</code>, <code>aiRequests[]</code>(처리 중·실패 복원) → 버튼 누르면 <code>connectionId</code>, <code>heartbeatIntervalMs</code></td><td><code>state</code> → <code>start</code> / <code>resume</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr class="grp"><td colspan="5">맵 (Phaser)</td></tr>
+            <tr data-n="g6"><td><b class="n">6</b></td><td>맵 캔버스</td><td><code>mapUrl</code>, <code>spawnX</code>, <code>spawnY</code>, <code>collisionLayer</code>, <code>interactionRadiusPx</code></td><td><code>GET /rooms/{id}/map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g7"><td><b class="n">7</b></td><td>NPC · 물증 배치</td><td><code>suspects[].{suspectId, name, spriteKey, canConverse, x, y}</code>, <code>evidences[].{evidenceId, name, x, y}</code></td><td><code>map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g8"><td><b class="n">8</b></td><td>"E: 대화 · 이름" 안내</td><td><code>name</code>, <code>canConverse</code>(false면 "E: 대화" 대신 안내 없음 또는 다른 문구)</td><td><code>map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr class="grp"><td colspan="5">오른쪽 패널</td></tr>
+            <tr data-n="g10"><td><b class="n">10</b></td><td>NPC 대화 머리말</td><td><code>suspectName</code>(또는 <code>map.suspects[].name</code>), <code>spriteKey</code></td><td><code>GET npc/{suspectId}/messages</code> · <code>map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g11"><td><b class="n">11</b></td><td>대화 말풍선</td><td><code>messages[].{messageId, senderType, content, sequenceNo, createdAt}</code> / 질문 직후엔 <code>question</code>, <code>answer</code></td><td><code>GET messages</code> · <code>POST npc/{suspectId}/ask</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g12"><td><b class="n">12</b></td><td>실패한 질문 · 다시 보내기</td><td><code>pendingRequests[].{requestId, status, input.question, error.message}</code></td><td><code>GET messages</code>의 <code>pendingRequests</code> · <code>state</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g13"><td><b class="n">13</b></td><td>정답 요구 차단 안내</td><td><code>400 QUESTION_BLOCKED</code>의 <code>message</code></td><td><code>POST ask</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g14"><td><b class="n">14</b></td><td>대화 기록 NPC 목록</td><td><code>conversations[].{suspectId, messageCount, lastMessageAt}</code> + 이름은 <code>map.suspects</code>에서 조인</td><td><code>state</code> · <code>map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g15"><td><b class="n">15</b></td><td>물증 설명</td><td><code>evidenceId</code>, <code>name</code>, <code>description</code> (이미지 필드 없음)</td><td><code>POST evidences/{id}/inspect</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g16"><td><b class="n">16</b></td><td>힌트 남은 횟수 · 차감 안내</td><td><code>hintCount.{remaining, reserved}</code></td><td><code>GET hints</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g17"><td><b class="n">17</b></td><td>힌트 기록</td><td><code>hints[].{hintId, question, content, createdAt, followup.{question, content}}</code></td><td><code>GET hints</code> · <code>POST hints</code> · <code>followup</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g18"><td><b class="n">18</b></td><td>"다시 묻기" 버튼</td><td><code>hints[].followupAvailable</code></td><td><code>GET hints</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g19"><td><b class="n">19</b></td><td>실패한 힌트 · 다시 요청</td><td><code>pendingRequests[type=HINT|HINT_FOLLOWUP]</code></td><td><code>GET hints</code>의 <code>pendingRequests</code> · <code>state</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g20"><td><b class="n">20</b></td><td>사전 정보</td><td><code>introduction</code>, <code>investigationGoal</code>, <code>backgroundKnowledge</code>, <code>timeLimitSec</code>, <code>hintLimit</code>, <code>accusationLimit</code></td><td><code>GET /rooms/{id}/briefing</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr class="grp"><td colspan="5">개인 노트</td></tr>
+            <tr data-n="g21"><td><b class="n">21</b></td><td>노트 본문 · 글자 수</td><td><code>content</code>, <code>revision</code>, <code>maxLength</code>, <code>editable</code>(false면 읽기 전용)</td><td><code>GET/PUT notes/me</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g22"><td><b class="n">22</b></td><td>저장 상태 · 충돌</td><td><code>updatedAt</code>, 충돌 시 <code>409 NOTE_REVISION_CONFLICT</code>의 <code>detail.{currentRevision, currentContent}</code> + 브라우저 로컬 초안</td><td><code>PUT notes/me</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr class="grp"><td colspan="5">범인 지목 창</td></tr>
+            <tr data-n="g23"><td><b class="n">23</b></td><td>범인 선택지</td><td><code>map.suspects[]</code> (좌표가 <code>null</code>인 인물 포함)</td><td><code>map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g24"><td><b class="n">24</b></td><td>트릭 설명 · 제출</td><td>요청 <code>{requestId, suspectId, trickExplanation}</code>, 남은 기회 <code>accusationCount.remaining</code></td><td><code>POST accusations</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g25"><td><b class="n">25</b></td><td>이전 지목 · 재채점</td><td><code>accusations[].{attemptNo, suspectName, trickExplanation, gradingStatus, verdict, feedback, retryAvailableAt, superseded}</code></td><td><code>GET accusations</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g26"><td><b class="n">26</b></td><td>채점 결과</td><td><code>accusation.{verdict, feedback}</code>, <code>accusationCount</code>, <code>roomStatus</code>(종료면 결과 화면으로)</td><td><code>POST accusations</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr class="grp"><td colspan="5">예외 상태</td></tr>
+            <tr data-n="g27"><td><b class="n">27</b></td><td>연결 교체 안내</td><td>하트비트·조작 API의 <code>409 CONNECTION_REPLACED</code>. 계속하기는 <code>pause</code> → <code>state</code>·<code>notes/me</code>·<code>hints</code>·<code>accusations</code> → <code>resume</code>(새 <code>connectionId</code>)</td><td><code>heartbeat</code> · <code>pause</code> · <code>resume</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g28"><td><b class="n">28</b></td><td>노트 저장 충돌</td><td><code>409 NOTE_REVISION_CONFLICT</code>의 <code>detail.{currentRevision, currentContent}</code> + 브라우저 로컬 초안. 덮어쓰기는 <code>PUT {content: 내 초안, revision: currentRevision}</code></td><td><code>PUT notes/me</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g29"><td><b class="n">29</b></td><td>지목 채점 중</td><td><code>202</code> <code>{requestId, status=PROCESSING}</code> → 2초마다 <code>GET ai-requests/{requestId}</code>. HUD는 <code>accusationCount.reserved</code>. 재접속 시 <code>state.pendingAccusation</code></td><td><code>POST accusations</code> · <code>GET ai-requests</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="g30"><td><b class="n">30</b></td><td>시간 종료 · 채점 대기</td><td><code>timer.awaitingGrading=true</code>, <code>remainingMs=0</code>, <code>pendingAccusation.{gradingStatus, retryAvailableAt, suspectName, trickExplanation}</code>. 재채점은 같은 <code>requestId</code>·답안으로 <code>POST accusations</code>(연결 헤더 불필요), 응답 <code>roomStatus</code>가 종료면 결과 화면으로</td><td><code>state</code> · <code>heartbeat</code> · <code>POST accusations</code></td><td><span class="pill good">명세 있음</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>게임 화면 · 명세 반영 결과</h3>
+        <ol><li><b>반영함 (12, 19).</b> <code>GET messages</code>와 <code>GET hints</code> 응답에 처리 중·실패 요청 <code>pendingRequests</code>를 추가했습니다.</li><li><b>바꾸지 않음.</b> 물증은 텍스트만 쓰고 이미지 필드는 두지 않습니다. 대화할 수 없는 인물의 안내 문구는 프론트에서 정합니다.</li></ol>
+      </div>
+    </div>
+  <div class="gaps"><h3>로딩·저장·읽기 전용 상태</h3><label>남은 힌트 예시 <select id="g-hint-left"><option value="3">3회</option><option value="0">0회 · 미사용 보충 질문은 가능</option></select></label>
+<label>로딩·복원 <select id="g-load"><option value="done">완료</option><option value="loading">로딩 중</option><option value="failed">맵 또는 기록 복원 실패</option></select></label><p id="g-load-status" role="status"></p>
+<button class="wf-btn" data-go="main">메인으로</button>
+<details><summary>저장 후 나가기 실패</summary><p>노트 저장에 실패했습니다. 입력은 이 기기의 초안으로 보존했습니다. 저장 후 나가기는 아직 완료되지 않았고 접속 중에는 시간이 흐릅니다.</p><button class="wf-btn" data-demo="save">노트 저장 다시 시도</button><p id="save-status" role="status"></p><p>노트 저장 후 일시정지 요청이 실패하면 화면을 유지하고 ‘일시정지 다시 시도’를 제공합니다. PAUSED 확인 후 메인으로 이동합니다.</p></details>
+<p id="g-readonly-status"></p><button class="wf-btn" data-go="records">수사 기록 보기</button>
+<label><input type="checkbox" id="g-test"> 관리자 테스트</label><span id="g-test-banner" hidden>관리자 테스트 · 랭킹 제외 <button class="wf-btn" data-go="apub">맵·테스트 화면으로</button></span>
+<p>기록 보기와 읽기 전용 상태에서는 새 질문·힌트·보충 질문·지목·노트 편집을 허용하지 않습니다. 마감 전 유효한 답안의 동일 재채점만 예외입니다.</p>
+<p>힌트 0회: 새 힌트 요청 비활성화, 기록 열람과 미사용 무료 보충 질문은 진행 중에 계속 허용합니다. 보충 질문 생성 중에는 해당 입력·전송을 잠그며 실패 시 같은 질문 재시도와 ‘횟수 미차감’을 표시합니다.</p></div></section>
+
+  <!-- ===================== 리빌 · 랭킹 ===================== -->
+  <section class="screen" id="screen-reveal" aria-labelledby="tab-reveal" hidden>
+    <div>
+      <h2>④ 리빌 · 랭킹</h2>
+      <p class="lede">세션이 최종 종료(<code>CLEARED</code>/<code>FAILED</code>/<code>EXPIRED</code>)되면 원작을 공개하는 결과 화면입니다. 성공 여부와 관계없이 원작·범인·트릭을 보여주고, 오른쪽에 사건별 랭킹을 붙였습니다. 종료된 세션은 메인의 "결과 보기"로 다시 열 수 있습니다.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><span>결과</span>
+        <select id="r-result" aria-label="결과">
+          <option value="CLEARED">CLEARED · 해결</option>
+          <option value="FAILED">FAILED · 지목 3회 소진</option>
+          <option value="EXPIRED">EXPIRED · 시간 만료</option>
+        </select>
+      </div>
+    </div>
+    <div class="controls"><label>이전 성공 기록 <select id="r-best"><option value="none">없음</option><option value="faster">있음 · 14:30 (이번 성공보다 빠름)</option><option value="slower">있음 · 17:00 (이번 성공보다 느림)</option></select></label></div>
+    <div class="scroll">
+      <div class="frame">
+        <div class="reveal">
+          <div class="left">
+            <div class="status-banner">
+              <div class="row"><b class="n" data-n="r1">1</b><span class="lbl">시계탑 저택의 마지막 종소리 · 10/04 20:11 종료</span></div>
+              <b id="r-title">사건을 해결했습니다</b>
+              <span class="hint-text" id="r-sub">2번째 지목에서 범인과 트릭을 모두 맞혔습니다.</span>
+            </div>
+            <div class="book">
+              <div class="ph">원작<br>표지 자리</div>
+              <div class="stack">
+                <div class="row"><b class="n" data-n="r2">2</b><span class="lbl">이 사건의 원작은</span></div>
+                <b style="font-size:17px">(가상) 『The Last Chime』</b>
+                <span>(가상) 작가명</span>
+                <div class="line" style="width:90%"></div><div class="line" style="width:60%"></div>
+                <span class="hint-text">원작 소개 (<code>novelIntro</code>)</span>
+              </div>
+            </div>
+            <div class="row" style="align-items:flex-start;gap:14px">
+              <div class="stack" style="width:150px;flex:none">
+                <div class="row"><b class="n" data-n="r3">3</b><span class="lbl">범인</span></div>
+                <div class="ph" style="height:90px">스프라이트</div>
+                <b>해리스</b>
+              </div>
+              <div class="stack" style="flex:1;min-width:0">
+                <div class="row"><b class="n" data-n="r4">4</b><span class="lbl">트릭</span></div>
+                <b>녹음기로 피해자가 살아 있는 시각을 조작했다</b>
+                <span class="lbl" style="margin-top:6px">해설</span>
+                <div class="line"></div><div class="line" style="width:95%"></div><div class="line" style="width:88%"></div><div class="line" style="width:70%"></div>
+              </div>
+            </div>
+            <div class="stack">
+              <div class="row"><b class="n" data-n="r5">5</b><span class="lbl">플레이 기록</span></div>
+              <div class="tiles">
+                <div class="tile"><span class="lbl">걸린 시간</span><strong id="r-dur">15:12</strong></div>
+                <div class="tile"><span class="lbl">힌트 사용</span><strong>2회</strong></div>
+                <div class="tile"><span class="lbl">지목</span><strong id="r-acc">2회</strong></div>
+              </div>
+            </div>
+            <div class="stack">
+              <div class="row"><b class="n" data-n="r6">6</b><span class="lbl">내 지목 기록</span></div>
+              <div class="attempt"><div class="row between"><b>1회차 · 해리스</b><span class="pill warn">부분 정답</span></div><span class="hint-text">"집사가 녹음기를 사용했다."</span></div>
+              <div class="attempt"><div class="row between"><b>2회차 · 해리스</b><span class="pill good" id="r-last">정답</span></div><span class="hint-text">"해리스가 8시 50분에 서재에 녹음기를 설치해…"</span></div>
+            </div>
+          </div>
+          <div class="right">
+            <div class="row"><b class="n" data-n="r7">7</b><h3>랭킹</h3><span class="hint-text" style="margin-left:auto">사용자별 최고 기록 · 힌트 사용량은 반영하지 않음</span></div>
+            <div class="banner" id="r-my"><span class="lbl">내 최고 기록</span><b>2위</b><span class="mono">15:12</span></div>
+            <div class="banner" id="r-my-none" hidden><span class="hint-text">아직 성공 기록이 없습니다. 실패·시간 만료 기록은 랭킹에 들어가지 않습니다.</span></div>
+            <div class="list" style="background:var(--surface)">
+              <div class="rank-row head" style="background:var(--fill-2)"><span class="lbl">순위</span><span class="lbl"><b class="n" data-n="r8">8</b> 닉네임</span><span class="lbl" style="text-align:right">시간</span></div>
+              <div class="rank-row"><span class="mono" style="text-align:left">1</span><span>왓슨</span><span class="mono">14:00</span></div>
+              <div class="rank-row me"><span class="mono" style="text-align:left">2</span><span>셜록초보</span><span class="mono">15:12</span></div>
+              <div class="rank-row"><span class="mono" style="text-align:left">2</span><span>포와로</span><span class="mono">15:12</span></div>
+              <div class="rank-row"><span class="mono" style="text-align:left">4</span><span>마플</span><span class="mono">16:41</span></div>
+            </div>
+            <span class="hint-text">같은 초는 공동 순위, 다음 순위는 건너뜀 (1·2·2·4)</span>
+            <div class="row" style="margin-top:auto"><b class="n" data-n="r9">9</b><button class="wf-btn" data-go="records">수사 기록 보기</button><span class="wf-btn primary">다시 도전</span><span class="wf-btn ghost">메인으로</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spec">
+      <h3>리빌 · 랭킹에 필요한 응답 필드</h3>
+      <div class="table-wrap">
+        <table class="fields">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr data-n="r1"><td><b class="n">1</b></td><td>결과 머리말</td><td><code>status</code>, <code>displayTitle</code>, <code>endedAt</code>, <code>isTest</code>(테스트면 "랭킹 미반영" 표시)</td><td><code>GET /rooms/{id}/result</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r2"><td><b class="n">2</b></td><td>원작 공개</td><td><code>source.{novelTitle, novelAuthor, novelIntro}</code></td><td><code>result</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r3"><td><b class="n">3</b></td><td>범인</td><td><code>culprit.{suspectId, name}</code>, 스프라이트는 <code>map.suspects[].spriteKey</code>와 조인</td><td><code>result</code> · <code>map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r4"><td><b class="n">4</b></td><td>트릭 · 해설</td><td><code>trickSummary</code>, <code>revealExplanation</code></td><td><code>result</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r5"><td><b class="n">5</b></td><td>플레이 기록</td><td><code>durationSec</code>, <code>hintUsedCount</code>, <code>accusationCompletedCount</code></td><td><code>result</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r6"><td><b class="n">6</b></td><td>내 지목 기록</td><td><code>accusations[].{attemptNo, suspectName, trickExplanation, verdict, feedback}</code></td><td><code>result</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r7"><td><b class="n">7</b></td><td>내 최고 기록</td><td><code>myRanking.{rank, durationSec, clearedAt}</code> (없으면 <code>null</code>)</td><td><code>GET /rankings/{caseId}</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r8"><td><b class="n">8</b></td><td>랭킹 목록</td><td><code>rankingPage.content[].{rank, nickname, durationSec, clearedAt}</code>, <code>totalPages</code></td><td><code>GET /rankings/{caseId}</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="r9"><td><b class="n">9</b></td><td>다시 도전</td><td>요청 <code>{caseId}</code> → <code>roomId</code></td><td><code>POST /rooms</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>리빌 · 랭킹 · 명세 반영 결과</h3>
+        <ol><li><b>반영함 (2).</b> 원작 소개 문장 <code>novelIntro</code>를 초안(<code>draft.source</code>) → <code>CASES.source_novel_intro</code> → 결과 응답 <code>source</code>로 추가했습니다. 리빌 전에는 내려주지 않는 정답 보호 필드입니다.</li><li><b>제외.</b> "최고 기록 갱신" 표시는 넣지 않기로 했습니다.</li></ol>
+      </div>
+    </div>
+  <div class="gaps"><p>관리자 테스트 결과에서는 랭킹·다시 도전을 숨기고 ‘관리자 테스트 · 랭킹 제외’와 아래 복귀 버튼을 표시합니다.</p><button class="wf-btn" data-go="apub">맵·테스트 화면으로</button></div></section>
+
+<section class="screen" id="screen-ranking" aria-labelledby="tab-ranking" hidden><h2>사건별 랭킹</h2><p class="lede">메인 카드의 랭킹에서 진입합니다. 원작·범인·트릭·리빌 API를 사용하지 않습니다.</p><div class="frame narrow"><div class="page"><h3>시계탑 저택의 마지막 종소리</h3><p>성공한 일반 플레이의 사용자별 최고 기록 · 힌트 횟수 무관 · 일시정지 제외</p><div class="list"><div class="rank-row"><b>1</b><span>왓슨</span><span>14:00</span></div><div class="rank-row"><b>2</b><span>셜록초보</span><span>15:12</span></div><div class="rank-row"><b>2</b><span>포와로</span><span>15:12</span></div><div class="rank-row"><b>4</b><span>마플</span><span>16:41</span></div></div><details><summary>성공 기록이 없는 경우</summary><p>아직 등록된 성공 기록이 없습니다.</p></details><button class="wf-btn" data-go="main">사건 목록으로</button></div></div><div class="spec"><h3>사용 데이터</h3><p>기존 사건별 랭킹 조회의 순위·닉네임·완료 시간과 공개 사건명만 사용합니다. 로그인한 사용자만 열람하며(비로그인 사용자가 랭킹을 누르면 로그인 화면으로 이동), 원작 정보는 포함하지 않습니다.</p></div></section>
+<section class="screen" id="screen-records" aria-labelledby="tab-records" hidden><h2>수사 기록 · 읽기 전용</h2><p class="lede">일시정지·채점 대기·종료 화면에서 진입합니다. 조회 중 세션을 재개하지 않습니다.</p><div class="frame narrow"><div class="page"><details open><summary>NPC 대화 원문 · 해리스</summary><p>나: 어젯밤 9시에 어디 계셨나요?</p><p>해리스: 주방에서 은식기를 닦고 있었습니다.</p></details><details><summary>힌트·보충 질문 기록</summary><p>Q: 누구 진술부터 확인해야 할까요?</p><p>A: 목소리를 들었다고 말한 시각을 비교해 보세요.</p><p>보충 질문: 시각 비교란 무엇인가요? / 각자 몇 시에 무엇을 들었는지 나란히 적어 보세요.</p></details><details><summary>서버에 저장된 개인 노트</summary><p>해리스는 9시엔 주방에 있었다고 함.</p><p>저장된 내용 · 편집 불가</p></details><details><summary>이 기기의 미저장 초안</summary><textarea readonly aria-label="복사 가능한 미저장 노트">작은 상자 = 태엽 장치. 뭐에 쓰는 거지</textarea><p>텍스트를 선택해 복사할 수 있습니다. 다른 기기로 동기화되지 않습니다. 이어하기 후 확인하여 저장하세요.</p></details><p>대화와 힌트가 없으면 ‘아직 기록이 없습니다’를 표시합니다. 물증 자동 수집 목록은 제공하지 않습니다.</p><button class="wf-btn" id="records-back">이전 화면으로</button><button class="wf-btn" data-go="main">메인으로</button></div></div><div class="spec"><h3>사용 데이터와 허용 동작</h3><p>기존 NPC messages·hints·notes/me 조회와 브라우저의 사용자·세션별 초안을 사용합니다. 새 AI 요청·실패 요청 재실행·서버 노트 저장은 제공하지 않습니다. 종료 전에는 원작과 정답을 조회하지 않습니다.</p></div></section>
+  <!-- ===================== 관리자 사건 목록 ===================== -->
+  <section class="screen" id="screen-alist" aria-labelledby="tab-alist" hidden>
+    <div>
+      <h2>⑤ 관리자 사건 목록</h2>
+      <p class="lede">관리자가 처음 보는 화면입니다. 행을 누르면 사건 상태에 따라 다른 화면으로 갑니다: <code>DRAFT</code>는 사건 제작(⑥), <code>CONTENT_CONFIRMED</code>는 맵·테스트·출시(⑦), <code>PUBLISHED</code>는 잠긴 읽기 전용 화면입니다.</p>
+    </div>
+    <div class="scroll">
+      <div class="frame">
+        <div class="topbar">
+          <span class="logo">Shelved 관리자</span>
+          <span class="wf-btn primary">사건 목록</span><span class="wf-btn ghost">AI 사용량</span>
+          <div class="right"><b class="n" data-n="al5">5</b><span class="pill warn">이번 달 예산 82%</span><span class="wf-btn ghost">플레이 화면으로</span></div>
+        </div>
+        <div class="page">
+          <div class="row between">
+            <div class="row"><b class="n" data-n="al1">1</b><span class="wf-btn primary">전체 4</span><span class="wf-btn">DRAFT 2</span><span class="wf-btn">CONTENT_CONFIRMED 1</span><span class="wf-btn">PUBLISHED 1</span></div>
+            <span class="row"><b class="n" data-n="al2">2</b><span class="wf-btn primary">+ 새 사건</span></span>
+          </div>
+          <div class="list">
+            <div class="list-row head" style="grid-template-columns:44px 1.4fr 1.2fr 70px 150px 70px 130px 100px 130px"><span>#</span><span><b class="n" data-n="al3">3</b> 카드 표시명</span><span>원작</span><span>난이도</span><span>상태</span><span>원문</span><span>테스트</span><span>수정</span><span></span></div>
+            <div class="list-row" style="grid-template-columns:44px 1.4fr 1.2fr 70px 150px 70px 130px 100px 130px"><span class="mono">8</span><span class="hint-text">(제목 미정)</span><span class="hint-text">—</span><span>—</span><span class="pill">DRAFT</span><span class="pill bad">없음</span><span>—</span><span class="hint-text">10/25</span><span class="row"><b class="n" data-n="al4">4</b><span class="wf-btn">제작 →</span></span></div>
+            <div class="list-row" style="grid-template-columns:44px 1.4fr 1.2fr 70px 150px 70px 130px 100px 130px"><span class="mono">7</span><b>시계탑 저택의 마지막 종소리</b><span>(가상) The Last Chime</span><span>쉬움</span><span class="pill">DRAFT</span><span class="pill good">있음</span><span>—</span><span class="hint-text">10/05</span><span class="wf-btn">제작 →</span></div>
+            <div class="list-row" style="grid-template-columns:44px 1.4fr 1.2fr 70px 150px 70px 130px 100px 130px"><span class="mono">5</span><b>안개 낀 부두의 목격자</b><span>(가상) The Fog Pier</span><span>보통</span><span class="pill warn">CONTENT_CONFIRMED</span><span class="pill good">있음</span><span class="pill warn">미종료 1</span><span class="hint-text">10/03</span><span class="wf-btn">맵·테스트 →</span></div>
+            <div class="list-row" style="grid-template-columns:44px 1.4fr 1.2fr 70px 150px 70px 130px 100px 130px"><span class="mono">3</span><b>붉은 장갑의 밤</b><span>(가상) Red Gloves</span><span>어려움</span><span class="pill good">PUBLISHED</span><span class="pill good">있음</span><span class="pill good">확인됨</span><span class="hint-text">09/30</span><span class="row"><b class="n" data-n="al6">6</b><span class="wf-btn">초안으로 복제</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spec">
+      <h3>관리자 사건 목록에 필요한 응답 필드</h3>
+      <div class="table-wrap">
+        <table class="fields">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr data-n="al1"><td><b class="n">1</b></td><td>상태 필터 · 개수</td><td>쿼리 <code>?status=</code>. 개수는 전체 목록을 받아 프론트에서 셈</td><td><code>GET /admin/cases</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="al2"><td><b class="n">2</b></td><td>새 사건</td><td><code>201 {caseId, status}</code> → 제작 화면으로</td><td><code>POST /admin/cases</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="al3"><td><b class="n">3</b></td><td>사건 행</td><td><code>caseId</code>, <code>displayTitle</code>, <code>sourceNovelTitle</code>, <code>difficulty</code>, <code>status</code>, <code>hasSourceText</code>, <code>unfinishedTestRoomCount</code>, <code>testVerified</code>, <code>updatedAt</code></td><td><code>GET /admin/cases</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="al4"><td><b class="n">4</b></td><td>상태별 이동</td><td><code>status</code></td><td>—</td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="al5"><td><b class="n">5</b></td><td>예산 경고 배지</td><td><code>currentMonth.{alertLevel, usagePercent}</code></td><td><code>GET /admin/llm-usage</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="al6"><td><b class="n">6</b></td><td>초안으로 복제</td><td><code>201 {caseId, status=DRAFT}</code></td><td><code>POST /admin/cases/{id}/clone</code></td><td><span class="pill good">명세 있음</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>관리자 사건 목록 · 명세 검토 결과</h3>
+        <p class="note-line">보완할 곳이 없습니다. 예산 배지를 위해 <code>GET /admin/llm-usage</code>를 한 번 더 부르지만, 관리자 화면에서만 쓰므로 부담이 없습니다. 목록에 표지 썸네일이나 "채팅 처리 중" 표시가 필요해지면 그때 <code>coverImageUrl</code>, <code>chatProcessing</code>을 추가하면 됩니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 관리자 화면 ===================== -->
+  <section class="screen" id="screen-admin" aria-labelledby="tab-admin" hidden>
+    <div>
+      <h2>⑥ 관리자 사건 제작</h2>
+      <p class="lede">왼쪽은 AI와의 제작 채팅, 오른쪽은 채팅 응답의 <code>draft</code>로 매번 다시 그리는 메모장입니다. 메모장은 읽기 전용이며 수정은 채팅으로 지시합니다(기획서 4.2절). 메모장 탭은 와이어프레임 안에서 직접 눌러 볼 수 있습니다.</p>
+    </div>
+
+    <div class="controls">
+      <div class="ctl"><span>채팅 상태</span>
+        <div class="seg" role="radiogroup" aria-label="채팅 상태">
+          <input type="radio" name="achat" id="ac-normal" value="normal" checked><label for="ac-normal">대기</label>
+          <input type="radio" name="achat" id="ac-proc" value="processing"><label for="ac-proc">AI 응답 생성 중</label>
+          <input type="radio" name="achat" id="ac-fail" value="failed"><label for="ac-fail">요청 실패</label>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="a-issues" checked> 확정 전 검사 표시</label>
+    </div>
+
+    <div class="scroll">
+      <div class="frame">
+        <div class="a-top">
+          <b class="n" data-n="a1">1</b>
+          <div class="stack" style="gap:0">
+            <span class="crumb">관리자 › 사건 목록 › #7</span>
+            <b style="font-size:15px">시계탑 저택의 마지막 종소리</b>
+          </div>
+          <div class="steps" style="margin-left:18px"><b class="n" data-n="a2">2</b><span class="on">DRAFT</span><em>→</em><span>CONTENT_CONFIRMED</span><em>→</em><span>PUBLISHED</span></div>
+          <div class="row" style="margin-left:auto">
+            <span class="wf-btn ghost">사용량 대시보드</span>
+            <span class="wf-btn primary" id="a-confirm-btn">콘텐츠 확정</span>
+          </div>
+        </div>
+        <div class="a-sub">
+          <span class="row"><b class="n" data-n="a3">3</b><span class="lbl">원문</span><span class="pill">clocktower.txt · 418,203자 · 10/02 업로드</span><span class="wf-btn ghost" id="a-src-btn">원문 교체</span></span>
+          <span class="row"><b class="n" data-n="a4">4</b><span class="lbl">표지</span><div class="ph" style="width:44px;height:28px">img</div><span class="wf-btn ghost">표지 업로드</span></span>
+          <span class="hint-text" style="margin-left:auto">초안 갱신 10/05 14:12</span>
+        </div>
+
+        <div class="a-main">
+          <!-- CHAT -->
+          <div class="a-chat">
+            <div class="p-head"><h3>제작 채팅</h3><span class="x"><span class="lbl">사건당 한 번에 한 요청</span></span></div>
+            <div class="p-body">
+              <b class="n" data-n="a5">5</b>
+              <div class="msg me">원문을 읽고 등장인물을 정리해 줘. 대화 가능한 인물과 아닌 인물을 구분하고, 각자 아는 사실과 숨기는 사실에 원문 근거를 붙여 줘.</div>
+              <div class="msg npc">등장인물 4명을 정리했습니다. 해리스(집사)는 9시 행적에 대해 거짓말을 하는 인물로 설정했고, 근거는 2장 4문단입니다. 주치의 엘리스는 원작에서 사건 당일 저택에 없었으므로 대화 불가로 두었습니다.
+                <div class="tool-chips"><b class="n" data-n="a6">6</b><span class="tool-chip">add_suspect · sus-1 해리스</span><span class="tool-chip">add_suspect · sus-2 마거릿</span><span class="tool-chip">add_suspect · sus-3 톰</span><span class="tool-chip">add_suspect · sus-4 엘리스</span><span class="tool-chip">set_glossary_term · Harris</span></div>
+              </div>
+              <div class="msg me">해리스가 추궁받을 때 너무 쉽게 털어놓지 않게 해 줘. 원작에서도 끝까지 부인하잖아.</div>
+              <div class="msg npc">해리스의 추궁 반응을 "모순을 추궁받아도 자백하지 않고 답변을 거부한다"로 바꿨습니다. 진술 변경 조건은 두지 않았습니다.
+                <div class="tool-chips"><span class="tool-chip">update_suspect · sus-1 persona.pressureResponse 변경</span></div>
+                <div class="row" style="margin-top:6px"><b class="n" data-n="a7">7</b><span class="pill warn">입력: 대화 이력 요약됨 · 182k 토큰</span></div>
+              </div>
+            </div>
+            <div class="p-foot" data-chat="normal">
+              <div class="input area">AI에게 수정 지시하기 (최대 10,000자)</div>
+              <div class="row between"><span class="hint-text">Enter 줄바꿈 · ⌘+Enter 전송</span><span class="wf-btn primary">보내기</span></div>
+            </div>
+            <div class="p-foot" data-chat="processing" hidden>
+              <div class="row"><b class="n" data-n="a8">8</b><span class="pill warn">AI 응답 생성 중… 0:42</span></div>
+              <span class="hint-text">처리 중에는 추가 전송 · 콘텐츠 확정 · 원문 교체가 잠깁니다. 창을 닫아도 서버에서 계속 처리합니다.</span>
+              <div class="input area" style="opacity:.5">입력 잠김</div>
+            </div>
+            <div class="p-foot" data-chat="failed" hidden>
+              <div class="msg fail" style="max-width:100%;align-self:stretch">정원사 톰의 알리바이를 원문 근거와 함께 보강해 줘.
+                <div class="meta"><span class="row"><b class="n" data-n="a5">5</b><span class="hint-text">AI 응답을 받지 못했습니다 · 초안은 바뀌지 않았습니다</span></span><span class="wf-btn">같은 메시지로 재시도</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MEMO -->
+          <div class="a-memo">
+            <div class="memo-tabs" role="tablist" aria-label="메모장 항목">
+              <b class="n" data-n="a9" style="align-self:center;margin-right:4px">9</b>
+              <button role="tab" data-memo="card" aria-selected="false">카드 · 원작</button>
+              <button role="tab" data-memo="sus" aria-selected="true">등장인물 <span class="cnt">4</span></button>
+              <button role="tab" data-memo="evi" aria-selected="false">물증 <span class="cnt">5</span></button>
+              <button role="tab" data-memo="trick" aria-selected="false">트릭 · 판정 <span class="cnt">2</span></button>
+              <button role="tab" data-memo="brief" aria-selected="false">사전 정보 · 리빌</button>
+              <button role="tab" data-memo="gloss" aria-selected="false">용어집 <span class="cnt">9</span></button>
+            </div>
+            <div class="memo-body">
+              <!-- 카드·원작 -->
+              <div data-memo-view="card" class="stack" style="gap:10px" hidden>
+                <div class="row"><b class="n" data-n="a10">10</b><h3>카드 정보</h3><span class="lbl">draft.card</span></div>
+                <div class="field"><span class="lbl">displayTitle</span><div class="fv">시계탑 저택의 마지막 종소리</div></div>
+                <div class="field"><span class="lbl">difficulty</span><div class="fv">EASY · 쉬움</div></div>
+                <div class="field"><span class="lbl">keywordTags</span><div class="fv tags"><span class="pill">저택</span><span class="pill">알리바이</span><span class="pill">시간 트릭</span></div></div>
+                <div class="field"><span class="lbl">표지</span><div class="ph" style="height:90px;width:160px">coverImageUrl</div></div>
+                <div class="row" style="margin-top:6px"><b class="n" data-n="a11">11</b><h3>원작 정보</h3><span class="lbl">draft.source · 리빌 전 비공개</span></div>
+                <div class="field"><span class="lbl">novelTitle</span><div class="fv">(가상) The Last Chime</div></div>
+                <div class="field"><span class="lbl">novelAuthor</span><div class="fv">(가상) 작가명</div></div>
+              </div>
+
+              <!-- 등장인물 -->
+              <div data-memo-view="sus" class="stack" style="gap:10px">
+                <div class="row"><b class="n" data-n="a12">12</b><span class="lbl">draft.suspects</span></div>
+                <div class="ent-list">
+                  <span class="ent on changed"><span class="key">sus-1</span>해리스<span class="pill bad">범인</span></span>
+                  <span class="ent"><span class="key">sus-2</span>마거릿</span>
+                  <span class="ent"><span class="key">sus-3</span>정원사 톰</span>
+                  <span class="ent"><span class="key">sus-4</span>엘리스<span class="pill">대화 불가</span></span>
+                </div>
+                <div class="persona">
+                  <div class="persona-h">
+                    <b>해리스</b><span class="hint-text">저택의 집사. 20년째 근무</span>
+                    <span class="pill">대화 가능</span><span class="pill bad">isCulprit</span>
+                    <span class="row"><b class="n" data-n="a14">14</b><span class="pill">spriteKey: npc-butler-01</span></span>
+                    <span class="row" style="margin-left:auto"><b class="n" data-n="a22">22</b><span class="pill warn">방금 변경</span></span>
+                  </div>
+                  <table class="ptable">
+                    <thead><tr><th><b class="n" data-n="a13">13</b> 설정</th><th>내용</th><th>원작 근거 (location · quote)</th></tr></thead>
+                    <tbody>
+                      <tr><td class="k">speechStyle</td><td>정중하고 짧게 말한다</td><td class="ref">—</td></tr>
+                      <tr><td class="k">knownFacts</td><td>서재에 녹음기가 있다는 것을 안다</td><td class="ref">2장 4문단 · <q>He knew of the machine…</q></td></tr>
+                      <tr><td class="k">statements</td><td>9시에는 주방에서 은식기를 닦고 있었다</td><td class="ref">3장 2문단 · <q>…</q></td></tr>
+                      <tr><td class="k">hiddenFacts</td><td>8시 50분에 서재에 들어갔다</td><td class="ref"><span class="pill warn">근거 없음</span></td></tr>
+                      <tr><td class="k">lies</td><td><b>9시의 행적</b>: "주방에 있었다" → 사실: 서재에서 녹음기를 설치했다</td><td class="ref">5장 8문단 · <q>…</q></td></tr>
+                      <tr class="changed-row"><td class="k">pressureResponse</td><td>모순을 추궁받아도 자백하지 않고 답변을 거부한다</td><td class="ref">9장 1문단 · <q>…</q></td></tr>
+                      <tr><td class="k">statementChanges</td><td class="hint-text">없음</td><td class="ref"></td></tr>
+                      <tr><td class="k">unknownFacts · silenceTopics</td><td class="hint-text">각 1개 (접힘)</td><td class="ref"></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 물증 -->
+              <div data-memo-view="evi" class="stack" style="gap:10px" hidden>
+                <div class="row"><b class="n" data-n="a15">15</b><span class="lbl">draft.evidences</span></div>
+                <div class="persona">
+                  <div class="persona-h"><span class="key ent" style="border:none;padding:0">evi-1</span><b>서재의 작은 상자</b></div>
+                  <table class="ptable"><tbody>
+                    <tr><td class="k">description</td><td>책장 뒤에서 발견된 손바닥만 한 나무 상자. 안쪽에 태엽 장치가 들어 있다.</td><td class="ref">4장 3문단 · <q>…</q></td></tr>
+                  </tbody></table>
+                </div>
+                <div class="persona">
+                  <div class="persona-h"><span class="lbl">evi-2</span><b>찢긴 메모</b></div>
+                  <table class="ptable"><tbody>
+                    <tr><td class="k">description</td><td><div class="line" style="width:90%"></div></td><td class="ref"><span class="pill warn">근거 없음</span></td></tr>
+                  </tbody></table>
+                </div>
+                <span class="hint-text">evi-3 ~ evi-5 …</span>
+              </div>
+
+              <!-- 트릭 -->
+              <div data-memo-view="trick" class="stack" style="gap:10px" hidden>
+                <div class="row"><b class="n" data-n="a16">16</b><span class="lbl">draft.trick</span></div>
+                <div class="field"><span class="lbl">summary</span><div class="fv">녹음기로 피해자가 살아 있는 시각을 조작했다</div></div>
+                <div class="persona">
+                  <div class="persona-h"><span class="lbl">trk-1 · 순서 1</span><b>녹음기를 서재에 설치해 피해자가 살아 있는 시각을 조작했다</b></div>
+                  <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
+                    <div class="row"><b class="n" data-n="a17">17</b><span class="lbl">rubric.items</span></div>
+                    <div class="rubric">
+                      <div class="h">label</div><div class="h">criterion</div><div class="h">인정 예시</div><div class="h">불인정 예시</div>
+                      <div>사용 도구</div><div>녹음 장치를 사용했음을 밝힘</div><div>녹음기 · 소리를 재생하는 장치</div><div>—</div>
+                      <div>사용 목적</div><div>피해자가 살아 있는 시각을 늦춰 보이게 함</div><div>사망 시각을 속였다</div><div>비명을 가렸다</div>
+                    </div>
+                    <div class="field"><span class="lbl">easyFeedback</span><div class="fv">"사람들이 피해자의 목소리를 언제 들었다고 했나요?" · 물증 evi-1 · 인물 sus-1</div></div>
+                    <div class="field"><span class="lbl"><b class="n" data-n="a18">18</b> 뒷받침 단서</span><div class="fv">물증 <b>서재의 작은 상자</b>(evi-1) — 태엽 장치가 녹음기의 흔적<br>증언 <b>마거릿</b>(sus-2) — 9시 15분에 목소리를 들음</div></div>
+                  </div>
+                </div>
+                <div class="persona">
+                  <div class="persona-h"><span class="lbl">trk-2 · 순서 2</span><b>…</b><span class="pill warn" style="margin-left:auto">뒷받침 단서 없음</span></div>
+                </div>
+              </div>
+
+              <!-- 사전 정보·리빌 -->
+              <div data-memo-view="brief" class="stack" style="gap:10px" hidden>
+                <div class="row"><b class="n" data-n="a19">19</b><h3>사전 정보</h3><span class="lbl">draft.briefing · 난이도에 맞춰 분량 조절</span></div>
+                <div class="field"><span class="lbl">introduction</span><div class="fv">시계탑이 있는 저택에서 주인이 서재에서 숨진 채 발견되었다…</div></div>
+                <div class="field"><span class="lbl">investigationGoal</span><div class="fv">범인과 범행 방법을 밝혀라.</div></div>
+                <div class="field"><span class="lbl">backgroundKnowledge</span><div class="fv"><div class="line"></div><div class="line" style="width:70%;margin-top:6px"></div></div></div>
+                <div class="row" style="margin-top:6px"><b class="n" data-n="a20">20</b><h3>리빌 해설</h3><span class="lbl">draft.revealExplanation</span></div>
+                <div class="fv" style="min-height:80px"><div class="line"></div><div class="line" style="width:85%;margin-top:6px"></div><div class="line" style="width:60%;margin-top:6px"></div></div>
+              </div>
+
+              <!-- 용어집 -->
+              <div data-memo-view="gloss" class="stack" style="gap:10px" hidden>
+                <div class="row"><b class="n" data-n="a21">21</b><span class="lbl">draft.glossary · 이후 모든 생성물이 이 표기를 따름</span></div>
+                <table class="gloss">
+                  <thead><tr><th>original</th><th>korean</th><th>note</th></tr></thead>
+                  <tbody>
+                    <tr class="changed-row"><td class="mono">Harris</td><td>해리스</td><td>집사</td></tr>
+                    <tr><td class="mono">Margaret</td><td>마거릿</td><td>가정부</td></tr>
+                    <tr><td class="mono">Tom</td><td>톰</td><td>정원사</td></tr>
+                    <tr><td class="mono">Clocktower Hall</td><td>시계탑 저택</td><td>지명</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="issues" id="a-issues-box">
+                <div class="row"><b class="n" data-n="a23">23</b><b>확정 전 검사</b><span class="pill bad">오류 1</span><span class="pill warn">경고 3</span></div>
+                <span><span class="pill bad">ERROR</span> <code>revealExplanation</code> 리빌 해설이 비어 있습니다.</span>
+                <span><span class="pill warn">WARNING</span> <code>trick.elements</code> 트릭 요소가 2개입니다 (3~5개 권장).</span>
+                <span><span class="pill warn">WARNING</span> <code>trick.elements[trk-2].supportingClues</code> 뒷받침 단서가 없습니다.</span>
+                <span><span class="pill warn">WARNING</span> <code>suspects[sus-1].persona.hiddenFacts</code> 원작 근거가 없습니다.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec">
+      <h3>관리자 사건 제작 화면에 필요한 응답 필드</h3>
+      <p class="note-line">메모장은 <code>GET /admin/cases/{id}</code>의 <code>draft</code>로 처음 그리고, 이후엔 <code>POST chat</code> 응답의 <code>draft</code>로 통째로 다시 그립니다. 아래 표의 <code>draft.*</code>는 <code>docs/api/admin-draft-schema.md</code> 구조입니다.</p>
+      <div class="table-wrap">
+        <table class="fields" id="a-table">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr class="grp"><td colspan="5">상단 · 작업 상태</td></tr>
+            <tr data-n="a1"><td><b class="n">1</b></td><td>사건 머리말</td><td><code>caseId</code>, <code>draft.card.displayTitle</code>, <code>clonedFromCaseId</code></td><td><code>GET /admin/cases/{id}</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a2"><td><b class="n">2</b></td><td>상태 단계 · 확정 버튼 활성</td><td><code>status</code>, <code>chatProcessing</code>, <code>contentUpdatedAt</code>, <code>testVerifiedAt</code></td><td><code>GET /admin/cases/{id}</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a3"><td><b class="n">3</b></td><td>원문 정보 · 교체</td><td><code>sourceText.{originalFilename, charCount, uploadedAt}</code></td><td><code>detail</code> · <code>POST source-text</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a4"><td><b class="n">4</b></td><td>표지</td><td><code>coverImageUrl</code></td><td><code>detail</code> · <code>POST cover-image</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr class="grp"><td colspan="5">제작 채팅</td></tr>
+            <tr data-n="a5"><td><b class="n">5</b></td><td>말풍선 · 실패 재시도</td><td><code>messages[].{messageId, requestId, senderType, content, status, errorMessage, createdAt}</code></td><td><code>GET messages</code> · <code>POST chat</code>의 <code>adminMessage</code>, <code>aiMessage</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a6"><td><b class="n">6</b></td><td>초안 변경 칩</td><td><code>aiMessage.toolChanges[].{tool, targetKey, summary}</code></td><td><code>messages</code> · <code>chat</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a7"><td><b class="n">7</b></td><td>입력 구성 안내</td><td><code>aiMessage.inputInfo.{mode, inputTokens, note}</code></td><td><code>chat</code> · <code>messages</code> (이력에 저장)</td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a8"><td><b class="n">8</b></td><td>처리 중 잠금</td><td><code>chatProcessing</code> / <code>202 {requestId, status, acceptedAt}</code> → <code>messages</code>에서 <code>status</code> 폴링</td><td><code>detail</code> · <code>chat</code> · <code>messages</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr class="grp"><td colspan="5">메모장 (draft)</td></tr>
+            <tr data-n="a9"><td><b class="n">9</b></td><td>항목 탭 · 개수</td><td><code>draft.suspects.length</code> 등 배열 길이 (프론트 계산)</td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a10"><td><b class="n">10</b></td><td>카드 정보</td><td><code>draft.card.{displayTitle, difficulty, keywordTags}</code>, <code>coverImageUrl</code></td><td><code>draft</code> · <code>detail</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a11"><td><b class="n">11</b></td><td>원작 정보</td><td><code>draft.source.{novelTitle, novelAuthor}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a12"><td><b class="n">12</b></td><td>인물 목록</td><td><code>draft.suspects[].{key, entityId, name, role, canConverse, isCulprit}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a13"><td><b class="n">13</b></td><td>NPC 설정 ↔ 원작 근거</td><td><code>persona.{speechStyle, knownFacts, unknownFacts, statements, hiddenFacts, lies, silenceTopics, pressureResponse, statementChanges}</code>, 각 <code>Fact.sourceRefs[].{location, quote}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a14"><td><b class="n">14</b></td><td>spriteKey 검증 표시</td><td><code>spriteKey</code> + <code>spriteKeys[]</code>, 없는 키는 <code>draftIssues</code> 경고</td><td><code>GET /admin/assets</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a15"><td><b class="n">15</b></td><td>물증</td><td><code>draft.evidences[].{key, name, description, sourceRefs}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a16"><td><b class="n">16</b></td><td>트릭 요약 · 요소</td><td><code>draft.trick.summary</code>, <code>elements[].{key, orderIndex, description}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a17"><td><b class="n">17</b></td><td>판정 항목 · 쉬움 피드백</td><td><code>rubric.items[].{itemId, label, criterion, acceptExamples, rejectExamples}</code>, <code>rubric.easyFeedback.{guideQuestion, evidenceKeys, suspectKeys}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a18"><td><b class="n">18</b></td><td>뒷받침 단서</td><td><code>supportingClues[].{type, refKey, note}</code> — <code>refKey</code>로 인물·물증 이름 조인 (프론트)</td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a19"><td><b class="n">19</b></td><td>사전 정보</td><td><code>draft.briefing.{introduction, investigationGoal, backgroundKnowledge}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a20"><td><b class="n">20</b></td><td>리빌 해설</td><td><code>draft.revealExplanation</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a21"><td><b class="n">21</b></td><td>용어집</td><td><code>draft.glossary[].{original, korean, note}</code></td><td><code>draft</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a22"><td><b class="n">22</b></td><td>"방금 변경" 강조</td><td>마지막 <code>toolChanges[].targetKey</code> (<code>set_*</code>는 <code>null</code>이므로 tool 이름 → 섹션으로 매핑)</td><td><code>chat</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="a23"><td><b class="n">23</b></td><td>확정 전 검사</td><td><code>draftIssues[].{severity, path, message}</code></td><td><code>GET detail</code> · <code>POST chat</code>의 <code>draftIssues</code></td><td><span class="pill good">명세 있음</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>관리자 화면 · 명세 반영 결과</h3>
+        <ol><li><b>반영함 (23).</b> 사건 상세와 채팅 응답에 확정 전 검사 결과 <code>draftIssues</code>를 추가했습니다.</li><li><b>반영함 (7).</b> <code>inputInfo</code>를 채팅 이력(<code>ADMIN_CASE_MESSAGES.input_info</code>)에 저장하고 AI 발화에 함께 반환합니다.</li><li><b>반영함 (14).</b> 새 <code>GET /api/admin/assets</code>로 spriteKey 목록을 받습니다.</li><li><b>바꾸지 않음.</b> 메모장 직접 편집은 넣지 않고, 수정은 채팅으로만 합니다.</li></ol>
+      </div>
+    </div>
+  <div class="gaps"><h3>새 사건·업로드 상태</h3><details open><summary>원문이 없는 최초 제작 화면</summary><p>새 초안을 만들었습니다. 소설 원문 .txt 파일을 먼저 업로드하세요. 채팅 이력과 메모장은 비어 있으며 원문 등록 전 제작 메시지 전송은 비활성화됩니다.</p><input type="file" accept=".txt,text/plain" aria-label="원문 txt 업로드"><p>원문 파일을 고르면 업로드 중 → 성공 시 파일명·문자 수·업로드 시각 표시 → 첫 메시지 입력을 활성화합니다.</p></details><details><summary>원문·표지 업로드 중 또는 실패</summary><p>원문은 .txt, 표지는 서버가 허용하는 이미지 형식·크기만 접수합니다. 실제 한도는 구현 설정과 API 계약을 따릅니다.</p><p>업로드 중: 중복 업로드 비활성화. 실패: 이유와 재시도 표시, 기존 파일 유지. 성공: 새 파일 정보·표지 미리보기 갱신.</p><p>원문 입력량을 맞출 수 없으면 원인과 분할 처리 필요성을 알립니다. 원문을 조용히 잘라 보내지 않습니다.</p></details><p>위 상태는 기존 사건 생성·원문 업로드·표지 업로드 응답을 사용하며 추가 API는 요구하지 않습니다.</p></div></section>
+
+  <!-- ===================== 관리자 맵 · 테스트 · 출시 ===================== -->
+  <section class="screen" id="screen-apub" aria-labelledby="tab-apub" hidden>
+    <div>
+      <h2>⑦ 관리자 맵 · 테스트 · 출시</h2>
+      <p class="lede">콘텐츠 확정(<code>CONTENT_CONFIRMED</code>) 이후의 작업을 한 화면에 모았습니다. 왼쪽에서 맵 설정, 가운데에서 NPC·물증 좌표 배치, 오른쪽에서 테스트 플레이와 출시를 합니다. 기획서 4.6절대로 브라우저 맵 편집기는 만들지 않고, 좌표는 Tiled에서 확인한 값을 입력합니다.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><span>사건 상태</span>
+        <select id="ap-state" aria-label="사건 상태">
+          <option value="confirmed">CONTENT_CONFIRMED · 작업 중</option>
+          <option value="published">PUBLISHED · 수정 잠금</option>
+        </select>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="frame">
+        <div class="a-top">
+          <div class="stack" style="gap:0"><span class="crumb">관리자 › 사건 목록 › #5</span><b style="font-size:15px">안개 낀 부두의 목격자</b></div>
+          <div class="steps" style="margin-left:18px"><span>DRAFT</span><em>→</em><span class="on" id="ap-step-c">CONTENT_CONFIRMED</span><em>→</em><span id="ap-step-p">PUBLISHED</span></div>
+          <div class="row" style="margin-left:auto"><b class="n" data-n="ap1">1</b><span class="wf-btn ghost">수정 재개 (DRAFT로)</span></div>
+        </div>
+        <div class="pub-grid" style="position:relative">
+          <div>
+            <div class="sec-h"><b class="n" data-n="ap2">2</b><h3>맵 설정</h3></div>
+            <div class="form-row"><span class="lbl">mapUrl</span><div class="input" style="color:var(--ink)">/assets/maps/fog-pier.json</div></div>
+            <div class="form-row"><span class="lbl">시작 위치 X, Y</span><div class="row"><div class="input" style="flex:1;color:var(--ink)">96</div><div class="input" style="flex:1;color:var(--ink)">480</div></div></div>
+            <div class="form-row"><span class="lbl">충돌 레이어</span><div class="input" style="color:var(--ink)">collision</div></div>
+            <div class="form-row"><span class="lbl">상호작용 반경</span><div class="input" style="color:var(--ink)">48 px</div></div>
+            <span class="wf-btn" style="align-self:flex-start">맵 설정 저장</span>
+            <div class="issues" style="border-color:var(--mark);background:var(--mark-soft)">
+              <div class="row"><b class="n" data-n="ap3">3</b><b>저장 실패</b></div>
+              <span>시작점 (96, 480)이 이동 불가 영역입니다.</span>
+            </div>
+            <div class="row"><b class="n" data-n="ap4">4</b><span class="lbl">미리보기 (읽기 전용)</span></div>
+            <div class="ph" style="height:170px">Phaser 맵 미리보기<br>시작점 · 배치된 NPC·물증 · 반경 표시</div>
+          </div>
+
+          <div>
+            <div class="sec-h"><b class="n" data-n="ap5">5</b><h3>NPC · 물증 배치</h3><span class="hint-text" style="margin-left:auto">저장하면 전체 교체</span></div>
+            <div class="list">
+              <div class="list-row head" style="grid-template-columns:70px 1fr 90px 70px 70px 90px"><span>종류</span><span>대상</span><span>대화</span><span>X</span><span>Y</span><span>상태</span></div>
+              <div class="list-row" style="grid-template-columns:70px 1fr 90px 70px 70px 90px"><span class="pill">NPC</span><span>뱃사공 그림 <span class="lbl">sus-1</span></span><span class="hint-text">가능</span><div class="input">412</div><div class="input">168</div><span class="pill good">배치됨</span></div>
+              <div class="list-row" style="grid-template-columns:70px 1fr 90px 70px 70px 90px"><span class="pill">NPC</span><span>세관원 루시 <span class="lbl">sus-2</span></span><span class="hint-text">가능</span><div class="input">—</div><div class="input">—</div><span class="pill bad">미배치</span></div>
+              <div class="list-row" style="grid-template-columns:70px 1fr 90px 70px 70px 90px"><span class="pill">NPC</span><span>선장 <span class="lbl">sus-3</span></span><span class="hint-text">불가</span><div class="input">—</div><div class="input">—</div><span class="pill">배치 선택</span></div>
+              <div class="list-row" style="grid-template-columns:70px 1fr 90px 70px 70px 90px"><span class="pill warn">물증</span><span>젖은 장부 <span class="lbl">evi-1</span></span><span>—</span><div class="input">220</div><div class="input">96</div><span class="pill good">배치됨</span></div>
+              <div class="list-row" style="grid-template-columns:70px 1fr 90px 70px 70px 90px"><span class="pill warn">물증</span><span>끊어진 밧줄 <span class="lbl">evi-2</span></span><span>—</span><div class="input">980</div><div class="input">40</div><span class="pill bad">맵 밖</span></div>
+            </div>
+            <span class="hint-text">대화 가능한 NPC와 모든 물증은 출시 전에 배치되어야 합니다. 대화할 수 없는 인물은 배치하지 않아도 지목 대상에 들어갑니다.</span>
+            <span class="wf-btn" style="align-self:flex-start">배치 저장</span>
+            <div class="row"><b class="n" data-n="ap11">11</b><span class="hint-text">mapUrl·충돌 레이어는 에셋 목록에서 선택</span></div>
+          </div>
+
+          <div>
+            <div class="sec-h"><b class="n" data-n="ap6">6</b><h3>관리자 테스트</h3></div>
+            <div class="list">
+              <div class="list-row" style="grid-template-columns:1fr 90px 90px"><span>#41 · 10/03 21:10</span><span class="pill warn">진행 중</span><span><button class="wf-btn" data-test-game>이어하기</button><span class="wf-btn ghost">중단</span></span></div>
+              <div class="list-row" style="grid-template-columns:1fr 90px 90px"><span>#38 · 10/02 · 18:40</span><span class="pill good">CLEARED</span><span><span class="pill">이전 내용</span><button class="wf-btn" data-go="reveal">결과 보기</button></span></div>
+            </div>
+            <div class="row"><span class="wf-btn disabled">테스트 시작</span><span class="hint-text">미종료 테스트는 하나만 · 기존 테스트는 이어하기로 복귀</span></div>
+            <div class="row"><b class="n" data-n="ap7">7</b><span class="wf-btn disabled">현재 내용으로 테스트 완료 확인</span></div>
+            <span class="hint-text">마지막 콘텐츠·맵·배치 변경 10/03 20:55 이후 종료된 테스트가 있어야 함</span>
+
+            <div class="sec-h" style="margin-top:6px"><b class="n" data-n="ap8">8</b><h3>출시 검사</h3><span class="pill bad" style="margin-left:auto">4건</span></div>
+            <div class="issue-list">
+              <span><span class="pill bad">HOTSPOT_MISSING</span> 세관원 루시가 배치되지 않았습니다.</span>
+              <span><span class="pill bad">HOTSPOT_INVALID</span> 끊어진 밧줄의 좌표가 맵 밖입니다.</span>
+              <span><span class="pill bad">TEST_UNFINISHED</span> 진행 중인 테스트가 있습니다.</span>
+              <span><span class="pill bad">TEST_NOT_VERIFIED</span> 현재 내용의 테스트 완료 확인이 없습니다.</span>
+            </div>
+            <div class="row" style="margin-top:auto"><b class="n" data-n="ap9">9</b><span class="wf-btn primary disabled">출시</span><span class="hint-text">출시 후에는 수정할 수 없음</span></div>
+          </div>
+
+          <div class="lock-banner" id="ap-lock" hidden>
+            <div class="card">
+              <div class="row"><b class="n" data-n="ap10">10</b><h3>출시된 사건입니다</h3></div>
+              <p class="hint-text">콘텐츠·맵·배치·표지·용어집을 수정할 수 없습니다. 고치려면 새 초안으로 복제해 다시 제작·테스트·출시합니다. 플레이 기록과 랭킹은 복제되지 않습니다.</p>
+              <span class="wf-btn primary" style="align-self:flex-start">초안으로 복제</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spec">
+      <h3>맵 · 테스트 · 출시에 필요한 응답 필드</h3>
+      <p class="note-line">처음 열 때 <code>GET /admin/cases/{id}</code>(맵·배치·확정 엔티티)와 <code>GET test-rooms</code>, <code>GET publish-check</code>를 함께 부릅니다. 테스트 플레이 자체는 ③ 게임 화면과 같은 <code>/rooms/{roomId}/...</code> API를 사용합니다.</p>
+      <div class="table-wrap">
+        <table class="fields">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr data-n="ap1"><td><b class="n">1</b></td><td>수정 재개</td><td>확인 창에 "테스트 기록 N개 삭제" → <code>test-rooms</code> 중 종료된 수. 응답 <code>{status, deletedTestRoomCount}</code></td><td><code>POST reopen</code> · <code>GET test-rooms</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap2"><td><b class="n">2</b></td><td>맵 설정 폼</td><td><code>map.{mapUrl, spawnX, spawnY, collisionLayer, interactionRadiusPx}</code></td><td><code>GET detail</code> · <code>PUT map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap3"><td><b class="n">3</b></td><td>맵 저장 오류</td><td><code>400 MAP_INVALID</code>의 <code>detail.issues[]</code></td><td><code>PUT map</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap4"><td><b class="n">4</b></td><td>맵 미리보기</td><td><code>map</code> + <code>hotspots</code> (프론트가 Phaser로 그림, API 추가 없음)</td><td><code>GET detail</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap5"><td><b class="n">5</b></td><td>배치 표</td><td><code>content.suspects[].{suspectId, key, name, canConverse}</code>, <code>content.evidences[].{evidenceId, key, name}</code>, <code>hotspots[].{hotspotId, type, refId, x, y}</code> — <code>refId</code>로 조인. 저장 오류는 <code>400 HOTSPOT_INVALID</code>의 <code>detail.issues[]</code></td><td><code>GET detail</code> · <code>PUT hotspots</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap6"><td><b class="n">6</b></td><td>테스트 세션</td><td><code>roomId</code>, <code>status</code>, <code>createdAt</code>, <code>endedAt</code>, <code>durationSec</code>, <code>countsForVerification</code></td><td><code>GET/POST/DELETE test-rooms</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap7"><td><b class="n">7</b></td><td>테스트 완료 확인</td><td><code>testVerifiedAt</code>, <code>contentUpdatedAt</code></td><td><code>POST test-verification</code> · <code>GET detail</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap8"><td><b class="n">8</b></td><td>출시 검사</td><td><code>publishable</code>, <code>issues[].{code, target, message}</code></td><td><code>GET publish-check</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap9"><td><b class="n">9</b></td><td>출시</td><td><code>200 {status}</code> / <code>409 PUBLISH_CHECK_FAILED</code></td><td><code>POST publish</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap10"><td><b class="n">10</b></td><td>잠금 · 복제</td><td><code>status=PUBLISHED</code> → 복제 <code>201 {caseId}</code></td><td><code>GET detail</code> · <code>POST clone</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="ap11"><td><b class="n">11</b></td><td>에셋 선택지</td><td><code>maps[].{mapUrl, widthPx, heightPx, layers[]}</code>, <code>spriteKeys[]</code></td><td><code>GET /admin/assets</code></td><td><span class="pill good">명세 있음</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>맵 · 테스트 · 출시 · 명세 반영 결과</h3>
+        <ol><li><b>반영함 (11).</b> <code>GET /api/admin/assets</code> → <code>{ maps: [{ mapUrl, widthPx, heightPx, layers[] }], spriteKeys[] }</code>를 추가했습니다. 읽기 실패 시 <code>500 ASSET_MANIFEST_INVALID</code>.</li><li><b>바꾸지 않음.</b> 출시 검사의 <code>target</code>은 <code>"suspect:3"</code> 문자열 그대로 둡니다.</li></ol>
+      </div>
+    </div>
+  <div class="gaps"><h3>수정·테스트 작업 상태</h3><label>편집 제한 <select id="ap-busy"><option value="test">미종료 테스트 있음</option><option value="ai">관련 AI 작업 처리 중</option><option value="none">없음 · 편집 가능</option></select></label><p id="ap-busy-status" role="status"></p><details><summary>수정 재개 확인 화면</summary><p>초안으로 돌아가면 종료된 테스트 기록 2개와 해당 대화·조사·결과를 삭제합니다. 제작 채팅·초안·비용 로그는 유지합니다. 재확정·배치 재검증·재테스트가 필요합니다.</p><button class="wf-btn" data-demo="reopen">테스트 기록 삭제 후 수정 재개</button><p id="reopen-status" role="status"></p></details><p>재확정 후 삭제·변경된 NPC·물증을 참조하는 배치는 ‘재배치 필요’로 표시하고 해당 행을 안내합니다. 테스트 완료 확인은 콘텐츠·맵·배치 변경 시 무효화됩니다.</p><p>확인 창은 기존 test-rooms의 종료 세션 수와 reopen의 deletedTestRoomCount를 사용합니다. 미종료 테스트 또는 관련 AI 작업이 있으면 편집과 출시를 보류합니다.</p></div></section>
+
+  <!-- ===================== 사용량 대시보드 ===================== -->
+  <section class="screen" id="screen-usage" aria-labelledby="tab-usage" hidden>
+    <div>
+      <h2>⑧ AI 사용량 대시보드</h2>
+      <p class="lede">Claude API 호출 수·토큰·예상 비용을 유형별로 보고, 월 예산과 경고 임계값을 설정합니다. 예산을 넘어도 알림만 하고 호출을 막지 않습니다. 그래프는 자리만 잡은 스케치이며 숫자는 예시입니다.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><span>이번 달 예산 상태</span>
+        <select id="u-alert" aria-label="예산 상태">
+          <option value="WARNING">WARNING · 경고 임계값 이상</option>
+          <option value="EXCEEDED">EXCEEDED · 한도 초과</option>
+          <option value="NONE">NONE · 정상</option>
+          <option value="NOT_CONFIGURED">NOT_CONFIGURED · 미설정</option>
+        </select>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="frame">
+        <div class="topbar">
+          <span class="logo">Shelved 관리자</span>
+          <span class="wf-btn ghost">사건 목록</span><span class="wf-btn primary">AI 사용량</span>
+        </div>
+        <div class="page">
+          <div class="banner warn" id="u-banner"><b class="n" data-n="u1">1</b><span id="u-banner-text">이번 달 예상 비용이 경고 임계값(80%)을 넘었습니다. 한도를 넘어도 AI 호출은 계속됩니다.</span></div>
+          <div class="tiles" style="grid-template-columns:2fr 1fr 1fr">
+            <div class="tile">
+              <div class="row"><b class="n" data-n="u2">2</b><span class="lbl">2026-10 예상 비용 (USD · Asia/Seoul 기준 달력월)</span></div>
+              <div class="row"><strong id="u-cost">$41.20</strong><span class="hint-text" id="u-limit">/ 한도 $50.00 · 82.4%</span></div>
+              <div class="progress"><i class="warn" id="u-bar" style="width:82.4%"></i></div>
+            </div>
+            <div class="tile"><span class="lbl">사용량 미확인 호출</span><strong>3건</strong><span class="hint-text">비용 합계에 포함되지 않음</span></div>
+            <div class="tile"><span class="lbl">기간 내 호출 · 실패</span><strong>1,284</strong><span class="hint-text">실패 17건</span></div>
+          </div>
+          <div class="row between">
+            <div class="row"><b class="n" data-n="u3">3</b><span class="lbl">기간</span><div class="input">2026-10-01</div><span>~</span><div class="input">2026-10-25</div></div>
+            <div class="row"><span class="wf-btn primary">일별</span><span class="wf-btn">월별</span></div>
+          </div>
+          <div class="stack">
+            <div class="row"><b class="n" data-n="u4">4</b><span class="lbl">일별 예상 비용 (유형별 누적)</span></div>
+            <div class="bars" aria-hidden="true">
+              <div class="bar"><i class="s1" style="height:30px"></i><i class="s5" style="height:40px"></i></div>
+              <div class="bar"><i class="s1" style="height:20px"></i><i class="s5" style="height:70px"></i></div>
+              <div class="bar"><i class="s1" style="height:14px"></i><i class="s5" style="height:90px"></i></div>
+              <div class="bar"><i class="s1" style="height:10px"></i><i class="s5" style="height:30px"></i></div>
+              <div class="bar"><i class="s1" style="height:40px"></i><i class="s2" style="height:12px"></i><i class="s4" style="height:16px"></i><i class="s5" style="height:20px"></i></div>
+              <div class="bar"><i class="s1" style="height:60px"></i><i class="s2" style="height:18px"></i><i class="s3" style="height:6px"></i><i class="s4" style="height:24px"></i></div>
+              <div class="bar"><i class="s1" style="height:46px"></i><i class="s2" style="height:14px"></i><i class="s4" style="height:20px"></i></div>
+              <div class="bar"><i class="s1" style="height:22px"></i><i class="s2" style="height:8px"></i><i class="s4" style="height:10px"></i></div>
+              <div class="bar"><i class="s1" style="height:12px"></i><i class="s5" style="height:24px"></i></div>
+              <div class="bar"><i class="s1" style="height:70px"></i><i class="s2" style="height:20px"></i><i class="s3" style="height:8px"></i><i class="s4" style="height:30px"></i></div>
+              <div class="bar"><i class="s1" style="height:52px"></i><i class="s2" style="height:16px"></i><i class="s4" style="height:22px"></i></div>
+              <div class="bar"><i class="s1" style="height:18px"></i><i class="s4" style="height:8px"></i></div>
+            </div>
+            <div class="axis"><span>10/14</span><span>10/19</span><span>10/25</span></div>
+            <div class="row hint-text" style="flex-wrap:wrap;gap:12px">
+              <span><i class="swatch s1"></i>NPC_CHAT</span><span><i class="swatch s2"></i>HINT</span><span><i class="swatch s3"></i>HINT_FOLLOWUP</span><span><i class="swatch s4"></i>GRADING</span><span><i class="swatch s5"></i>CASE_GENERATION</span>
+            </div>
+          </div>
+          <div class="row" style="align-items:flex-start;gap:14px">
+            <div class="stack" style="flex:1;min-width:0">
+              <div class="row"><b class="n" data-n="u5">5</b><span class="lbl">유형별 합계</span></div>
+              <div class="list">
+                <div class="list-row head" style="grid-template-columns:1.4fr repeat(6,1fr)"><span>유형</span><span>호출</span><span>실패</span><span>입력 토큰</span><span>출력 토큰</span><span>예상 비용</span><span>미확인</span></div>
+                <div class="list-row mono" style="grid-template-columns:1.4fr repeat(6,1fr)"><span>CASE_GENERATION</span><span>142</span><span>4</span><span>18.2M</span><span>0.41M</span><span>$22.10</span><span>1</span></div>
+                <div class="list-row mono" style="grid-template-columns:1.4fr repeat(6,1fr)"><span>NPC_CHAT</span><span>890</span><span>9</span><span>3.1M</span><span>0.22M</span><span>$12.40</span><span>2</span></div>
+                <div class="list-row mono" style="grid-template-columns:1.4fr repeat(6,1fr)"><span>GRADING</span><span>98</span><span>2</span><span>0.9M</span><span>0.05M</span><span>$4.30</span><span>0</span></div>
+                <div class="list-row mono" style="grid-template-columns:1.4fr repeat(6,1fr)"><span>HINT · HINT_FOLLOWUP</span><span>154</span><span>2</span><span>0.6M</span><span>0.04M</span><span>$2.40</span><span>0</span></div>
+              </div>
+            </div>
+            <div class="stack" style="width:280px;flex:none">
+              <div class="row"><b class="n" data-n="u6">6</b><span class="lbl">예산 설정</span></div>
+              <div class="form-row"><span class="lbl">월 한도 (USD)</span><div class="input" style="color:var(--ink)">50.00</div></div>
+              <div class="form-row"><span class="lbl">경고 임계값</span><div class="input" style="color:var(--ink)">80 %</div></div>
+              <div class="row between"><span class="hint-text">마지막 변경 10/01</span><span class="wf-btn">저장</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spec">
+      <h3>AI 사용량 대시보드에 필요한 응답 필드</h3>
+      <div class="table-wrap">
+        <table class="fields">
+          <thead><tr><th>#</th><th>화면 요소</th><th>필요한 필드</th><th>API</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr data-n="u1"><td><b class="n">1</b></td><td>경고 배너</td><td><code>currentMonth.{alertLevel, usagePercent}</code></td><td><code>GET /admin/llm-usage</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="u2"><td><b class="n">2</b></td><td>이번 달 현황</td><td><code>currentMonth.{month, estimatedCost, monthlyLimit, usagePercent, unknownUsageCallCount, budgetConfigured}</code>, 기간 합계 <code>total.{callCount, failedCallCount}</code></td><td><code>GET /admin/llm-usage</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="u3"><td><b class="n">3</b></td><td>기간 · 단위</td><td>쿼리 <code>from</code>, <code>to</code>, <code>granularity</code> → 적용된 <code>from</code>, <code>to</code>, <code>timezone</code>, <code>currency</code></td><td><code>GET /admin/llm-usage</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="u4"><td><b class="n">4</b></td><td>기간별 그래프</td><td><code>series[].{period, byType[].{requestType, estimatedCost, callCount}}</code></td><td><code>GET /admin/llm-usage</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="u5"><td><b class="n">5</b></td><td>유형별 표</td><td><code>byType[].{requestType, callCount, failedCallCount, inputTokens, outputTokens, estimatedCost, unknownUsageCallCount}</code></td><td><code>GET /admin/llm-usage</code></td><td><span class="pill good">명세 있음</span></td></tr>
+            <tr data-n="u6"><td><b class="n">6</b></td><td>예산 설정</td><td><code>configured</code>, <code>monthlyLimit</code>, <code>warningPercent</code>, <code>updatedAt</code> / 요청 <code>{monthlyLimit, warningPercent}</code></td><td><code>GET/PATCH /admin/llm-usage/budget</code></td><td><span class="pill good">명세 있음</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gaps">
+        <h3>AI 사용량 · 명세 반영 결과</h3>
+        <p class="note-line"><b>바꾸지 않음.</b> 사건별 비용 집계(<code>byCase</code>)는 MVP 사건이 3편뿐이라 넣지 않고, 유형별 집계만 유지합니다.</p>
+      </div>
+    </div>
+  <div class="gaps"><h3>예산 설정 검증·저장 상태</h3><label>월 한도 (USD) <input id="budget-limit" type="number" min="0.01" step="0.01" value="50"></label><label>경고 임계값 (%) <input id="budget-warning" type="number" min="1" max="100" value="80"></label><button class="wf-btn" id="budget-save">예산 저장 예시</button><p id="budget-status" role="status"></p><p>저장 중 버튼 비활성화. 서버 저장 실패 시 입력을 유지하고 재시도하며, 성공 시 현재 월 경고를 재계산합니다. 기간 조회는 로딩·실패·빈 집계 상태를 구분합니다.</p></div></section>
+</div>
+
+<script>
+(function () {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+  function refreshAll() {
+    $$('table.fields tr[data-n]').forEach(tr => {
+      const id = tr.dataset.n;
+      const visible = $$('.frame .n[data-n="' + id + '"]').some(el => el.getClientRects().length > 0);
+      tr.classList.toggle('dim', !visible);
+    });
+  }
+
+  // 화면 탭
+  function showScreen(key) {
+    $$('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.screen === key)));
+    $$('section.screen').forEach(s => { s.hidden = s.id !== 'screen-' + key; });
+    try { localStorage.setItem('wf-screen', key); } catch (e) {}
+    refreshAll();
+  }
+  $$('.tabs button').forEach(btn => btn.addEventListener('click', () => showScreen(btn.dataset.screen)));
+
+  // 메인
+  function updateMain() {
+    const u = $('#m-user').value;
+    const sec = $('#screen-main');
+    $$('[data-user="in"]', sec).forEach(el => { el.hidden = u === 'guest'; });
+    $$('[data-user="guest"]', sec).forEach(el => { el.hidden = u !== 'guest'; });
+    $$('[data-user="admin"]', sec).forEach(el => { el.hidden = u !== 'admin'; });
+    $('#m-dialog').hidden = !$('#m-conflict').checked;
+    refreshAll();
+  }
+  $$('#m-user, #m-conflict').forEach(el => el.addEventListener('change', updateMain));
+
+  // 게임
+  const panel = $('#g-panel');
+  const modal = $('#g-accuse-modal');
+  function updateGame() {
+    const mode = $('input[name="gpanel"]:checked').value;
+    $$('[data-view]', panel).forEach(v => { v.hidden = v.dataset.view !== mode; });
+    panel.hidden = mode === 'none';
+    const noteOpen = $('#g-note').checked;
+    $('#g-note-col').hidden = !noteOpen;
+    const accuse = $('#g-accuse').checked;
+    modal.hidden = !accuse;
+    const st = $('#g-state').value;
+    $('#g-ov-ready').hidden = st !== 'ready';
+    $('#g-ov-paused').hidden = st !== 'paused';
+    $('#g-ov-awaiting').hidden = st !== 'awaiting';
+    $('#g-ov-replaced').hidden = st !== 'replaced';
+    $('#g-status-pill').textContent = { ready: '준비', paused: '일시정지', awaiting: '채점 대기', replaced: '연결 끊김' }[st] || '진행 중';
+    $('#g-timer').textContent = st === 'ready' ? '20:00' : st === 'awaiting' ? '0:00' : '12:48';
+    const grading = $('input[name="gacc"]:checked').value === 'grading';
+    $$('[data-acc]', modal).forEach(el => { el.hidden = (el.dataset.acc === 'grading') !== grading; });
+    $('#g-acc-sub').textContent = grading ? '/ 3 · 처리 중 1' : '/ 3';
+    $('#g-acc-remain').textContent = grading ? '1' : '2';
+    $('#g-conflict-dlg').hidden = !$('#g-conflict').checked;
+    $('#g-stop').hidden = !((mode !== 'none' || noteOpen || accuse) && st === 'progress');
+    refreshAll();
+  }
+  $$('input[name="gpanel"], input[name="gacc"], #g-note, #g-state, #g-accuse, #g-conflict').forEach(el => el.addEventListener('change', updateGame));
+
+  // 리빌
+  const REVEAL = {
+    CLEARED: ['사건을 해결했습니다', '2번째 지목에서 범인과 트릭을 모두 맞혔습니다.', '15:12', '2회', ['good', '정답']],
+    FAILED: ['지목 기회를 모두 사용했습니다', '3번의 지목 모두 정답에 이르지 못했습니다. 원작과 진상을 확인해 보세요.', '18:03', '3회', ['bad', '오답']],
+    EXPIRED: ['제한시간이 끝났습니다', '시간 안에 정답을 제출하지 못했습니다. 원작과 진상을 확인해 보세요.', '20:00', '2회', ['warn', '부분 정답']]
+  };
+  function updateReveal() {
+    const r = REVEAL[$('#r-result').value];
+    $('#r-title').textContent = r[0];
+    $('#r-sub').textContent = r[1];
+    $('#r-dur').textContent = r[2];
+    $('#r-acc').textContent = r[3];
+    const last = $('#r-last');
+    last.className = 'pill ' + r[4][0];
+    last.textContent = r[4][1];
+    const cleared = $('#r-result').value === 'CLEARED';
+    const previous = $('#r-best').value;
+    const hasBest = cleared || previous !== 'none';
+    $('#r-my').hidden = !hasBest;
+    $('#r-my-none').hidden = hasBest;
+    const bestTime = previous === 'faster' ? '14:30' : cleared ? '15:12' : '17:00';
+    const entries = [{name:'왓슨', time:'14:00'}, {name:'포와로', time:'15:12'}, {name:'마플', time:'16:41'}];
+    if (hasBest) entries.push({name:'셜록초보', time:bestTime, me:true});
+    entries.sort((a,b) => a.time.localeCompare(b.time));
+    let rank = 0;
+    const rows = entries.map((entry, index) => {
+      if (index === 0 || entry.time !== entries[index - 1].time) rank = index + 1;
+      if (entry.me) $('#r-my').innerHTML = '<span class="lbl">내 최고 기록</span><b>' + rank + '위</b><span class="mono">' + entry.time + '</span>';
+      return '<div class="rank-row' + (entry.me ? ' me' : '') + '"><span>' + rank + '</span><span>' + entry.name + '</span><span class="mono">' + entry.time + '</span></div>';
+    });
+    const ranking = $('#screen-reveal .rank-row.head').parentElement;
+    $$('.rank-row:not(.head)', ranking).forEach(row => row.remove());
+    ranking.insertAdjacentHTML('beforeend', rows.join(''));
+    refreshAll();
+  }
+  $('#r-result').addEventListener('change', updateReveal);
+  $('#r-best').addEventListener('change', updateReveal);
+
+  // 관리자 제작
+  $$('.memo-tabs button').forEach(btn => btn.addEventListener('click', () => {
+    $$('.memo-tabs button').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    $$('[data-memo-view]').forEach(v => { v.hidden = v.dataset.memoView !== btn.dataset.memo; });
+    refreshAll();
+  }));
+  function updateAdmin() {
+    const st = $('input[name="achat"]:checked').value;
+    $$('[data-chat]').forEach(f => { f.hidden = f.dataset.chat !== st; });
+    const locked = st === 'processing';
+    $('#a-confirm-btn').classList.toggle('disabled', locked);
+    $('#a-src-btn').classList.toggle('disabled', locked);
+    $('#a-issues-box').hidden = !$('#a-issues').checked;
+    refreshAll();
+  }
+  $$('input[name="achat"], #a-issues').forEach(el => el.addEventListener('change', updateAdmin));
+
+  // 맵·테스트·출시
+  function updatePub() {
+    const pub = $('#ap-state').value === 'published';
+    $('#ap-lock').hidden = !pub;
+    $('#ap-step-c').classList.toggle('on', !pub);
+    $('#ap-step-p').classList.toggle('on', pub);
+    refreshAll();
+  }
+  $('#ap-state').addEventListener('change', updatePub);
+
+  // 사용량
+  const ALERT = {
+    WARNING: ['warn', '이번 달 예상 비용이 경고 임계값(80%)을 넘었습니다. 한도를 넘어도 AI 호출은 계속됩니다.', '$41.20', '/ 한도 $50.00 · 82.4%', 82.4, 'warn'],
+    EXCEEDED: ['bad', '이번 달 예상 비용이 월 한도를 넘었습니다. 알림만 하며 AI 호출은 막지 않습니다.', '$53.70', '/ 한도 $50.00 · 107.4%', 100, 'bad'],
+    NONE: ['good', '이번 달 예상 비용이 한도 안에 있습니다.', '$12.80', '/ 한도 $50.00 · 25.6%', 25.6, ''],
+    NOT_CONFIGURED: ['', '월 예산이 설정되지 않았습니다. 오른쪽 아래에서 한도와 경고 임계값을 정해 주세요.', '$41.20', '/ 한도 미설정', 0, '']
+  };
+  function updateUsage() {
+    const a = ALERT[$('#u-alert').value];
+    $('#u-banner').className = 'banner ' + a[0];
+    $('#u-banner-text').textContent = a[1];
+    $('#u-cost').textContent = a[2];
+    $('#u-limit').textContent = a[3];
+    const bar = $('#u-bar');
+    bar.style.width = a[4] + '%';
+    bar.className = a[5];
+    refreshAll();
+  }
+  $('#u-alert').addEventListener('change', updateUsage);
+
+  // 표의 행 ↔ 표식 강조
+  $$('table.fields tr[data-n]').forEach(tr => {
+    const marks = () => $$('.frame .n[data-n="' + tr.dataset.n + '"]');
+    tr.addEventListener('mouseenter', () => marks().forEach(m => m.classList.add('pulse')));
+    tr.addEventListener('mouseleave', () => marks().forEach(m => m.classList.remove('pulse')));
+  });
+
+  let recordsOrigin = 'game';
+  $$('[data-go]').forEach(button => button.addEventListener('click', () => {
+    if (button.dataset.go === 'records') recordsOrigin = $('.tabs [aria-selected="true"]').dataset.screen;
+    showScreen(button.dataset.go);
+  }));
+  $('#records-back').addEventListener('click', () => showScreen(recordsOrigin));
+  function updateExtraGame() {
+    const state = $('#g-state').value;
+    const readonly = state !== 'progress';
+    $$('#g-panel .p-foot, #g-panel [data-demo="followup"], #g-panel textarea').forEach(el => { el.hidden = readonly; });
+    $$('.g-hud .actions .wf-btn').forEach(el => el.classList.toggle('disabled', readonly));
+    $$('#g-accuse-modal .wf-btn').filter(el => /제출하기|같은 답안/.test(el.textContent)).forEach(el => el.classList.toggle('disabled', readonly));
+    $('#g-accuse-modal').hidden = readonly || !$('#g-accuse').checked;
+    const load = $('#g-load').value;
+    $('#g-load-status').textContent = {done: '맵·기록 복원 완료', loading: '맵·기록을 복원하고 있습니다. 시작·이어하기 비활성화.', failed: '맵 또는 기록을 불러오지 못했습니다. 로딩 상태를 다시 선택해 재시도하세요.'}[load];
+    $$('#g-ov-ready .wf-btn, #g-ov-paused .wf-btn.primary').forEach(b => b.classList.toggle('disabled', load !== 'done'));
+    $('#g-readonly-status').textContent = state === 'progress' ? '진행 중 · 편집 및 새 요청 가능' : '현재 상태에서는 기록 조회만 가능합니다. 유효한 동일 답안 재채점은 별도 화면에서 허용합니다.';
+    $('#g-test-banner').hidden = !$('#g-test').checked;
+    if (state === 'ended') $('#g-status-pill').textContent = '종료 · 읽기 전용';
+  }
+  $$('#g-state, #g-load, #g-test').forEach(el => el.addEventListener('change', updateExtraGame));
+  $$('[data-test-game]').forEach(el => el.addEventListener('click', () => { $('#g-test').checked = true; $('#g-state').value = 'paused'; updateGame(); updateExtraGame(); showScreen('game'); }));
+  function updateLocks() {
+    const busy = $('#ap-busy').value;
+    const published = $('#ap-state').value === 'published';
+    $('#ap-busy-status').textContent = published ? '출시된 사건은 수정할 수 없습니다.' : busy === 'test' ? '테스트를 완료하거나 중단한 뒤 수정 재개·맵 저장·배치 저장·출시가 가능합니다.' : busy === 'ai' ? '관련 AI 작업이 처리 중입니다. 완료될 때까지 편집·출시를 보류합니다.' : '편집 가능. 출시 검사의 모든 항목과 현재 내용의 테스트 완료 확인은 별도로 충족해야 합니다.';
+    $$('#screen-apub .a-top .wf-btn, #screen-apub .pub-grid .wf-btn').filter(b => /수정 재개|맵 설정 저장|배치 저장/.test(b.textContent)).forEach(b => b.classList.toggle('disabled', published || busy !== 'none'));
+    const confirm = $('[data-demo="reopen"]'); confirm.disabled = published || busy !== 'none';
+  }
+  $$('#ap-busy, #ap-state').forEach(el => el.addEventListener('change', updateLocks));
+  $$('[data-demo]').forEach(b => b.addEventListener('click', () => {
+    const messages = {followup: '보충 답변 생성 중… 해당 질문 입력과 전송 잠김', save: '노트 저장 재시도 예시입니다. 성공 확인 후 일시정지를 요청합니다.', reopen: '삭제 확인 예시입니다. 실제 데이터는 삭제하지 않습니다.'};
+    $('#' + b.dataset.demo + '-status').textContent = messages[b.dataset.demo];
+    if (b.dataset.demo === 'followup') { b.disabled = true; b.closest('details').querySelector('textarea').disabled = true; }
+  }));
+  $('#g-hint-left').addEventListener('change', () => {
+    const remaining = $('#g-hint-left').value;
+    $('#g-panel [data-view="hint"] .p-head .pill').innerHTML = '<b class="n" data-n="g16">16</b> 남은 ' + remaining + ' / 5';
+    $('.g-hud .meters .meter:nth-child(2) strong').textContent = remaining;
+    const footer = $('#g-panel [data-view="hint"] .p-foot');
+    $('.wf-btn', footer).classList.toggle('disabled', remaining === '0');
+    $('.hint-text', footer).textContent = remaining === '0' ? '새 힌트를 모두 사용했습니다. 기록 열람과 미사용 무료 보충 질문은 가능합니다.' : '전송하면 힌트 1회를 사용합니다 (남은 3회)';
+  });
+  $('#followup-example').addEventListener('change', () => {
+    const value = $('#followup-example').value;
+    const button = $('[data-demo="followup"]');
+    button.disabled = value === 'processing' || value === 'done';
+    button.closest('details').querySelector('textarea').disabled = button.disabled;
+    button.textContent = value === 'failed' ? '같은 보충 질문 재시도' : '무료 보충 질문 보내기';
+    $('#followup-status').textContent = {idle:'무료 1회 사용 가능', processing:'답변 생성 중…', failed:'답변을 받지 못했습니다. 보충 질문 횟수는 차감되지 않았습니다.', done:'보충 답변이 저장되었습니다. 이 힌트의 보충 질문은 사용했습니다.'}[value];
+  });
+  $('#budget-save').addEventListener('click', () => {
+    const amount = Number($('#budget-limit').value), warning = Number($('#budget-warning').value);
+    $('#budget-status').textContent = !Number.isFinite(amount) || amount <= 0 || !Number.isFinite(warning) || warning < 1 || warning > 100 ? '월 한도는 양수, 경고 임계값은 1~100%로 입력하세요.' : '입력 검증 완료 · 실제 서버 저장은 하지 않는 와이어프레임입니다.';
+  });
+  updateMain(); updateGame(); updateReveal(); updateAdmin(); updatePub(); updateUsage(); updateExtraGame(); updateLocks();
+  let saved = null;
+  try { saved = localStorage.getItem('wf-screen'); } catch (e) {}
+  showScreen(saved && $('#screen-' + saved) ? saved : 'login');
+})();
+</script>
+</body>
+</html>
