@@ -1,5 +1,6 @@
 package com.shelved.common.config;
 
+import com.shelved.common.enums.Difficulty;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -15,6 +16,28 @@ public record GameProperties(
         Duration heartbeatTimeout,
         Duration gradingRetryMinInterval
 ) {
+
+    /**
+     * 난이도의 제한시간
+     */
+    public Duration timeLimitOf(Difficulty difficulty) {
+        return switch (difficulty) {
+            case EASY -> timeLimit.easy();
+            case NORMAL -> timeLimit.normal();
+            case HARD -> timeLimit.hard();
+        };
+    }
+
+    /**
+     * 난이도의 새 힌트 횟수
+     */
+    public int hintLimitOf(Difficulty difficulty) {
+        return switch (difficulty) {
+            case EASY -> hintLimit.easy();
+            case NORMAL -> hintLimit.normal();
+            case HARD -> hintLimit.hard();
+        };
+    }
 
     /** 난이도별 제한시간 */
     public record TimeLimit(
