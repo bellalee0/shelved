@@ -93,8 +93,8 @@
 - [x] [W1] `dev` 브랜치 원격 푸시, 문서 브랜치 → `dev` 병합 (담당: Claude, 소유자 승인으로 PR 없이 병합)
 - [x] [W1] 쓰지 않는 브랜치·worktree 정리 — 미커밋 API 보완 내용은 `dev`로 옮긴 뒤 삭제 (담당: Claude)
 - [x] [W1] 루트 `.editorconfig` — UTF-8·LF·마지막 개행, Java 4칸 / TS·JSON·YAML 2칸 (common.md 포맷 규칙) (담당: BE-1)
-- [ ] [W1] JSON 네이밍/에러 응답/날짜 형식 등 API 공통 컨벤션 확정 — 초안은 `docs/api/README.md`·`errors.md`에 작성됨. 저장소 소유자 검토·병합 후 완료 처리
-- [ ] [W1] Google Cloud OAuth client ID 발급, Claude API 키 발급 (소유자)
+- [x] [W1] JSON 네이밍/에러 응답/날짜 형식 등 API 공통 컨벤션 확정 — 초안은 `docs/api/README.md`·`errors.md`에 작성됨 (메모: FE-2·BE-3 구현과 INT로 확인)
+- [~] [W1] Google Cloud OAuth client ID 발급, Claude API 키 발급 (소유자, 메모: OAuth client ID 확인(INT), Claude API 키는 미확인)
 
 ### 백엔드 기반
 
@@ -155,7 +155,7 @@
 
 ## 2. 인증 (7.1절, 6.1절, `docs/api/auth-user.md`)
 
-- [~] [W1] `POST /api/auth/google` — Google ID 토큰 검증(발급자·대상 client ID·만료), `google_sub`로 사용자 조회·생성(`role=PLAYER`, `nickname=null`) (담당: BE-3, 구현·대체 구현 테스트 완료. 실제 Google 토큰 확인은 INT)
+- [x] [W1] `POST /api/auth/google` — Google ID 토큰 검증(발급자·대상 client ID·만료), `google_sub`로 사용자 조회·생성(`role=PLAYER`, `nickname=null`) (담당: BE-3, 구현·대체 구현 테스트 완료, 실제 Google 로그인 확인 완료(INT))
 - [x] [W1] JWT 액세스 토큰 발급(1시간)/검증 필터, 만료 시 `401 EXPIRED_TOKEN`, 위조 시 `401 INVALID_TOKEN` (담당: BE-3)
 - [x] [W1] 리프레시 토큰 발급(2주)·해시 저장, `POST /api/auth/refresh` — 재발급 시 rotation(이전 토큰 무효화와 새 토큰 저장을 한 트랜잭션에서 원자적으로, 같은 토큰 중복 rotation 금지), 실패 시 `401 INVALID_REFRESH_TOKEN` (담당: BE-3)
 - [x] [W1] `POST /api/auth/logout` — 리프레시 토큰 무효화, 이미 무효·없는 토큰도 `200` (담당: BE-3)
@@ -312,7 +312,7 @@
 
 ## 15. 프론트엔드 — 공통 (3.9절, 5.2절, frontend.md)
 
-- [~] [W1] 로그인 화면 — Google Identity Services 버튼, ID 토큰 → `POST /api/auth/google` (담당: FE-2, 메모: 목 로그인으로 확인 완료. 실제 Google 로그인은 INT에서 확인)
+- [x] [W1] 로그인 화면 — Google Identity Services 버튼, ID 토큰 → `POST /api/auth/google` (담당: FE-2, 메모: 실제 Google 로그인 확인 완료(INT))
 - [x] [W1] 닉네임 설정 화면 — 검증 메시지·`409 NICKNAME_EXIST` 표시 (담당: FE-2)
 - [x] [W1] 인증 상태 — 액세스 토큰은 Zustand 메모리, 리프레시 토큰은 `localStorage`, 앱 시작 시 한 곳에서 `refresh → users/me` 복원 (담당: FE-2)
 - [x] [W1] 여러 탭 토큰 조정 — Web Locks(`shelved-auth`)로 저장·재발급·로그아웃 직렬화, 잠금 안에서 최신 리프레시 토큰 재확인, `INVALID_REFRESH_TOKEN` 시 저장값이 바뀌었으면 최신 값으로 1회 재시도, 네트워크·서버 오류에서는 토큰 유지, `storage` 이벤트로 다른 탭 로그아웃 반영 (`docs/api/auth-user.md`) (담당: FE-2)
