@@ -46,7 +46,9 @@
 | `content` | string | AI 답변 |
 | `createdAt` | string | |
 | `followup` | [HintFollowupResponse](#hintfollowupresponse) \| null | 보충 질문·답변 |
-| `followupAvailable` | boolean | 보충 질문을 아직 쓸 수 있는지 (`followup == null`이고 처리 중인 보충 질문이 없음) |
+| `followupAvailable` | boolean | 미사용 기회가 남았는지 (`followup == null`이고 처리 중인 보충 질문이 없음). 세션 상태와 무관한 값이며 지금 전송 가능하다는 뜻은 아님 |
+
+보충 질문 전송 버튼은 최신 `followupAvailable=true`이고 `state.timer.status=IN_PROGRESS`, `remainingMs > 0`, 현재 조작 연결을 가진 경우에만 활성화합니다. 서버가 최종 검증합니다.
 
 #### HintFollowupResponse
 

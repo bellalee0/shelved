@@ -32,10 +32,14 @@ GET state, briefing, map (병렬) → 맵 로딩 → PLACE_AT_SPAWN → MAP_READ
 [재접속·새로고침]
 POST pause (헤더 없이)          # 기존 연결의 시간이 계속 흐르지 않도록
 GET state, notes/me, hints, accusations, map (병렬) → 처리 중·실패 요청 복원
-맵 로딩 → PLACE_AT_SPAWN → MAP_READY
-"수사 이어하기" 활성화 → POST resume → 새 connectionId → 하트비트 시작
-  ※ state.timer.awaitingGrading=true면 이어하기 대신 "채점 대기" 화면을 표시
-     (resume은 409 ROOM_TIME_EXPIRED). 재채점은 연결 헤더 없이 POST accusations
+state.timer.status가 종료 상태 → 결과 화면 (맵 로딩·재개하지 않음)
+state.timer.awaitingGrading=true → 채점 대기·실패 화면
+  (resume은 409 ROOM_TIME_EXPIRED). 재채점은 연결 헤더 없이 POST accusations
+그 외에는 맵 로딩 → PLACE_AT_SPAWN → MAP_READY
+  READY → "수사 시작" → POST start
+  PAUSED + remainingMs > 0 → "수사 이어하기" → POST resume
+  start/resume 성공 → 새 connectionId 보관 → 하트비트 시작
+로딩 중 상태가 바뀔 수 있으므로 start/resume이 409면 state를 다시 조회해 분기
 
 [다른 화면에서 이어하기 (409 CONNECTION_REPLACED)]
 조작·하트비트 중단 → "이 화면에서 계속하기"를 누르면 재접속 흐름과 같음
@@ -74,7 +78,7 @@ AI 요청의 처리 상태입니다. AI POST의 `202` 응답, 상태 조회 API,
 | `targetId` | number \| null | `NPC_ASK`: suspectId, `HINT_FOLLOWUP`: hintId, 그 외 `null` |
 | `status` | `AiRequestStatus` | `PROCESSING` / `SUCCEEDED` / `FAILED` |
 | `input` | object | 플레이어가 보낸 입력. 재시도 시 그대로 다시 보낸다. `NPC_ASK`·`HINT`·`HINT_FOLLOWUP`: `{ "question" }`, `ACCUSATION`: `{ "suspectId", "trickExplanation" }` |
-| `result` | object \| null | `SUCCEEDED`일 때 원래 POST의 성공 응답과 같은 객체 (`NPC_ASK`: [NpcAskResponse](investigation.md#npcaskresponse), `HINT`: [HintCreateResponse](hint-accusation.md#post-apiroomsroomidhints), `HINT_FOLLOWUP`: [HintFollowupResponse](hint-accusation.md#hintfollowupresponse), `ACCUSATION`: [AccusationCreateResponse](hint-accusation.md#post-apiroomsroomidaccusations)) |
+| `result` | object \| null | `SUCCEEDED`일 때 최초 성공 당시 원래 POST의 성공 응답 스냅샷 (현재 횟수·상태는 `GET state`로 재조회)과 같은 객체 (`NPC_ASK`: [NpcAskResponse](investigation.md#npcaskresponse), `HINT`: [HintCreateResponse](hint-accusation.md#post-apiroomsroomidhints), `HINT_FOLLOWUP`: [HintFollowupResponse](hint-accusation.md#hintfollowupresponse), `ACCUSATION`: [AccusationCreateResponse](hint-accusation.md#post-apiroomsroomidaccusations)) |
 | `error` | object \| null | `FAILED`일 때 `{ "code", "message" }` |
 | `retryAvailableAt` | string \| null | `ACCUSATION`이 `FAILED`일 때 같은 답안 재채점이 가능한 시각. 그 외 `null` |
 | `acceptedAt` | string | 서버 최초 접수 시각 |
@@ -165,7 +169,7 @@ AI 내부 입력 컨텍스트(`input_json`의 프롬프트 등)는 포함하지 
 | `accusationCount` | [UsageCount](#usagecount) | 지목 횟수 (정상 채점 완료 기준) |
 | `pendingAccusation` | object \| null | 채점 중(`PENDING`)이거나 채점 실패(`ERROR`)한 지목. 형식은 [AccusationResponse](hint-accusation.md#accusationresponse) |
 | `aiRequests` | [AiRequestStatusResponse](#airequeststatusresponse)[] | `PROCESSING`이거나 재시도 대기 중인 `FAILED` 요청 (대체된 지목 제외) |
-| `conversations` | object[] | 대화한 NPC 목록 `{ "suspectId", "messageCount", "lastMessageAt" }` |
+| `conversations` | object[] | 대화한 NPC 목록 `{ suspectId: number, messageCount: number, lastMessageAt: string }`. `messageCount`는 양의 정수 |
 
 ### UsageCount
 
@@ -260,8 +264,20 @@ Phaser가 맵을 그리는 데 필요한 정보입니다. 모든 상태에서 �
 | `spawnX`, `spawnY` | number | 시작 위치 |
 | `collisionLayer` | string | 충돌 판정 레이어 이름 |
 | `interactionRadiusPx` | number | 상호작용 반경 |
-| `suspects` | object[] | `{ "suspectId", "name", "spriteKey", "canConverse", "x", "y" }` — 배치되지 않았으면 `x`, `y`는 `null` |
-| `evidences` | object[] | `{ "evidenceId", "name", "x", "y" }` |
+| `suspects` | RoomMapSuspect[] | 아래 구조. 지목 대상 전체 |
+| `evidences` | RoomMapEvidence[] | 아래 구조. 배치된 물증 전체 |
+
+#### RoomMapSuspect / RoomMapEvidence
+
+| 필드 | 타입 | 적용·제약 |
+|---|---|---|
+| `suspectId` / `evidenceId` | number | 각각 인물 / 물증 ID |
+| `name` | string | 표시 이름 |
+| `spriteKey` | string \| null | 인물만. 미배치 인물은 없을 수 있음. 배치된 인물은 유효한 값 필수 |
+| `canConverse` | boolean | 인물만. `false`여도 지목 가능 |
+| `x`, `y` | number \| null | 인물은 미배치 시 둘 다 `null`. 배치된 인물·물증은 0 이상의 정수이며 맵 범위 안 |
+
+대화 가능한 인물과 모든 물증은 출시 전에 배치해야 합니다. 대화 불가능 인물은 배치와 `spriteKey`를 생략할 수 있고, 이때 지목·리빌 UI는 이름과 기본 실루엣으로 표시합니다.
 
 Phaser의 `INTERACT_REQUESTED { type, targetId }`에서 `targetId`는 `suspectId` 또는 `evidenceId`입니다.
 
@@ -326,6 +342,15 @@ Phaser의 `INTERACT_REQUESTED { type, targetId }`에서 `targetId`는 `suspectId
 
 ---
 
+### 일시정지의 시간 정산 순서
+
+1. 세션 잠금 안에서 기존 `last_seen_at`과 서버 시각으로 접속·시간 상태를 먼저 정산합니다. `pause` 자체는 `last_seen_at`을 갱신하는 플레이 행동으로 보지 않습니다.
+2. 하트비트 미수신 시간이 이탈 기준(잠정 15초) 이상이면 마지막 접속 확인 시각까지 누적하고 `PAUSED`로 전환합니다. 이미 확인·확정된 시간 만료는 되돌리지 않습니다.
+3. 이탈 기준 미만이면 `pause` 접수 시각까지 누적합니다. 이때 제한시간을 소진했으면 유효한 미해결 지목이 없는 경우 `EXPIRED`, 있으면 결과 확정을 보류하고 `PAUSED`로 둡니다. 그 외에는 `PAUSED`입니다.
+4. 현재 연결을 무효화하고 정산된 `RoomTimerResponse`를 반환합니다. `READY`·기존 `PAUSED`·종료 상태에서는 시간과 상태를 다시 변경하지 않습니다.
+
+명시적 `pause`는 유예 구간에도 접속 확인 시각을 현재로 확정하는 정지 요청입니다. 일반 조회·주기 점검의 유예 구간 만료 보류와 구분합니다.
+
 ## POST /api/rooms/{roomId}/resume
 
 "수사 이어하기"입니다. `PAUSED`에서만 가능합니다. 새 `connectionId`를 발급하며 이전 연결의 하트비트·조작 요청은 이후 `409 CONNECTION_REPLACED`가 됩니다.
@@ -360,8 +385,8 @@ Phaser의 `INTERACT_REQUESTED { type, targetId }`에서 `targetId`는 `suspectId
 | `durationSec` | number | `CLEARED`: 정답 접수 시점까지 누적 진행 시간, `FAILED`: 종료 시점까지, `EXPIRED`: 제한시간 |
 | `hintUsedCount` | number | |
 | `accusationCompletedCount` | number | 정상 채점 완료된 지목 수 |
-| `source` | object | `{ "novelTitle", "novelAuthor", "novelIntro" }` 원작 공개. `novelIntro`는 원작 소개 문장 |
-| `culprit` | object | `{ "suspectId", "name" }` |
+| `source` | object | `{ novelTitle: string, novelAuthor: string, novelIntro: string }` 원작 공개. 모두 null 불가 |
+| `culprit` | object | `{ suspectId: number, name: string }`. 모두 null 불가 |
 | `trickSummary` | string | 트릭 요약 |
 | `revealExplanation` | string | 리빌 해설 (제작 시 검수된 고정 텍스트) |
 | `accusations` | [AccusationResponse](hint-accusation.md#accusationresponse)[] | 이 세션의 지목 기록 |

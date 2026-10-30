@@ -170,8 +170,8 @@ NPC에게 자유 질문을 보내고 답변을 받습니다. 질문과 답변은
 
 | 필드 | 타입 | 필수 | 제약 |
 |---|---|---|---|
-| `content` | string | O | 0~`maxLength`자 (빈 문자열 허용) |
-| `revision` | number | O | 마지막으로 받은 `revision` |
+| `content` | string | O | 0~`maxLength`자. 빈 문자열 허용, trim·공백 및 줄바꿈 정규화 없이 원문 보존 |
+| `revision` | number | O | 마지막으로 받은 `revision`. 0 이상의 정수 |
 
 **성공 응답** `200` [NoteResponse](#get-apiroomsroomidnotesme)
 

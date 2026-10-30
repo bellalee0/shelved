@@ -70,7 +70,7 @@
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `configured` | boolean | 미설정이면 `false`, 나머지 값은 `null` |
+| `configured` | boolean | 미설정이면 `false`, `monthlyLimit`·`warningPercent`·`updatedAt`만 `null`. `currency`·`timezone`은 고정값 유지 |
 | `monthlyLimit` | number \| null | USD |
 | `warningPercent` | number \| null | 1~100 |
 | `currency` | string | `"USD"` |

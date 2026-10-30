@@ -81,7 +81,7 @@
 | `status` | `CaseStatus` | |
 | `clonedFromCaseId` | number \| null | 복제로 만든 사건이면 원본 ID |
 | `coverImageUrl` | string \| null | |
-| `sourceText` | object \| null | `{ "originalFilename", "charCount", "uploadedAt" }` (원문 내용은 포함하지 않음) |
+| `sourceText` | SourceTextInfo \| null | 아래 구조. 원문 내용은 포함하지 않음 |
 | `draft` | Draft | [초안 구조](admin-draft-schema.md#전체-구조) |
 | `draftUpdatedAt` | string | |
 | `draftIssues` | [DraftIssue](admin-draft-schema.md#콘텐츠-확정-시-검증과-반영)[] | 현재 초안의 확정 전 검사 결과. 문제가 없으면 `[]` |
@@ -91,14 +91,25 @@
 | `contentUpdatedAt` | string \| null | 마지막 콘텐츠·맵·배치 변경 시각 |
 | `testVerifiedAt` | string \| null | 현재 내용의 테스트 완료 확인 시각 |
 | `chatProcessing` | boolean | 처리 중인 제작 채팅이 있는지 |
+| `chatContextRevision` | number | 0 이상의 정수. 원문·초안·제작 상태 변경을 구분하는 서버 버전 |
 
 `content` — 맵 배치 화면에서 사용할 확정 엔티티 목록
 
 | 필드 | 타입 |
 |---|---|
-| `suspects` | `{ "suspectId", "key", "name", "spriteKey", "canConverse", "isCulprit" }[]` |
-| `evidences` | `{ "evidenceId", "key", "name" }[]` |
-| `trickElements` | `{ "trickElementId", "key", "orderIndex", "description" }[]` |
+| `suspects` | `{ suspectId: number, key: string, name: string, spriteKey: string \| null, canConverse: boolean, isCulprit: boolean }[]` |
+| `evidences` | `{ evidenceId: number, key: string, name: string }[]` |
+| `trickElements` | `{ trickElementId: number, key: string, orderIndex: number, description: string }[]` |
+
+`orderIndex`는 1 이상의 정수입니다. `spriteKey`는 미배치 인물일 때 `null`을 허용하며, 배치된 인물은 출시 검사에서 유효한 스프라이트를 요구합니다.
+
+#### SourceTextInfo
+
+| 필드 | 타입 | 제약 |
+|---|---|---|
+| `originalFilename` | string | 업로드 원본 파일명 |
+| `charCount` | number | 1 이상의 정수. UTF-16 코드 단위 길이 |
+| `uploadedAt` | string | 서버 업로드 시각 |
 
 ### GET /api/admin/cases/{caseId}/messages
 
@@ -138,7 +149,7 @@
 |---|---|---|---|
 | `file` | file | O | 확장자 `.txt`, UTF-8, 크기 한도는 설정값 (`shelved.casebuilder.source-text-max-size`) |
 
-**성공 응답** `200` `{ "originalFilename", "charCount", "uploadedAt" }`
+**성공 응답** `200` [SourceTextInfo](#sourcetextinfo)
 
 **실패 응답** (공통 외)
 
@@ -169,11 +180,21 @@
 
 ### POST /api/admin/cases/{caseId}/chat
 
-관리자 메시지를 보내면 AI가 답변하고 tool로 초안을 갱신합니다. 사건당 한 번에 한 요청만 처리합니다. 요청 식별 규칙은 [README](README.md#ai-요청-처리-requestid)와 같습니다.
+관리자 메시지를 보내면 AI가 답변하고 tool로 초안을 갱신합니다. 사건당 한 번에 한 요청만 처리합니다. 요청 식별의 공통 원칙은 [README](README.md#ai-요청-처리-requestid)를 따르며, 사건 범위와 아래 재시도 예외를 적용합니다.
 
 - 원문이 업로드되어 있어야 합니다(`409 SOURCE_TEXT_REQUIRED`).
 - 서버는 원문(또는 필요한 분할 구간)·대화 이력·현재 초안·용어집·tool 정의로 입력을 구성합니다. 모델 입력 한도를 넘으면 오래된 대화 이력을 요약하고, 그래도 넘으면 원문을 분할합니다(기획서 8.4절). **어떻게 구성했는지 `inputInfo`로 알려줍니다.** 그래도 맞출 수 없으면 원문을 조용히 자르지 않고 `400 LLM_INPUT_TOO_LARGE`를 반환합니다.
 - AI 호출이 실패하면 초안을 바꾸지 않고 `502 CASE_CHAT_FAILED`를 반환합니다. 같은 `requestId`·메시지로 재시도합니다.
+
+#### 제작 상태 변경과 재시도
+
+- 서버는 사건 생성 시 `chatContextRevision=0`으로 시작하고, 원문 업로드·교체, 새 제작 채팅의 성공 저장(초안 변경이 없어도 대화 이력이 바뀜), 콘텐츠 확정·수정 재개마다 1 올립니다. 실패·처리 중·완료 결과 재조회와 표지·맵·좌표 변경에서는 올리지 않습니다. `CASES.chat_context_revision`에 저장합니다.
+- 최초 채팅 접수 시 현재 버전을 해당 관리자 요청에 저장합니다(`ADMIN_CASE_MESSAGES.chat_context_revision`). 클라이언트가 요청 본문에 버전을 보낼 필요는 없습니다.
+- 실패한 동일 `requestId`·메시지는 `DRAFT`이고 접수 버전과 현재 버전이 같을 때만 현재 원문·초안·대화 이력으로 재실행합니다. 실패한 발화는 생성용 대화 이력에서 제외합니다. 버전 비교·접수는 사건 기준의 짧은 잠금 안에서 처리합니다.
+- 버전이 달라졌으면 `409 CASE_CHAT_CONTEXT_CHANGED`와 `{ currentRevision: number }`를 반환합니다. 프론트엔드는 최신 detail·messages를 다시 받고, 사용자가 확인한 내용을 새 `requestId`로 전송합니다. 오래된 요청을 자동으로 새 요청으로 바꾸지 않습니다.
+- 같은 ID의 입력 비교 및 완료·처리 중 조회는 현재 사건의 수정 가능 상태 검사보다 먼저 수행합니다(관리자 권한 검사는 항상 먼저). 완료 요청은 확정·출시 후에도 당시 성공 응답을 반환하며 AI를 다시 호출하지 않습니다.
+- 완료 응답의 `draft`, `draftUpdatedAt`, `draftIssues`는 당시 스냅샷입니다. 재전송·폴링으로 복구한 뒤에는 detail·messages를 다시 조회해 최신 메모장을 표시합니다. 과거 초안을 최신 상태에 덮어쓰지 않습니다.
+- 최초 접수 때 관리자 발화를 저장하며, 재시도는 같은 발화의 상태를 갱신하고 중복 발화를 만들지 않습니다. 정상 완료 시 AI 발화·초안·버전 증가·요청 성공 결과를 한 번에 저장합니다. 관리자 발화의 `response_json`에 전체 `AdminChatResponse` 스냅샷을 보존하며 이 저장 컬럼 자체는 메시지 DTO에 노출하지 않습니다.
 
 **요청 본문** `AdminChatRequest`
 
@@ -203,7 +224,7 @@
 | `inputTokens` | number \| null | 확인된 입력 토큰 수 |
 | `note` | string \| null | 요약·분할 범위 등 설명 |
 
-**처리 중** `202` `{ "requestId", "status": "PROCESSING", "acceptedAt" }` — 완료 여부는 [messages](#get-apiadmincasescaseidmessages)에서 해당 `requestId`의 `status`로 확인합니다.
+**처리 중** `202` `{ requestId: string, status: "PROCESSING", acceptedAt: string }` — 완료 여부는 [messages](#get-apiadmincasescaseidmessages)에서 해당 `requestId`의 `status`로 확인합니다.
 
 **실패 응답** (공통 외)
 
@@ -213,6 +234,7 @@
 | 400 | `LLM_INPUT_TOO_LARGE` | 축약·분할로도 입력 한도를 맞출 수 없음 |
 | 409 | `SOURCE_TEXT_REQUIRED` | 원문 미업로드 |
 | 409 | `AI_REQUEST_ID_REUSED` | 같은 `requestId`에 다른 메시지 |
+| 409 | `CASE_CHAT_CONTEXT_CHANGED` | 실패 요청 접수 후 원문·대화·초안·제작 상태 변경. `detail: { "currentRevision": number }` |
 | 502 | `CASE_CHAT_FAILED` | Claude API 실패. 초안 변경 없음 |
 
 ### POST /api/admin/cases/{caseId}/confirm
@@ -260,7 +282,7 @@
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `maps` | object[] | `{ "mapUrl", "widthPx", "heightPx", "layers": string[] }` — `layers`는 충돌 레이어 선택지 |
+| `maps` | object[] | `{ mapUrl: string, widthPx: number, heightPx: number, layers: string[] }`. 크기는 양의 정수 픽셀. `layers`는 충돌 레이어 선택지 |
 | `spriteKeys` | string[] | NPC에 지정할 수 있는 스프라이트 식별자 |
 
 **실패 응답**
@@ -278,9 +300,9 @@
 | 필드 | 타입 | 필수 | 제약 |
 |---|---|---|---|
 | `mapUrl` | string | O | `/assets/maps/`로 시작하는 Tiled JSON 경로 |
-| `spawnX`, `spawnY` | number | O | 0 이상 |
+| `spawnX`, `spawnY` | number | O | 0 이상의 정수. 맵 범위 안 |
 | `collisionLayer` | string | O | 맵에 존재하는 레이어 이름 |
-| `interactionRadiusPx` | number | O | 1 이상 |
+| `interactionRadiusPx` | number | O | 1 이상의 정수 |
 
 **성공 응답** `200` `AdminCaseMapResponse` (요청과 같은 필드)
 
@@ -301,7 +323,7 @@ NPC·물증 배치를 **전체 교체**합니다. 맵 설정이 먼저 있어야
 | `hotspots` | object[] | O | `{ "type": HotspotType, "refId": number, "x": number, "y": number }` |
 
 - `refId`는 이 사건의 `suspectId`(`SUSPECT`) 또는 `evidenceId`(`EVIDENCE`)입니다.
-- 같은 대상을 두 번 배치할 수 없습니다.
+- 같은 대상을 두 번 배치할 수 없습니다. `x`, `y`는 0 이상의 정수이며 맵 범위 안이어야 합니다. 빈 배열은 허용하되 필수 배치 누락은 출시 검사에서 차단합니다.
 
 **성공 응답** `200` `{ "hotspots": HotspotResponse[] }`
 

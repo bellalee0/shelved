@@ -49,9 +49,11 @@
 | 시간 길이 | 필드명에 단위를 붙인다. 밀리초 `...Ms`, 초 `...Sec` (예: `remainingMs`, `durationSec`) |
 | null | 값이 없는 필드는 생략하지 않고 `null`로 내려준다. 빈 목록은 `[]` |
 | 페이지네이션 | 쿼리 `page`(0부터), `size`(기본 20, 최대 100). 응답은 [PageResponse](#pageresponse) |
-| 문자열 입력 | 앞뒤 공백을 제거한 뒤 검증한다. 길이 제한은 각 API에 적는다 |
+| 문자열 입력 | 앞뒤 공백을 제거한 뒤 검증한다. 단, 개인 노트 `content`는 공백·줄바꿈을 포함해 그대로 보존한다. 길이는 Java/JavaScript의 UTF-16 코드 단위로 세며 각 API의 제한을 적용한다 |
 
 ---
+
+숫자 ID는 양의 정수, 페이지·횟수·버전은 0 이상의 정수입니다. 좌표·반경·맵 크기는 정수 픽셀 단위입니다. 요청에서 범위를 벗어나거나 소수인 값은 `400 INVALID_INPUT`(본문) 또는 `400 INVALID_PARAMETER`(경로·쿼리)입니다.
 
 ## 공통 응답 형식
 
@@ -161,7 +163,7 @@
 
 ## AI 요청 처리 (requestId)
 
-NPC 질문, 새 힌트, 보충 질문, 지목, 관리자 제작 채팅은 Claude API를 호출합니다. 중복 실행·중복 차감을 막기 위해 요청 본문에 `requestId`(UUID)를 넣습니다. (기획서 3.6절)
+NPC 질문, 새 힌트, 보충 질문, 지목은 Claude API를 호출합니다. 중복 실행·중복 차감을 막기 위해 요청 본문에 `requestId`(UUID)를 넣습니다. (기획서 3.6절)
 
 | 상황 | 응답 |
 |---|---|
@@ -177,8 +179,17 @@ NPC 질문, 새 힌트, 보충 질문, 지목, 관리자 제작 채팅은 Claude
 - 프론트엔드: 새로 전송할 때만 `crypto.randomUUID()`로 새 ID를 만들고, 재시도는 같은 ID와 같은 입력을 보냅니다. ([frontend.md](../conventions/frontend.md#5-ai-요청의-requestid-처리))
 - `requestId`는 세션 안에서 요청 유형과 관계없이 유일해야 합니다.
 - 직접적인 정답 요구로 차단된 질문(`400 QUESTION_BLOCKED`)은 AI 요청으로 접수하지 않으므로, 같은 `requestId`를 다른 질문에 다시 써도 됩니다.
+- 차단 여부는 NPC 질문·새 힌트·보충 질문을 접수하기 전에 작은 모델의 의도 분류 호출로 판정합니다(기획서 2.4절). 분류 호출이 실패하면 요청을 접수하지 않고 해당 API의 `502` 실패 코드(`NPC_ANSWER_FAILED`, `HINT_GENERATION_FAILED`, `HINT_FOLLOWUP_FAILED`)를 반환합니다. 기회는 차감되지 않으며 같은 `requestId`·입력으로 다시 보내면 됩니다.
 
 ---
+
+### 저장된 결과와 현재 상태
+
+완료된 요청 재전송과 AI 상태 조회의 `result`는 **최초 성공 당시의 스냅샷**입니다. `hintCount`, `accusationCount`, `roomStatus`, `followupAvailable`도 당시 값이며 현재 상태로 재계산하지 않습니다. 프론트엔드는 복구·재전송 결과에서 대화·답안을 복원한 뒤 `GET /api/rooms/{roomId}/state`를 다시 조회해 현재 시간·횟수·화면 전환을 결정합니다. 보충 질문 버튼은 최신 `GET hints`로 갱신합니다. 과거 응답으로 현재 상태를 덮어쓰지 않습니다.
+
+### 관리자 제작 채팅의 예외
+
+관리자 채팅의 `requestId`는 세션이 아닌 **사건 안에서 유일**합니다. `202`는 `{ requestId: string, status: "PROCESSING", acceptedAt: string }`이며 게임용 `AiRequestStatusResponse`를 사용하지 않습니다. 상태는 관리자 `GET messages`로 확인합니다. 사건별 순차 처리 오류는 `CASE_CHAT_IN_PROGRESS`, 실패 후 제작 상태 변경은 `CASE_CHAT_CONTEXT_CHANGED`로 구분합니다. 완료 결과의 과거 초안 처리와 재시도 조건은 [관리자 채팅](admin-casebuilder.md#post-apiadmincasescaseidchat)을 따릅니다.
 
 ## 공통 enum
 
@@ -195,4 +206,4 @@ NPC 질문, 새 힌트, 보충 질문, 지목, 관리자 제작 채팅은 Claude
 | `MessageSenderType` | `USER`, `NPC` | NPC 대화 발화자 |
 | `AdminMessageSenderType` | `ADMIN`, `AI` | 관리자 제작 채팅 발화자 |
 | `HotspotType` | `SUSPECT`, `EVIDENCE` | 맵 배치 대상 |
-| `LlmRequestType` | `NPC_CHAT`, `HINT`, `HINT_FOLLOWUP`, `GRADING`, `CASE_GENERATION` | 사용량 로그 유형 |
+| `LlmRequestType` | `NPC_CHAT`, `HINT`, `HINT_FOLLOWUP`, `GRADING`, `CASE_GENERATION`, `QUESTION_FILTER` | 사용량 로그 유형. `QUESTION_FILTER`는 직접 정답 요구 차단 판정 호출 |

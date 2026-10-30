@@ -100,6 +100,7 @@
 | `CASE_NOT_CONTENT_CONFIRMED` | 409 | 콘텐츠 확정 상태에서만 할 수 있습니다. | |
 | `CASE_NOT_PUBLISHED` | 409 | 공개된 사건만 복제할 수 있습니다. | |
 | `CASE_CHAT_IN_PROGRESS` | 409 | 제작 채팅을 처리하고 있습니다. 완료된 뒤 다시 시도해 주세요. | `{ "requestId" }` |
+| `CASE_CHAT_CONTEXT_CHANGED` | 409 | 제작 내용이 변경되었습니다. 최신 내용을 확인한 뒤 새 메시지로 보내 주세요. | `{ "currentRevision": number }` |
 | `CASE_AI_REQUEST_IN_PROGRESS` | 409 | 테스트 세션의 AI 요청을 처리하고 있습니다. 잠시 후 다시 시도해 주세요. | |
 | `SOURCE_TEXT_REQUIRED` | 409 | 원문을 먼저 업로드해 주세요. | |
 | `DRAFT_INVALID` | 409 | 초안에 수정할 항목이 있습니다. | `{ "issues": DraftIssue[] }` |
