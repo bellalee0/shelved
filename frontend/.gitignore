@@ -1,0 +1,23 @@
+# 의존성·빌드 결과
+node_modules
+dist
+dist-ssr
+coverage
+
+# 로컬 환경 변수 (예시 파일만 커밋)
+.env
+.env.*
+!.env.example
+*.local
+
+# 로그
+logs
+*.log
+npm-debug.log*
+
+# 에디터·OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.sw?
