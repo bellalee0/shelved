@@ -17,6 +17,10 @@ spring:
         jdbc:
           # 서버 기준 시간대 (Asia/Seoul)
           time_zone: Asia/Seoul
+        type:
+          # jsonb 컬럼 변환에 Jackson 3을 쓴다. springdoc이 Jackson 2를 함께 가져오면 Hibernate가 Jackson 2를 먼저 고르므로 명시한다.
+          # Spring의 JsonMapper 빈과 별개이므로 요청 본문 trim 등 웹 설정은 DB 저장값에 적용되지 않는다.
+          json_format_mapper: jackson3
 
   jackson:
     # 서버 기준 시간대 (Asia/Seoul). LocalDateTime은 오프셋 없는 ISO-8601 문자열로 직렬화한다.
