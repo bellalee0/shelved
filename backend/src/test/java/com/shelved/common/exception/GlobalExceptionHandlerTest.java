@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -29,6 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ExceptionTestController.class)
+// 예외 변환만 확인하므로 Security 필터는 끈다 (인증 오류 응답은 SecurityIntegrationTest에서 확인)
+@AutoConfigureMockMvc(addFilters = false)
 @Import({GlobalExceptionHandlerTest.ExceptionTestController.class, JacksonConfig.class})
 class GlobalExceptionHandlerTest {
 
