@@ -1,0 +1,132 @@
+# 공통 설정. 프로필별 설정은 application-{local,demo}.yml, 테스트는 src/test/resources/application-test.yml
+# 프로필은 환경 변수 SPRING_PROFILES_ACTIVE로 지정한다 (.env.example 참고).
+spring:
+  application:
+    name: shelved
+
+  jpa:
+    # 외부 AI 호출 중 DB 커넥션을 붙잡지 않도록 끈다 (backend.md 13). 지연 로딩은 트랜잭션 안에서만 사용한다.
+    open-in-view: false
+    hibernate:
+      # 프로필에서 덮어쓴다. 프로필이 없으면 스키마를 바꾸지 않는 validate
+      ddl-auto: validate
+    # SQL 로그는 기본적으로 끈다. 바인딩 값 로그는 아래 logging.level에서 OFF로 고정한다.
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          # 서버 기준 시간대 (Asia/Seoul)
+          time_zone: Asia/Seoul
+
+  jackson:
+    # 서버 기준 시간대 (Asia/Seoul). LocalDateTime은 오프셋 없는 ISO-8601 문자열로 직렬화한다.
+    time-zone: Asia/Seoul
+    mapper:
+      # Jackson 3 기본값(알파벳순) 대신 필드 선언 순서로 직렬화한다 (명세의 success·message·data·timestamp 순서)
+      sort-properties-alphabetically: false
+    datatype:
+      datetime:
+        write-dates-as-timestamps: false
+    deserialization:
+      # 정수 필드에 소수(1.5)가 오면 잘라내지 않고 400으로 거부한다 (docs/api/README.md 공통 규칙)
+      accept-float-as-int: false
+
+  servlet:
+    multipart:
+      # 업로드 한도 중 가장 큰 값(shelved.casebuilder.source-text-max-size, cover-image-max-size)과 맞춘다.
+      # 파일별 한도 검사는 각 업로드 API에서 다시 한다.
+      max-file-size: 5MB
+      # 파일 1개 + multipart 경계 등 여유분
+      max-request-size: 6MB
+
+  mvc:
+    # 요청 파라미터·헤더를 디버그 로그에 남기지 않는다 (common.md 비밀 값 및 로그 관리)
+    log-request-details: false
+
+server:
+  tomcat:
+    # 한도를 넘은 업로드에도 연결을 끊지 않고 FILE_TOO_LARGE 응답을 돌려줄 수 있도록 남은 본문을 읽어 버리는 한도
+    max-swallow-size: 10MB
+
+# Swagger UI는 local 프로필에서만 연다 (application-local.yml)
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+shelved:
+  game:
+    # 난이도별 제한시간 — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    time-limit:
+      easy: 20m
+      normal: 25m
+      hard: 35m
+    # 난이도별 힌트 횟수 — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    hint-limit:
+      easy: 5
+      normal: 3
+      hard: 1
+    # 지목 기회 — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    accusation-limit: 3
+    # 하트비트 간격 / 이탈 판정 — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    heartbeat-interval: 5s
+    heartbeat-timeout: 15s
+    # 채점 재시도 최소 간격 — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    grading-retry-min-interval: 10s
+
+  note:
+    # 개인 노트 최대 글자 수 (UTF-16 코드 단위) — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    max-length: 5000
+
+  llm:
+    # 비밀 값과 모델명은 환경 변수로만 주입한다. 1주차에는 비어 있어도 기동되며, 호출 시점 검증은 W3에서 추가한다.
+    api-key: ${CLAUDE_API_KEY:}
+    # 본 응답용 모델 (NPC 대화·힌트·채점·사건 제작)
+    model: ${CLAUDE_MODEL:}
+    # 직접적인 정답 요구 차단 판정용 작은 모델 (QUESTION_FILTER)
+    filter-model: ${CLAUDE_FILTER_MODEL:}
+    # 게임플레이 AI 호출 시간 제한 — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    game-timeout: 60s
+    # 관리자 제작 채팅 시간 제한 — 잠정, W5 실측 후 조정
+    casebuilder-chat-timeout: 300s
+    # PROCESSING 요청 복구 기준 = 각 시간 제한 + 이 값 — 잠정
+    processing-recovery-margin: 60s
+    # 호출 1회의 입력 토큰 상한. 넘으면 잘라 보내지 않고 LLM_INPUT_TOO_LARGE — 잠정, W5 실측 후 확정
+    max-input-tokens: 150000
+    # 호출 1회의 출력 토큰 상한 — 잠정, W5 실측 후 확정
+    max-output-tokens: 8192
+
+  casebuilder:
+    # 원문(.txt) 업로드 크기 한도 — 잠정, W5 실측 후 확정
+    source-text-max-size: 5MB
+    # 표지 이미지 크기 한도 — 잠정
+    cover-image-max-size: 5MB
+    # 표지 이미지 저장 경로 (서버 로컬 디스크, 실행 위치 기준 상대 경로 가능)
+    cover-image-dir: ./data/cover-images
+
+  assets:
+    # 프론트엔드 정적 에셋 폴더. 맵·스프라이트 검증에 사용 (docs/api/admin-casebuilder.md 맵·좌표)
+    base-path: ../frontend/public/assets
+
+logging:
+  level:
+    # SQL 바인딩 값(토큰 해시·원문·노트 등)이 로그에 남지 않도록 고정 (common.md 비밀 값 및 로그 관리)
+    org.hibernate.orm.jdbc.bind: OFF
+    org.hibernate.orm.jdbc.extract: OFF
+    # HTTP 클라이언트 요청·응답 본문·헤더(API 키) 로그 차단 (W3 Claude API 연동 대비)
+    org.apache.hc.client5.http.wire: OFF
+    org.apache.hc.client5.http.headers: OFF
+    # 요청·응답 본문을 남기는 디버그 로그를 켜지 않는다
+    org.springframework.web: INFO
+
+---
+# 로컬·시연 DB 접속 정보. 테스트 프로필은 Testcontainers가 접속 정보를 주입한다.
+spring:
+  config:
+    activate:
+      on-profile: local | demo
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}

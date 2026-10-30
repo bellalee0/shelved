@@ -1,0 +1,25 @@
+# 로컬 개발용 PostgreSQL
+# 접속 정보는 같은 폴더의 .env 값을 사용한다 (docker compose가 변수 치환에 자동으로 읽는다).
+name: shelved
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:?DB_NAME을 .env에 설정해 주세요}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME을 .env에 설정해 주세요}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 .env에 설정해 주세요}
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
