@@ -121,7 +121,7 @@
 - [x] [W1] npm 스크립트 — `lint`, `typecheck`, `test -- --run`, `build` (담당: FE-1)
 - [x] [W1] React Router, TanStack Query, Zustand 설정 (`src/app`) (담당: FE-1)
 - [x] [W1] 폴더 구조 — `app`/`pages`/`features/{도메인}`/`game`/`mocks`/`shared` (frontend.md) (담당: FE-1)
-- [~] [W1] `shared/api/client.ts` — 기본 주소, 액세스 토큰 첨부, `401 EXPIRED_TOKEN`일 때만 재발급 후 1회 재전송(동시 만료 시 재발급 Promise 공유), `X-Connection-Id` 헤더 첨부, 실패를 HTTP 상태·`message`·`data.code`·`data.detail` 보존 공통 에러로 변환 (담당: FE-1, 메모: 기본 주소·토큰 첨부·연결 헤더·공통 에러 변환 완료. 401 재발급·1회 재전송은 FE-2)
+- [x] [W1] `shared/api/client.ts` — 기본 주소, 액세스 토큰 첨부, `401 EXPIRED_TOKEN`일 때만 재발급 후 1회 재전송(동시 만료 시 재발급 Promise 공유), `X-Connection-Id` 헤더 첨부, 실패를 HTTP 상태·`message`·`data.code`·`data.detail` 보존 공통 에러로 변환 (담당: FE-1, FE-2)
 - [x] [W1] `shared/api/types.ts` — `CommonResponse<T>`, `ErrorData`, `PageResponse<T>`, 공통 enum 타입 (`docs/api/README.md` 공통 enum) (담당: FE-1)
 - [x] [W1] MSW 설정 — `VITE_USE_MOCK=true`일 때만 동작, 배포 빌드 제외, `src/mocks/handlers/{도메인}.ts`, 가상 사건 데이터만 사용 (담당: FE-1)
 - [x] [W1] `frontend/.env.example` — `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, `VITE_USE_MOCK` (담당: FE-1)
@@ -129,27 +129,27 @@
 ### README
 
 - [x] [W1] README에 기술 버전, 실행 명령(작업 디렉터리 포함), 필수 환경 변수 이름·용도, `.env` 주입 방법, DB 초기화 방법 기록 (common.md README 관리) (담당: BE-1, FE-1)
-- [ ] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록
+- [~] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록 (담당: FE-2, 메모: 토큰 방식 기록 완료, 정적 에셋 경로는 2주차)
 
 ## 1. 데이터베이스 (엔티티, 6절)
 
 > 엔티티는 `common/entity`, ID는 `Long` + `IDENTITY`, enum은 `EnumType.STRING`, 긴 문자열은 `text`, jsonb는 전용 record 타입 (backend.md 엔티티 규칙)
 
-- [~] [W1] 공통 enum — `UserRole`, `Difficulty`, `CaseStatus`, `RoomStatus`, `AiRequestType`, `AiRequestStatus`, `GradingStatus`, `Verdict`, `MessageSenderType`, `AdminMessageSenderType`, `HotspotType`, `LlmRequestType` (담당: BE-1, `UserRole`만 완료. 나머지는 BE-2)
+- [x] [W1] 공통 enum — `UserRole`, `Difficulty`, `CaseStatus`, `RoomStatus`, `AiRequestType`, `AiRequestStatus`, `GradingStatus`, `Verdict`, `MessageSenderType`, `AdminMessageSenderType`, `HotspotType`, `LlmRequestType` (담당: BE-1, BE-2)
 - [x] [W1] `USERS`(닉네임 최초 null, **영문 대소문자를 구분하지 않는 UNIQUE**), `REFRESH_TOKENS`(해시 저장, `revoked_at`) (6.1절). 소문자로 정규화한 `nickname_lower` 컬럼(`Locale.ROOT`)을 함께 저장하고 이 컬럼에 UNIQUE (담당: BE-1)
-- [ ] [W1] `CASES` — 상태, 카드 정보, 정답 보호 필드, 사전 정보, 리빌 해설, `glossary`(jsonb), `cloned_from_case_id`, `content_updated_at`, `test_verified_at`, `chat_context_revision`(0부터) (6.2절)
-- [ ] [W1] `CASE_SOURCE_TEXTS`(원문 전문 `text`), `CASE_DRAFTS`(`draft_json`, `docs/api/admin-draft-schema.md` 구조), `ADMIN_CASE_MESSAGES`(`request_id`, `tool_changes`·`input_info` jsonb, `chat_context_revision`, `response_json`(관리자 발화에 전체 응답 스냅샷, DTO 비노출), `status`, `error_message`), `CASE_MAPS`(`case_id` UNIQUE) (6.3절)
-- [ ] [W1] `SUSPECTS`(`persona_prompt` text, `sprite_key`, `is_culprit`, `can_converse`), `EVIDENCES`, `CASE_TRICK_ELEMENTS`(`grading_rubric` jsonb), `MAP_HOTSPOTS`(`type` + `ref_id` 폴리모픽 참조) (6.2절)
-- [ ] [W1] `ROOMS`(`is_test`, `status`, `time_limit_sec`, `started_at`, `elapsed_active_ms`, `active_since`, `last_seen_at`, `connection_id`), `ROOM_PARTICIPANTS` (6.4절)
-- [ ] [W1] `NPC_CONVERSATIONS`, `NPC_MESSAGES`(`(conversation_id, sequence_no)` UNIQUE)
-- [ ] [W1] `PLAYER_NOTES`(`(room_id, user_id)` UNIQUE, `revision`)
-- [ ] [W1] `HINTS`, `HINT_FOLLOWUPS`(`hint_id` UNIQUE)
-- [ ] [W1] `ACCUSATIONS`(`submitted_at`, `submitted_active_ms`, `grading_status`, `request_id`, `element_results` jsonb, `feedback`), `PLAY_RESULTS`(`room_id` UNIQUE)
-- [ ] [W1] `AI_REQUESTS`(`(room_id, request_id)` UNIQUE, `input_json` jsonb, `result_json` jsonb(플레이어용 성공 응답 스냅샷, 내부 프롬프트 제외), `execution_no`, `superseded_at`, `result_ref_id`, `error_code`)
-- [ ] [W1] `EVIDENCE_INSPECTIONS`(`(room_id, evidence_id)` UNIQUE)
-- [ ] [W1] `LLM_USAGE_LOGS`(`usage_known`, 미확인 시 토큰·비용 null), `LLM_BUDGET_SETTINGS`(단일 설정) (6.5절)
-- [ ] [W1] UNIQUE 제약이 엔티티에 모두 선언되었는지 확인 (서비스 중복 검사로 대신하지 않음)
-- [ ] [W1] 커밋용 가상 샘플 사건 데이터 (예: 「시계탑 저택의 마지막 종소리」) — 테스트 픽스처·MSW 목에서 공유
+- [x] [W1] `CASES` — 상태, 카드 정보, 정답 보호 필드, 사전 정보, 리빌 해설, `glossary`(jsonb), `cloned_from_case_id`, `content_updated_at`, `test_verified_at`, `chat_context_revision`(0부터) (6.2절) (담당: BE-2)
+- [x] [W1] `CASE_SOURCE_TEXTS`(원문 전문 `text`), `CASE_DRAFTS`(`draft_json`, `docs/api/admin-draft-schema.md` 구조), `ADMIN_CASE_MESSAGES`(`request_id`, `tool_changes`·`input_info` jsonb, `chat_context_revision`, `response_json`(관리자 발화에 전체 응답 스냅샷, DTO 비노출), `status`, `error_message`), `CASE_MAPS`(`case_id` UNIQUE) (6.3절) (담당: BE-2)
+- [x] [W1] `SUSPECTS`(`persona_prompt` text, `sprite_key`, `is_culprit`, `can_converse`), `EVIDENCES`, `CASE_TRICK_ELEMENTS`(`grading_rubric` jsonb), `MAP_HOTSPOTS`(`type` + `ref_id` 폴리모픽 참조) (6.2절) (담당: BE-2)
+- [x] [W1] `ROOMS`(`is_test`, `status`, `time_limit_sec`, `started_at`, `elapsed_active_ms`, `active_since`, `last_seen_at`, `connection_id`), `ROOM_PARTICIPANTS` (6.4절) (담당: BE-2)
+- [x] [W1] `NPC_CONVERSATIONS`, `NPC_MESSAGES`(`(conversation_id, sequence_no)` UNIQUE) (담당: BE-2)
+- [x] [W1] `PLAYER_NOTES`(`(room_id, user_id)` UNIQUE, `revision`) (담당: BE-2)
+- [x] [W1] `HINTS`, `HINT_FOLLOWUPS`(`hint_id` UNIQUE) (담당: BE-2)
+- [x] [W1] `ACCUSATIONS`(`submitted_at`, `submitted_active_ms`, `grading_status`, `request_id`, `element_results` jsonb, `feedback`), `PLAY_RESULTS`(`room_id` UNIQUE) (담당: BE-2)
+- [x] [W1] `AI_REQUESTS`(`(room_id, request_id)` UNIQUE, `input_json` jsonb, `result_json` jsonb(플레이어용 성공 응답 스냅샷, 내부 프롬프트 제외), `execution_no`, `superseded_at`, `result_ref_id`, `error_code`) (담당: BE-2)
+- [x] [W1] `EVIDENCE_INSPECTIONS`(`(room_id, evidence_id)` UNIQUE) (담당: BE-2)
+- [x] [W1] `LLM_USAGE_LOGS`(`usage_known`, 미확인 시 토큰·비용 null), `LLM_BUDGET_SETTINGS`(단일 설정) (6.5절) (담당: BE-2)
+- [x] [W1] UNIQUE 제약이 엔티티에 모두 선언되었는지 확인 (서비스 중복 검사로 대신하지 않음) (담당: BE-2)
+- [x] [W1] 커밋용 가상 샘플 사건 데이터 (예: 「시계탑 저택의 마지막 종소리」) — 테스트 픽스처·MSW 목에서 공유 (담당: BE-2, 메모: 백엔드 테스트 픽스처 `ClocktowerCaseFixture`. MSW 목은 2주차)
 - [ ] [W1~W2] 사건 A 개발용 시드 데이터 작성 — 로컬 전용 `backend/src/main/resources/dev-data/`, 커밋 금지, 카드 표시명·태그는 개발용 임시 이름 (소유자 검수)
 - [ ] [W2] 로컬 프로필에서 시드를 읽어 `PUBLISHED` 사건으로 넣는 로더
 
@@ -312,16 +312,16 @@
 
 ## 15. 프론트엔드 — 공통 (3.9절, 5.2절, frontend.md)
 
-- [ ] [W1] 로그인 화면 — Google Identity Services 버튼, ID 토큰 → `POST /api/auth/google`
-- [ ] [W1] 닉네임 설정 화면 — 검증 메시지·`409 NICKNAME_EXIST` 표시
-- [ ] [W1] 인증 상태 — 액세스 토큰은 Zustand 메모리, 리프레시 토큰은 `localStorage`, 앱 시작 시 한 곳에서 `refresh → users/me` 복원
-- [ ] [W1] 여러 탭 토큰 조정 — Web Locks(`shelved-auth`)로 저장·재발급·로그아웃 직렬화, 잠금 안에서 최신 리프레시 토큰 재확인, `INVALID_REFRESH_TOKEN` 시 저장값이 바뀌었으면 최신 값으로 1회 재시도, 네트워크·서버 오류에서는 토큰 유지, `storage` 이벤트로 다른 탭 로그아웃 반영 (`docs/api/auth-user.md`)
-- [ ] [W1] 로그아웃 — 토큰 삭제, Query 캐시·사용자·세션 메모리 상태 정리
-- [ ] [W1] 라우트 보호 — 로그인 필요 화면, 관리자 화면(`role=ADMIN`), 닉네임 미설정 시 닉네임 화면으로
-- [ ] [W1] 공통 UI 컴포넌트 — Button, Modal, 입력창, 로딩·에러 표시 (`shared/components`)
+- [~] [W1] 로그인 화면 — Google Identity Services 버튼, ID 토큰 → `POST /api/auth/google` (담당: FE-2, 메모: 목 로그인으로 확인 완료. 실제 Google 로그인은 INT에서 확인)
+- [x] [W1] 닉네임 설정 화면 — 검증 메시지·`409 NICKNAME_EXIST` 표시 (담당: FE-2)
+- [x] [W1] 인증 상태 — 액세스 토큰은 Zustand 메모리, 리프레시 토큰은 `localStorage`, 앱 시작 시 한 곳에서 `refresh → users/me` 복원 (담당: FE-2)
+- [x] [W1] 여러 탭 토큰 조정 — Web Locks(`shelved-auth`)로 저장·재발급·로그아웃 직렬화, 잠금 안에서 최신 리프레시 토큰 재확인, `INVALID_REFRESH_TOKEN` 시 저장값이 바뀌었으면 최신 값으로 1회 재시도, 네트워크·서버 오류에서는 토큰 유지, `storage` 이벤트로 다른 탭 로그아웃 반영 (`docs/api/auth-user.md`) (담당: FE-2)
+- [x] [W1] 로그아웃 — 토큰 삭제, Query 캐시·사용자·세션 메모리 상태 정리 (담당: FE-2)
+- [x] [W1] 라우트 보호 — 로그인 필요 화면, 관리자 화면(`role=ADMIN`), 닉네임 미설정 시 닉네임 화면으로 (담당: FE-2)
+- [x] [W1] 공통 UI 컴포넌트 — Button, Modal, 입력창, 로딩·에러 표시 (`shared/components`) (담당: FE-2)
 - [ ] [W2] 메인 화면 — 사건 카드 목록(비로그인 열람 가능), 진행 중 수사(이어하기·다시 채점하기), 지난 수사(결과 보기), "진행 중" 배지, 빈 목록·조회 실패 상태
 - [ ] [W2] 수사 시작 — 비로그인이면 로그인 후 고른 사건으로 복귀, `409 ROOM_ALREADY_EXISTS`면 이어하기 안내 창
-- [ ] [W1~W6] 도메인별 MSW 목 핸들러 — 정상 응답과 `202`·`409`·`502` 등 명세 오류 재현
+- [~] [W1~W6] 도메인별 MSW 목 핸들러 — 정상 응답과 `202`·`409`·`502` 등 명세 오류 재현 (담당: FE-2, 메모: auth 완료)
 
 ## 16. 프론트엔드 — 게임 화면 (3.5절, 3.9절, 5.2절, frontend.md)
 
@@ -434,7 +434,7 @@
 - [ ] [W4] 정답 비공개 — 종료 전 API 응답·맵·에셋에 정답 필드 미포함 확인
 - [ ] [W4] 기록·랭킹 집계
 - [ ] [W6] 관리자 상태 전이·출시 검사·공개 후 수정 차단
-- [ ] [W2~W6] 프론트엔드 필수 테스트 — `utils` 함수, 입력 허용 조건, 노트 자동 저장(한 번에 하나·409 시 초안 보존), `requestId` 재사용, 재접속 상태 분기(READY 복귀·종료·채점 대기), 여러 탭의 재발급·로그아웃
+- [~] [W2~W6] 프론트엔드 필수 테스트 — `utils` 함수, 입력 허용 조건, 노트 자동 저장(한 번에 하나·409 시 초안 보존), `requestId` 재사용, 재접속 상태 분기(READY 복귀·종료·채점 대기), 여러 탭의 재발급·로그아웃 (담당: FE-2, 메모: 여러 탭 재발급·로그아웃 완료)
 
 ### 수동 플레이테스트 (로컬 `playtest/{YYYY-MM-DD}-{사건 식별명}.md`)
 

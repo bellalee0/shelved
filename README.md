@@ -219,3 +219,22 @@ npm run format          # Prettier로 코드 정렬
 2. 브라우저 개발자 도구 콘솔에 `[MSW] Mocking enabled.`가 표시되면 목 모드입니다.
 
 목은 개발 서버에서만 동작하며, `npm run build` 결과에는 목 코드와 워커 파일(`mockServiceWorker.js`)이 포함되지 않습니다. 목 핸들러가 없는 요청은 실제 서버(`VITE_API_BASE_URL`)로 그대로 전달됩니다.
+
+목 모드의 로그인 화면(`/login`)에는 실제 Google 대신 가짜 ID 토큰으로 로그인하는 **목 로그인** 버튼이 나타납니다.
+
+- `목 로그인 · 새 사용자`: 누를 때마다 닉네임이 없는 새 사용자로 로그인해 닉네임 설정 화면부터 확인할 수 있습니다.
+- `목 로그인 · 관리자`: `role=ADMIN` 사용자로 로그인합니다.
+- 목 사용자·토큰은 새로고침 후 복원을 확인할 수 있도록 브라우저 `localStorage`의 `shelved.mock.authDb`에 저장됩니다. 처음 상태로 되돌리려면 개발자 도구에서 이 값을 지웁니다.
+
+#### 로그인 토큰 처리
+
+상세 흐름은 [docs/api/auth-user.md](docs/api/auth-user.md#토큰-처리-흐름)를 따릅니다.
+
+| 항목 | 방식 |
+|---|---|
+| 액세스 토큰 | 메모리(Zustand)에만 보관하고 모든 인증 API에 `Authorization: Bearer` 헤더로 보냅니다. 새로고침하면 사라집니다 |
+| 리프레시 토큰 | `localStorage`의 `shelved.auth.refreshToken`에만 보관합니다. 브라우저 저장소에 두는 인증 정보는 이것 하나입니다 |
+| 새로고침 후 복원 | 앱 시작 시 리프레시 토큰이 있으면 `POST /api/auth/refresh` → `GET /api/users/me` 순서로 복원하고, 그동안 로딩 화면을 보여줍니다 |
+| 만료 시 재발급 | API가 `401 EXPIRED_TOKEN`이면 공통 axios 인스턴스가 한 번 재발급한 뒤 원래 요청을 한 번만 다시 보냅니다. 동시에 만료된 요청은 재발급 하나를 함께 기다립니다 |
+| 여러 탭 조정 | 토큰 저장·재발급·로그아웃은 Web Locks(`shelved-auth` 잠금)로 탭 간 순서를 맞추고, 다른 탭의 로그아웃은 `storage` 이벤트로 반영합니다 |
+| 로그아웃 | `POST /api/auth/logout` 후 메모리·`localStorage` 토큰과 TanStack Query 캐시를 지웁니다. 요청이 실패해도 이 브라우저의 로그인 상태는 정리합니다 |
