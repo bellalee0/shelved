@@ -116,19 +116,19 @@
 
 ### 프론트엔드 기반
 
-- [ ] [W1] Vite + React + TypeScript 스캐폴드, `frontend/.nvmrc`(Node LTS), `package-lock.json` 커밋
-- [ ] [W1] Tailwind CSS(디자인 기준값은 설정 파일에), ESLint + Prettier, Vitest + React Testing Library
-- [ ] [W1] npm 스크립트 — `lint`, `typecheck`, `test -- --run`, `build`
-- [ ] [W1] React Router, TanStack Query, Zustand 설정 (`src/app`)
-- [ ] [W1] 폴더 구조 — `app`/`pages`/`features/{도메인}`/`game`/`mocks`/`shared` (frontend.md)
-- [ ] [W1] `shared/api/client.ts` — 기본 주소, 액세스 토큰 첨부, `401 EXPIRED_TOKEN`일 때만 재발급 후 1회 재전송(동시 만료 시 재발급 Promise 공유), `X-Connection-Id` 헤더 첨부, 실패를 HTTP 상태·`message`·`data.code`·`data.detail` 보존 공통 에러로 변환
-- [ ] [W1] `shared/api/types.ts` — `CommonResponse<T>`, `ErrorData`, `PageResponse<T>`, 공통 enum 타입 (`docs/api/README.md` 공통 enum)
-- [ ] [W1] MSW 설정 — `VITE_USE_MOCK=true`일 때만 동작, 배포 빌드 제외, `src/mocks/handlers/{도메인}.ts`, 가상 사건 데이터만 사용
-- [ ] [W1] `frontend/.env.example` — `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, `VITE_USE_MOCK`
+- [x] [W1] Vite + React + TypeScript 스캐폴드, `frontend/.nvmrc`(Node LTS), `package-lock.json` 커밋 (담당: FE-1)
+- [x] [W1] Tailwind CSS(디자인 기준값은 설정 파일에), ESLint + Prettier, Vitest + React Testing Library (담당: FE-1)
+- [x] [W1] npm 스크립트 — `lint`, `typecheck`, `test -- --run`, `build` (담당: FE-1)
+- [x] [W1] React Router, TanStack Query, Zustand 설정 (`src/app`) (담당: FE-1)
+- [x] [W1] 폴더 구조 — `app`/`pages`/`features/{도메인}`/`game`/`mocks`/`shared` (frontend.md) (담당: FE-1)
+- [~] [W1] `shared/api/client.ts` — 기본 주소, 액세스 토큰 첨부, `401 EXPIRED_TOKEN`일 때만 재발급 후 1회 재전송(동시 만료 시 재발급 Promise 공유), `X-Connection-Id` 헤더 첨부, 실패를 HTTP 상태·`message`·`data.code`·`data.detail` 보존 공통 에러로 변환 (담당: FE-1, 메모: 기본 주소·토큰 첨부·연결 헤더·공통 에러 변환 완료. 401 재발급·1회 재전송은 FE-2)
+- [x] [W1] `shared/api/types.ts` — `CommonResponse<T>`, `ErrorData`, `PageResponse<T>`, 공통 enum 타입 (`docs/api/README.md` 공통 enum) (담당: FE-1)
+- [x] [W1] MSW 설정 — `VITE_USE_MOCK=true`일 때만 동작, 배포 빌드 제외, `src/mocks/handlers/{도메인}.ts`, 가상 사건 데이터만 사용 (담당: FE-1)
+- [x] [W1] `frontend/.env.example` — `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, `VITE_USE_MOCK` (담당: FE-1)
 
 ### README
 
-- [~] [W1] README에 기술 버전, 실행 명령(작업 디렉터리 포함), 필수 환경 변수 이름·용도, `.env` 주입 방법, DB 초기화 방법 기록 (common.md README 관리) (담당: BE-1, 백엔드 부분 완료. 프론트엔드는 FE-1)
+- [x] [W1] README에 기술 버전, 실행 명령(작업 디렉터리 포함), 필수 환경 변수 이름·용도, `.env` 주입 방법, DB 초기화 방법 기록 (common.md README 관리) (담당: BE-1, FE-1)
 - [ ] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록
 
 ## 1. 데이터베이스 (엔티티, 6절)

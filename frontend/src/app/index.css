@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+/*
+ * 디자인 기준값(색상·폰트)은 이 @theme 블록 한 곳에서 정의한다. (Tailwind v4는 tailwind.config.js 대신 여기가 설정 파일 역할)
+ * 여기서 정의한 이름이 클래스가 된다. 예: --color-ink → text-ink, bg-ink / --font-sans → font-sans
+ * 컴포넌트에서 #3a2f1b 같은 색상 값을 직접 쓰지 않고, 필요한 값은 여기에 추가한다.
+ * 1주차에는 기본값만 두며 실제 디자인은 화면 작업 때 정한다.
+ */
+@theme {
+  --color-paper: #f7f3ea;
+  --color-ink: #2b2620;
+  --color-muted: #7a7064;
+  --color-accent: #8c3b2e;
+
+  --font-sans: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+}
+
+body {
+  @apply bg-paper font-sans text-ink;
+}
