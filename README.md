@@ -65,3 +65,45 @@
 
 '게임과 디지털 네러티브' 수업의 학기 프로젝트로 진행하며, 2026년 12월 MVP 시연을 목표로 합니다.
 사건의 바탕이 되는 소설은 모두 저작권이 만료된 퍼블릭 도메인 작품입니다.
+
+<br>
+
+## 로컬 실행
+
+### 프론트엔드
+
+- Node.js 26 (Active LTS). 버전은 `frontend/.nvmrc`에 고정되어 있으며, nvm을 쓰면 `frontend/`에서 `nvm use`로 맞출 수 있습니다.
+- 패키지 매니저는 npm이며, 설치는 잠금 파일(`package-lock.json`) 기준의 `npm ci`로 합니다.
+
+```bash
+cd frontend
+npm ci                  # 의존성 설치 (package-lock.json 기준)
+npm run dev             # 개발 서버 실행 (http://localhost:5173)
+
+npm run lint            # ESLint 검사
+npm run typecheck       # TypeScript 타입 검사
+npm run test -- --run   # 테스트 1회 실행 후 종료 (--run 없이 실행하면 파일 변경을 감시)
+npm run build           # 배포용 빌드 (frontend/dist)
+npm run format          # Prettier로 코드 정렬
+```
+
+#### 환경 변수
+
+`frontend/.env.example`을 `frontend/.env.local`로 복사한 뒤 값을 채웁니다. Vite가 `npm run dev`·`npm run build` 실행 시 이 파일을 자동으로 읽습니다. `.env.local`은 Git에서 제외됩니다.
+
+| 이름 | 용도 |
+|---|---|
+| `VITE_API_BASE_URL` | 백엔드 API 기본 주소 |
+| `VITE_GOOGLE_CLIENT_ID` | Google 로그인 클라이언트 ID |
+| `VITE_USE_MOCK` | `true`면 개발 서버에서 MSW 목 응답 사용 |
+
+`VITE_`로 시작하는 변수는 빌드 결과에 그대로 포함되어 누구나 볼 수 있으므로, 공개해도 되는 값만 넣습니다.
+
+#### 목(MSW) 모드
+
+백엔드 없이 사전 설계 명세(`docs/api/`)대로 가짜 응답을 받아 개발할 때 사용합니다.
+
+1. `frontend/.env.local`에 `VITE_USE_MOCK=true`를 설정하거나, 실행할 때 `VITE_USE_MOCK=true npm run dev`로 지정합니다.
+2. 브라우저 개발자 도구 콘솔에 `[MSW] Mocking enabled.`가 표시되면 목 모드입니다.
+
+목은 개발 서버에서만 동작하며, `npm run build` 결과에는 목 코드와 워커 파일(`mockServiceWorker.js`)이 포함되지 않습니다. 목 핸들러가 없는 요청은 실제 서버(`VITE_API_BASE_URL`)로 그대로 전달됩니다.
