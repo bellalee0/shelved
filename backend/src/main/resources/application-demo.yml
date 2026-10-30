@@ -1,0 +1,6 @@
+# 보존할 개발·시연 DB (backend.md 환경별 스키마 관리)
+# 스키마를 자동으로 바꾸지 않는다. create·create-drop·update 금지. 스키마 생성·변경은 백업 후 명시적 SQL로 한다.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate

@@ -1,0 +1,12 @@
+# 폐기 가능한 로컬 DB (backend.md 환경별 스키마 관리)
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+# 로컬에서만 Swagger UI 노출: http://localhost:8080/swagger-ui.html
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

@@ -70,6 +70,79 @@
 
 ## 로컬 실행
 
+### 백엔드
+
+#### 필요한 도구와 버전
+
+| 항목 | 버전 |
+|---|---|
+| Java | 21 |
+| Spring Boot | 4.1.0 (Gradle Wrapper 사용, Gradle 별도 설치 불필요) |
+| PostgreSQL | 17 (Docker 이미지 `postgres:17-alpine`) |
+| Docker | Docker Compose v2 포함 (로컬 DB 실행, Testcontainers 통합 테스트) |
+
+#### 환경 변수
+
+`backend/.env.example`을 `backend/.env`로 복사한 뒤 값을 채웁니다. `.env`는 Git에서 제외됩니다.
+
+| 이름 | 용도 |
+|---|---|
+| `SPRING_PROFILES_ACTIVE` | 실행 프로필. `local`(폐기 가능한 로컬 DB, 스키마 자동 갱신, Swagger UI 노출) / `demo`(보존할 개발·시연 DB, 스키마 검증만) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | PostgreSQL 접속 정보. `docker-compose.yml`도 같은 값으로 DB를 만든다 |
+| `GOOGLE_CLIENT_ID` | Google 로그인 ID 토큰의 대상(client ID) 검증 |
+| `JWT_SECRET_KEY` | 액세스·리프레시 토큰 서명 키 |
+| `CLAUDE_API_KEY` | Claude API 키 |
+| `CLAUDE_MODEL` | 본 응답용 Claude 모델 (NPC 대화·힌트·채점·사건 제작) |
+| `CLAUDE_FILTER_MODEL` | 질문 분류용 작은 Claude 모델 (직접적인 정답 요구 차단) |
+
+Claude 관련 변수는 비어 있어도 서버가 기동됩니다. AI 기능을 쓸 때 필요합니다.
+
+#### `.env` 주입 방법
+
+애플리케이션은 `.env`를 자동으로 읽지 않습니다. 서버를 실행하는 **같은 셸**에서 아래처럼 환경 변수로 내보낸 뒤 실행합니다.
+
+```bash
+set -a; source .env; set +a
+```
+
+`docker compose`는 같은 폴더의 `.env`를 변수 치환에 자동으로 사용하므로 별도 주입이 필요 없습니다. IDE에서 실행할 때는 실행 구성의 환경 변수에 `.env` 내용을 직접 지정합니다.
+
+#### 실행 명령 (작업 디렉터리: `backend/`)
+
+```bash
+cd backend
+cp .env.example .env          # 처음 한 번, 값 수정
+
+# DB 실행
+docker compose up -d
+
+# 서버 실행 (http://localhost:8080)
+set -a; source .env; set +a
+./gradlew bootRun
+
+# 테스트 (Docker 실행 중이어야 함: Testcontainers PostgreSQL 사용)
+./gradlew test
+
+# 빌드 (테스트 포함)
+./gradlew build
+```
+
+- Swagger UI: `local` 프로필에서만 열립니다. http://localhost:8080/swagger-ui.html
+- DB 종료: `docker compose down` (데이터 유지)
+
+#### DB 초기화
+
+- **local**: 스키마는 JPA가 자동으로 만들고 갱신합니다(`ddl-auto=update`). 데이터를 모두 지우고 처음부터 시작하려면 볼륨까지 삭제한 뒤 다시 실행합니다.
+
+  ```bash
+  cd backend
+  docker compose down -v
+  docker compose up -d
+  ```
+
+- **demo**: 보존할 DB이므로 스키마를 자동으로 바꾸지 않습니다(`ddl-auto=validate`). 스키마 생성·변경은 백업 후 명시적인 SQL로 수행하며, 절차는 시연 환경을 정할 때 이 절에 추가합니다.
+- **test**: 테스트마다 Testcontainers가 임시 DB를 띄우고 `create-drop`으로 스키마를 만듭니다. 로컬 DB와 분리되어 있습니다.
+
 ### 프론트엔드
 
 - Node.js 26 (Active LTS). 버전은 `frontend/.nvmrc`에 고정되어 있으며, nvm을 쓰면 `frontend/`에서 `nvm use`로 맞출 수 있습니다.

@@ -92,27 +92,27 @@
 
 - [x] [W1] `dev` 브랜치 원격 푸시, 문서 브랜치 → `dev` 병합 (담당: Claude, 소유자 승인으로 PR 없이 병합)
 - [x] [W1] 쓰지 않는 브랜치·worktree 정리 — 미커밋 API 보완 내용은 `dev`로 옮긴 뒤 삭제 (담당: Claude)
-- [ ] [W1] 루트 `.editorconfig` — UTF-8·LF·마지막 개행, Java 4칸 / TS·JSON·YAML 2칸 (common.md 포맷 규칙)
+- [x] [W1] 루트 `.editorconfig` — UTF-8·LF·마지막 개행, Java 4칸 / TS·JSON·YAML 2칸 (common.md 포맷 규칙) (담당: BE-1)
 - [ ] [W1] JSON 네이밍/에러 응답/날짜 형식 등 API 공통 컨벤션 확정 — 초안은 `docs/api/README.md`·`errors.md`에 작성됨. 저장소 소유자 검토·병합 후 완료 처리
 - [ ] [W1] Google Cloud OAuth client ID 발급, Claude API 키 발급 (소유자)
 
 ### 백엔드 기반
 
-- [ ] [W1] Spring Boot 스캐폴드 — Java 21, Spring Boot 4.1.0, Gradle Wrapper 커밋, 루트 패키지 `com.shelved` (`common`/`infra`/`domain` 구조, backend.md)
-- [ ] [W1] 의존성 — Web, Validation, Data JPA, PostgreSQL, Security, springdoc-openapi, Lombok, Testcontainers
-- [ ] [W1] PostgreSQL 로컬 실행 환경 (`docker-compose.yml`)
-- [ ] [W1] 환경별 프로필 — 테스트 `create-drop`, 폐기 가능한 로컬 `update`, 보존할 개발·시연 DB `validate` (backend.md 환경별 스키마 관리)
-- [ ] [W1] `application.yml` + `@ConfigurationProperties` (`common/config`, 키 `shelved.{영역}.{항목}`) — 난이도별 제한시간·힌트 횟수, 지목 기회(3), 하트비트 간격(5s)·이탈 판정(15s), AI 작업 시간 제한, 채점 재시도 최소 간격(10s), 노트 최대 글자 수, 원문 업로드 크기 한도, 표지 크기 한도(5MB), Claude 모델명(본 응답용·질문 분류용 `shelved.llm.filter-model`), 입·출력 토큰 예산, 에셋 경로(`shelved.assets.base-path`), 표지 저장 경로
-- [ ] [W1] 잠정 초기값 적용 (사건 A 플레이테스트 후 조정) — 하트비트 간격 5초·이탈 판정 15초, 채점 재시도 최소 간격 10초, 노트 최대 5000자·입력 멈춘 뒤 2초 후 자동 저장, 게임 AI 호출 시간 제한 60초, 관리자 제작 채팅 시간 제한 300초, `PROCESSING` 복구 기준은 시간 제한 + 60초, AI 요청 상태 조회 간격 2초
-- [ ] [W1] `Clock` 빈 등록 (게임 시간 판정용, backend.md 12)
-- [ ] [W1] `CommonResponse`, `ErrorData`, `PageResponse`, `SuccessMessage`, `ValidationMessage`
-- [ ] [W1] `ErrorCode` — `docs/api/errors.md`의 전체 코드·상태·메시지를 그대로 정의
-- [ ] [W1] 공통 입력 검증 — 문자열은 앞뒤 공백 제거 후 검증(개인 노트 `content`는 예외로 원문 보존), 길이는 UTF-16 코드 단위, 숫자 ID는 양의 정수·페이지·횟수·버전은 0 이상의 정수·좌표는 정수 픽셀, 위반 시 본문 `INVALID_INPUT` / 경로·쿼리 `INVALID_PARAMETER` (`docs/api/README.md` 공통 규칙)
-- [ ] [W1] `CustomException(ErrorCode)` / `CustomException(ErrorCode, detail)`, `GlobalExceptionHandler` — `@Valid` 실패, 본문 파싱 오류, 지원하지 않는 메서드, 타입 불일치, 외부 API 실패, 기타 런타임 예외를 공통 응답으로 변환
+- [x] [W1] Spring Boot 스캐폴드 — Java 21, Spring Boot 4.1.0, Gradle Wrapper 커밋, 루트 패키지 `com.shelved` (`common`/`infra`/`domain` 구조, backend.md) (담당: BE-1)
+- [~] [W1] 의존성 — Web, Validation, Data JPA, PostgreSQL, Security, springdoc-openapi, Lombok, Testcontainers (담당: BE-1, Security 외 추가 완료. Security는 BE-3에서 추가)
+- [x] [W1] PostgreSQL 로컬 실행 환경 (`docker-compose.yml`) (담당: BE-1)
+- [x] [W1] 환경별 프로필 — 테스트 `create-drop`, 폐기 가능한 로컬 `update`, 보존할 개발·시연 DB `validate` (backend.md 환경별 스키마 관리) (담당: BE-1)
+- [x] [W1] `application.yml` + `@ConfigurationProperties` (`common/config`, 키 `shelved.{영역}.{항목}`) — 난이도별 제한시간·힌트 횟수, 지목 기회(3), 하트비트 간격(5s)·이탈 판정(15s), AI 작업 시간 제한, 채점 재시도 최소 간격(10s), 노트 최대 글자 수, 원문 업로드 크기 한도, 표지 크기 한도(5MB), Claude 모델명(본 응답용·질문 분류용 `shelved.llm.filter-model`), 입·출력 토큰 예산, 에셋 경로(`shelved.assets.base-path`), 표지 저장 경로 (담당: BE-1)
+- [~] [W1] 잠정 초기값 적용 (사건 A 플레이테스트 후 조정) — 하트비트 간격 5초·이탈 판정 15초, 채점 재시도 최소 간격 10초, 노트 최대 5000자·입력 멈춘 뒤 2초 후 자동 저장, 게임 AI 호출 시간 제한 60초, 관리자 제작 채팅 시간 제한 300초, `PROCESSING` 복구 기준은 시간 제한 + 60초, AI 요청 상태 조회 간격 2초 (담당: BE-1, 서버 설정값만 적용. 자동 저장 2초·상태 조회 간격 2초는 프론트엔드 값)
+- [x] [W1] `Clock` 빈 등록 (게임 시간 판정용, backend.md 12) (담당: BE-1)
+- [x] [W1] `CommonResponse`, `ErrorData`, `PageResponse`, `SuccessMessage`, `ValidationMessage` (담당: BE-1)
+- [x] [W1] `ErrorCode` — `docs/api/errors.md`의 전체 코드·상태·메시지를 그대로 정의 (담당: BE-1)
+- [x] [W1] 공통 입력 검증 — 문자열은 앞뒤 공백 제거 후 검증(개인 노트 `content`는 예외로 원문 보존), 길이는 UTF-16 코드 단위, 숫자 ID는 양의 정수·페이지·횟수·버전은 0 이상의 정수·좌표는 정수 픽셀, 위반 시 본문 `INVALID_INPUT` / 경로·쿼리 `INVALID_PARAMETER` (`docs/api/README.md` 공통 규칙) (담당: BE-1, 공통 처리 완료. 필드별 범위 제약(`@Positive` 등)은 각 DTO 작성 시 추가)
+- [x] [W1] `CustomException(ErrorCode)` / `CustomException(ErrorCode, detail)`, `GlobalExceptionHandler` — `@Valid` 실패, 본문 파싱 오류, 지원하지 않는 메서드, 타입 불일치, 외부 API 실패, 기타 런타임 예외를 공통 응답으로 변환 (담당: BE-1)
 - [ ] [W1] 인증 필터 오류 처리 — `AuthenticationEntryPoint`·`AccessDeniedHandler`·JWT 필터에서도 같은 `CommonResponse.exception(...)` 형식 반환
-- [ ] [W1] springdoc Swagger UI 로컬 노출
-- [ ] [W1] 로그 정책 — 토큰·API 키·인증 헤더·원문·프롬프트·정답·노트 전문을 로그에 남기지 않도록 HTTP 클라이언트·SQL 바인딩 디버그 로그 설정 확인
-- [ ] [W1] `backend/.env.example` — DB 접속 정보, `GOOGLE_CLIENT_ID`, JWT 서명 키, `CLAUDE_API_KEY`, `CLAUDE_MODEL` (가짜 값만)
+- [x] [W1] springdoc Swagger UI 로컬 노출 (담당: BE-1)
+- [x] [W1] 로그 정책 — 토큰·API 키·인증 헤더·원문·프롬프트·정답·노트 전문을 로그에 남기지 않도록 HTTP 클라이언트·SQL 바인딩 디버그 로그 설정 확인 (담당: BE-1)
+- [x] [W1] `backend/.env.example` — DB 접속 정보, `GOOGLE_CLIENT_ID`, JWT 서명 키, `CLAUDE_API_KEY`, `CLAUDE_MODEL`, `CLAUDE_FILTER_MODEL` (가짜 값만) (담당: BE-1)
 
 ### 프론트엔드 기반
 
@@ -128,15 +128,15 @@
 
 ### README
 
-- [~] [W1] README에 기술 버전, 실행 명령(작업 디렉터리 포함), 필수 환경 변수 이름·용도, `.env` 주입 방법, DB 초기화 방법 기록 (common.md README 관리) (담당: FE-1, 메모: 프론트엔드 부분 완료, 백엔드는 BE-1)
+- [x] [W1] README에 기술 버전, 실행 명령(작업 디렉터리 포함), 필수 환경 변수 이름·용도, `.env` 주입 방법, DB 초기화 방법 기록 (common.md README 관리) (담당: BE-1, FE-1)
 - [ ] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록
 
 ## 1. 데이터베이스 (엔티티, 6절)
 
 > 엔티티는 `common/entity`, ID는 `Long` + `IDENTITY`, enum은 `EnumType.STRING`, 긴 문자열은 `text`, jsonb는 전용 record 타입 (backend.md 엔티티 규칙)
 
-- [ ] [W1] 공통 enum — `UserRole`, `Difficulty`, `CaseStatus`, `RoomStatus`, `AiRequestType`, `AiRequestStatus`, `GradingStatus`, `Verdict`, `MessageSenderType`, `AdminMessageSenderType`, `HotspotType`, `LlmRequestType`
-- [ ] [W1] `USERS`(닉네임 최초 null, **영문 대소문자를 구분하지 않는 UNIQUE**), `REFRESH_TOKENS`(해시 저장, `revoked_at`) (6.1절). 소문자로 정규화한 `nickname_lower` 컬럼(`Locale.ROOT`)을 함께 저장하고 이 컬럼에 UNIQUE
+- [~] [W1] 공통 enum — `UserRole`, `Difficulty`, `CaseStatus`, `RoomStatus`, `AiRequestType`, `AiRequestStatus`, `GradingStatus`, `Verdict`, `MessageSenderType`, `AdminMessageSenderType`, `HotspotType`, `LlmRequestType` (담당: BE-1, `UserRole`만 완료. 나머지는 BE-2)
+- [x] [W1] `USERS`(닉네임 최초 null, **영문 대소문자를 구분하지 않는 UNIQUE**), `REFRESH_TOKENS`(해시 저장, `revoked_at`) (6.1절). 소문자로 정규화한 `nickname_lower` 컬럼(`Locale.ROOT`)을 함께 저장하고 이 컬럼에 UNIQUE (담당: BE-1)
 - [ ] [W1] `CASES` — 상태, 카드 정보, 정답 보호 필드, 사전 정보, 리빌 해설, `glossary`(jsonb), `cloned_from_case_id`, `content_updated_at`, `test_verified_at`, `chat_context_revision`(0부터) (6.2절)
 - [ ] [W1] `CASE_SOURCE_TEXTS`(원문 전문 `text`), `CASE_DRAFTS`(`draft_json`, `docs/api/admin-draft-schema.md` 구조), `ADMIN_CASE_MESSAGES`(`request_id`, `tool_changes`·`input_info` jsonb, `chat_context_revision`, `response_json`(관리자 발화에 전체 응답 스냅샷, DTO 비노출), `status`, `error_message`), `CASE_MAPS`(`case_id` UNIQUE) (6.3절)
 - [ ] [W1] `SUSPECTS`(`persona_prompt` text, `sprite_key`, `is_culprit`, `can_converse`), `EVIDENCES`, `CASE_TRICK_ELEMENTS`(`grading_rubric` jsonb), `MAP_HOTSPOTS`(`type` + `ref_id` 폴리모픽 참조) (6.2절)
