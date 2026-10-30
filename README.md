@@ -90,12 +90,26 @@
 | `SPRING_PROFILES_ACTIVE` | 실행 프로필. `local`(폐기 가능한 로컬 DB, 스키마 자동 갱신, Swagger UI 노출) / `demo`(보존할 개발·시연 DB, 스키마 검증만) |
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | PostgreSQL 접속 정보. `docker-compose.yml`도 같은 값으로 DB를 만든다 |
 | `GOOGLE_CLIENT_ID` | Google 로그인 ID 토큰의 대상(client ID) 검증 |
-| `JWT_SECRET_KEY` | 액세스·리프레시 토큰 서명 키 |
+| `JWT_SECRET_KEY` | 액세스 토큰 서명 키 (UTF-8 32바이트 이상). 없거나 짧으면 서버가 기동하지 않는다 |
+| `SHELVED_CORS_ALLOWED_ORIGINS` | (선택) 브라우저에서 API를 호출할 수 있는 출처. 기본값 `http://localhost:5173` |
 | `CLAUDE_API_KEY` | Claude API 키 |
 | `CLAUDE_MODEL` | 본 응답용 Claude 모델 (NPC 대화·힌트·채점·사건 제작) |
 | `CLAUDE_FILTER_MODEL` | 질문 분류용 작은 Claude 모델 (직접적인 정답 요구 차단) |
 
 Claude 관련 변수는 비어 있어도 서버가 기동됩니다. AI 기능을 쓸 때 필요합니다.
+`GOOGLE_CLIENT_ID`가 비어 있어도 서버는 기동되지만 Google 로그인 요청은 모두 `GOOGLE_TOKEN_INVALID`로 실패합니다.
+
+`JWT_SECRET_KEY`는 아래 명령으로 만든 임의 값을 `.env`에 넣습니다. 이 값이 바뀌면 이미 발급된 액세스 토큰은 모두 `INVALID_TOKEN`이 됩니다.
+
+```bash
+openssl rand -base64 32
+```
+
+CORS 허용 출처는 `application.yml`의 `shelved.cors.allowed-origins`(기본값 `http://localhost:5173`)입니다. 프론트엔드를 다른 주소에서 띄우면 `.env`에 쉼표로 구분해 지정합니다. 쿠키를 쓰지 않으므로 credentials는 허용하지 않습니다.
+
+```bash
+SHELVED_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
 
 #### `.env` 주입 방법
 
@@ -129,6 +143,31 @@ set -a; source .env; set +a
 
 - Swagger UI: `local` 프로필에서만 열립니다. http://localhost:8080/swagger-ui.html
 - DB 종료: `docker compose down` (데이터 유지)
+
+#### 관리자 계정 만들기
+
+관리자 가입 절차는 없습니다. Google로 한 번 로그인해 사용자를 만든 뒤 DB에서 역할을 직접 바꿉니다. 역할은 요청마다 DB 값으로 확인하므로 다시 로그인하지 않아도 바로 반영됩니다.
+
+1. 프론트엔드에서 관리자로 쓸 Google 계정으로 로그인합니다 (닉네임도 설정해 둡니다. 닉네임이 없으면 관리자 API도 `NICKNAME_REQUIRED`).
+2. DB에 접속해 해당 사용자를 찾습니다. `id`는 로그인 응답이나 `GET /api/users/me`의 `userId`로도 확인할 수 있습니다.
+
+   ```bash
+   cd backend
+   docker compose exec postgres psql -U "$DB_USERNAME" -d "$DB_NAME"   # .env를 셸에 주입한 상태에서
+   ```
+
+   ```sql
+   SELECT id, nickname, role FROM users ORDER BY id;
+   ```
+
+3. 역할을 바꾸고 확인합니다.
+
+   ```sql
+   UPDATE users SET role = 'ADMIN' WHERE id = 7;   -- 위에서 확인한 id
+   SELECT id, nickname, role FROM users WHERE id = 7;
+   ```
+
+4. 확인: `GET /api/users/me` 응답의 `role`이 `ADMIN`이면 됩니다. 되돌릴 때는 `role = 'PLAYER'`로 바꿉니다.
 
 #### DB 초기화
 
