@@ -18,7 +18,7 @@
 ## 주차별 개발 계획 (2026-10-27 ~ 2026-12-14, 최대 7주)
 
 - 기간: 2026-10-27(화) 시작, 7주차 종료 2026-12-14(월). 7주차는 안정화·시연 준비용 여유 기간으로 두고, 기능 개발은 6주차까지 끝내는 것을 목표로 합니다.
-- 시연일이 확정되면(`project-spec.md` 9절) 7주차 일정을 시연일 기준으로 다시 맞춥니다.
+- 시연일은 잠정 **2026-12-14(월)**, 7주차 마지막 날입니다. 결함 수정·리허설 여유를 위해 12/11(금)까지 시연 가능한 상태를 만드는 것을 목표로 합니다. 날짜가 바뀌면 7주차 일정을 다시 맞춥니다.
 - 진행 순서는 `project-spec.md` 10.1절을 따릅니다: **사건 A 1편을 개발용 시드 데이터로 끝까지 연결 → 관리자 제작 파이프라인 → 사건 B·C 제작 → 주변 기능**.
 - 프론트엔드는 MSW 목으로 백엔드와 같은 주에 병렬로 개발하고, 해당 백엔드 API가 완성되면 목을 끄고 실제 서버와 연결해 확인합니다.
 
@@ -59,7 +59,7 @@
 - **목표**: 관리자가 원문을 올리고 AI와 채팅해 초안을 만들고 콘텐츠를 확정할 수 있다
 - 백엔드: 관리자 사건 목록·상세·생성, 원문·표지 업로드, 제작 채팅(tool use로 초안 갱신), 초안 검사(`draftIssues`), 콘텐츠 확정·수정 재개, 원문 입력 구성(전체 → 대화 요약 → 원문 분할)
 - 프론트엔드: 관리자 사건 목록, 사건 제작 화면(채팅 + 메모장 패널 + 확정 전 검사)
-- 콘텐츠·소유자: 사건 B·C 원문 `.txt` 준비 및 업로드량 실측(업로드 한도·입출력 예산·분할 크기 확정), 사건 카드 표시명·키워드 태그 확정
+- 콘텐츠·소유자: 미리 준비해 둔 사건 B·C 원문으로 업로드량 실측(업로드 한도·입출력 예산·분할 크기·사용 모델 확정), 사건 카드 표시명·키워드 태그 확정
 - **완료 기준**: 사건 A를 관리자 파이프라인으로 다시 만들어 확정할 수 있다 (또는 사건 B 초안 작성 시작)
 
 ### 6주차 (12/01 ~ 12/07) — 맵 배치·테스트·출시, 사용량 대시보드, 사건 B·C 제작
@@ -70,7 +70,7 @@
 - 콘텐츠·소유자: 사건 B·C 초안 검수·확정, 맵 제작·좌표 배치, 관리자 테스트, 표지 이미지 업로드, 출시
 - **완료 기준**: 일반 사용자 화면에서 사건 3편이 보이고 각각 시작할 수 있다
 
-### 7주차 (12/08 ~ 12/14) — 검증·안정화·시연 준비
+### 7주차 (12/08 ~ 12/14) — 검증·안정화·시연 준비 (12/14 시연, 잠정)
 
 - **목표**: 시연 가능한 MVP
 - 사건 3편 각각 수동 플레이테스트(정상 성공·실패 종료 흐름), 발견된 결함 수정 후 재검증
@@ -90,8 +90,8 @@
 
 ### 저장소·문서
 
-- [ ] [W1] `dev` 브랜치 원격 푸시, 문서 브랜치(`docs/workflow-safety`) → `dev` PR 생성·병합 (병합은 소유자)
-- [ ] [W1] 쓰지 않는 브랜치·worktree 정리 (`docs/api-contract-clarifications`, `docs/wireframe-flows`) (소유자 확인 후)
+- [x] [W1] `dev` 브랜치 원격 푸시, 문서 브랜치 → `dev` 병합 (담당: Claude, 소유자 승인으로 PR 없이 병합)
+- [x] [W1] 쓰지 않는 브랜치·worktree 정리 — 미커밋 API 보완 내용은 `dev`로 옮긴 뒤 삭제 (담당: Claude)
 - [ ] [W1] 루트 `.editorconfig` — UTF-8·LF·마지막 개행, Java 4칸 / TS·JSON·YAML 2칸 (common.md 포맷 규칙)
 - [ ] [W1] JSON 네이밍/에러 응답/날짜 형식 등 API 공통 컨벤션 확정 — 초안은 `docs/api/README.md`·`errors.md`에 작성됨. 저장소 소유자 검토·병합 후 완료 처리
 - [ ] [W1] Google Cloud OAuth client ID 발급, Claude API 키 발급 (소유자)
@@ -102,10 +102,12 @@
 - [ ] [W1] 의존성 — Web, Validation, Data JPA, PostgreSQL, Security, springdoc-openapi, Lombok, Testcontainers
 - [ ] [W1] PostgreSQL 로컬 실행 환경 (`docker-compose.yml`)
 - [ ] [W1] 환경별 프로필 — 테스트 `create-drop`, 폐기 가능한 로컬 `update`, 보존할 개발·시연 DB `validate` (backend.md 환경별 스키마 관리)
-- [ ] [W1] `application.yml` + `@ConfigurationProperties` (`common/config`, 키 `shelved.{영역}.{항목}`) — 난이도별 제한시간·힌트 횟수, 지목 기회(3), 하트비트 간격(5s)·이탈 판정(15s), AI 작업 시간 제한, 채점 재시도 최소 간격(10s), 노트 최대 글자 수, 원문 업로드 크기 한도, 표지 크기 한도(5MB), Claude 모델명, 입·출력 토큰 예산, 에셋 경로(`shelved.assets.base-path`), 표지 저장 경로
+- [ ] [W1] `application.yml` + `@ConfigurationProperties` (`common/config`, 키 `shelved.{영역}.{항목}`) — 난이도별 제한시간·힌트 횟수, 지목 기회(3), 하트비트 간격(5s)·이탈 판정(15s), AI 작업 시간 제한, 채점 재시도 최소 간격(10s), 노트 최대 글자 수, 원문 업로드 크기 한도, 표지 크기 한도(5MB), Claude 모델명(본 응답용·질문 분류용 `shelved.llm.filter-model`), 입·출력 토큰 예산, 에셋 경로(`shelved.assets.base-path`), 표지 저장 경로
+- [ ] [W1] 잠정 초기값 적용 (사건 A 플레이테스트 후 조정) — 하트비트 간격 5초·이탈 판정 15초, 채점 재시도 최소 간격 10초, 노트 최대 5000자·입력 멈춘 뒤 2초 후 자동 저장, 게임 AI 호출 시간 제한 60초, 관리자 제작 채팅 시간 제한 300초, `PROCESSING` 복구 기준은 시간 제한 + 60초, AI 요청 상태 조회 간격 2초
 - [ ] [W1] `Clock` 빈 등록 (게임 시간 판정용, backend.md 12)
 - [ ] [W1] `CommonResponse`, `ErrorData`, `PageResponse`, `SuccessMessage`, `ValidationMessage`
 - [ ] [W1] `ErrorCode` — `docs/api/errors.md`의 전체 코드·상태·메시지를 그대로 정의
+- [ ] [W1] 공통 입력 검증 — 문자열은 앞뒤 공백 제거 후 검증(개인 노트 `content`는 예외로 원문 보존), 길이는 UTF-16 코드 단위, 숫자 ID는 양의 정수·페이지·횟수·버전은 0 이상의 정수·좌표는 정수 픽셀, 위반 시 본문 `INVALID_INPUT` / 경로·쿼리 `INVALID_PARAMETER` (`docs/api/README.md` 공통 규칙)
 - [ ] [W1] `CustomException(ErrorCode)` / `CustomException(ErrorCode, detail)`, `GlobalExceptionHandler` — `@Valid` 실패, 본문 파싱 오류, 지원하지 않는 메서드, 타입 불일치, 외부 API 실패, 기타 런타임 예외를 공통 응답으로 변환
 - [ ] [W1] 인증 필터 오류 처리 — `AuthenticationEntryPoint`·`AccessDeniedHandler`·JWT 필터에서도 같은 `CommonResponse.exception(...)` 형식 반환
 - [ ] [W1] springdoc Swagger UI 로컬 노출
@@ -134,36 +136,36 @@
 > 엔티티는 `common/entity`, ID는 `Long` + `IDENTITY`, enum은 `EnumType.STRING`, 긴 문자열은 `text`, jsonb는 전용 record 타입 (backend.md 엔티티 규칙)
 
 - [ ] [W1] 공통 enum — `UserRole`, `Difficulty`, `CaseStatus`, `RoomStatus`, `AiRequestType`, `AiRequestStatus`, `GradingStatus`, `Verdict`, `MessageSenderType`, `AdminMessageSenderType`, `HotspotType`, `LlmRequestType`
-- [ ] [W1] `USERS`(닉네임 UNIQUE, 최초 null), `REFRESH_TOKENS`(해시 저장, `revoked_at`) (6.1절)
-- [ ] [W1] `CASES` — 상태, 카드 정보, 정답 보호 필드, 사전 정보, 리빌 해설, `glossary`(jsonb), `cloned_from_case_id`, `content_updated_at`, `test_verified_at` (6.2절)
-- [ ] [W1] `CASE_SOURCE_TEXTS`(원문 전문 `text`), `CASE_DRAFTS`(`draft_json`, `docs/api/admin-draft-schema.md` 구조), `ADMIN_CASE_MESSAGES`(`request_id`, `tool_changes`·`input_info` jsonb, `status`, `error_message`), `CASE_MAPS`(`case_id` UNIQUE) (6.3절)
+- [ ] [W1] `USERS`(닉네임 최초 null, **영문 대소문자를 구분하지 않는 UNIQUE**), `REFRESH_TOKENS`(해시 저장, `revoked_at`) (6.1절). 소문자로 정규화한 `nickname_lower` 컬럼(`Locale.ROOT`)을 함께 저장하고 이 컬럼에 UNIQUE
+- [ ] [W1] `CASES` — 상태, 카드 정보, 정답 보호 필드, 사전 정보, 리빌 해설, `glossary`(jsonb), `cloned_from_case_id`, `content_updated_at`, `test_verified_at`, `chat_context_revision`(0부터) (6.2절)
+- [ ] [W1] `CASE_SOURCE_TEXTS`(원문 전문 `text`), `CASE_DRAFTS`(`draft_json`, `docs/api/admin-draft-schema.md` 구조), `ADMIN_CASE_MESSAGES`(`request_id`, `tool_changes`·`input_info` jsonb, `chat_context_revision`, `response_json`(관리자 발화에 전체 응답 스냅샷, DTO 비노출), `status`, `error_message`), `CASE_MAPS`(`case_id` UNIQUE) (6.3절)
 - [ ] [W1] `SUSPECTS`(`persona_prompt` text, `sprite_key`, `is_culprit`, `can_converse`), `EVIDENCES`, `CASE_TRICK_ELEMENTS`(`grading_rubric` jsonb), `MAP_HOTSPOTS`(`type` + `ref_id` 폴리모픽 참조) (6.2절)
 - [ ] [W1] `ROOMS`(`is_test`, `status`, `time_limit_sec`, `started_at`, `elapsed_active_ms`, `active_since`, `last_seen_at`, `connection_id`), `ROOM_PARTICIPANTS` (6.4절)
 - [ ] [W1] `NPC_CONVERSATIONS`, `NPC_MESSAGES`(`(conversation_id, sequence_no)` UNIQUE)
 - [ ] [W1] `PLAYER_NOTES`(`(room_id, user_id)` UNIQUE, `revision`)
 - [ ] [W1] `HINTS`, `HINT_FOLLOWUPS`(`hint_id` UNIQUE)
 - [ ] [W1] `ACCUSATIONS`(`submitted_at`, `submitted_active_ms`, `grading_status`, `request_id`, `element_results` jsonb, `feedback`), `PLAY_RESULTS`(`room_id` UNIQUE)
-- [ ] [W1] `AI_REQUESTS`(`(room_id, request_id)` UNIQUE, `input_json` jsonb, `execution_no`, `superseded_at`, `result_ref_id`, `error_code`)
+- [ ] [W1] `AI_REQUESTS`(`(room_id, request_id)` UNIQUE, `input_json` jsonb, `result_json` jsonb(플레이어용 성공 응답 스냅샷, 내부 프롬프트 제외), `execution_no`, `superseded_at`, `result_ref_id`, `error_code`)
 - [ ] [W1] `EVIDENCE_INSPECTIONS`(`(room_id, evidence_id)` UNIQUE)
 - [ ] [W1] `LLM_USAGE_LOGS`(`usage_known`, 미확인 시 토큰·비용 null), `LLM_BUDGET_SETTINGS`(단일 설정) (6.5절)
 - [ ] [W1] UNIQUE 제약이 엔티티에 모두 선언되었는지 확인 (서비스 중복 검사로 대신하지 않음)
 - [ ] [W1] 커밋용 가상 샘플 사건 데이터 (예: 「시계탑 저택의 마지막 종소리」) — 테스트 픽스처·MSW 목에서 공유
-- [ ] [W1~W2] 사건 A 개발용 시드 데이터 작성 — 로컬 전용 `backend/src/main/resources/dev-data/`, 커밋 금지 (소유자 검수)
+- [ ] [W1~W2] 사건 A 개발용 시드 데이터 작성 — 로컬 전용 `backend/src/main/resources/dev-data/`, 커밋 금지, 카드 표시명·태그는 개발용 임시 이름 (소유자 검수)
 - [ ] [W2] 로컬 프로필에서 시드를 읽어 `PUBLISHED` 사건으로 넣는 로더
 
 ## 2. 인증 (7.1절, 6.1절, `docs/api/auth-user.md`)
 
 - [ ] [W1] `POST /api/auth/google` — Google ID 토큰 검증(발급자·대상 client ID·만료), `google_sub`로 사용자 조회·생성(`role=PLAYER`, `nickname=null`)
 - [ ] [W1] JWT 액세스 토큰 발급(1시간)/검증 필터, 만료 시 `401 EXPIRED_TOKEN`, 위조 시 `401 INVALID_TOKEN`
-- [ ] [W1] 리프레시 토큰 발급(2주)·해시 저장, `POST /api/auth/refresh` — 재발급 시 rotation(이전 토큰 무효화), 실패 시 `401 INVALID_REFRESH_TOKEN`
+- [ ] [W1] 리프레시 토큰 발급(2주)·해시 저장, `POST /api/auth/refresh` — 재발급 시 rotation(이전 토큰 무효화와 새 토큰 저장을 한 트랜잭션에서 원자적으로, 같은 토큰 중복 rotation 금지), 실패 시 `401 INVALID_REFRESH_TOKEN`
 - [ ] [W1] `POST /api/auth/logout` — 리프레시 토큰 무효화, 이미 무효·없는 토큰도 `200`
 - [ ] [W1] `GET /api/users/me` — 내 정보 조회 (새로고침 후 로그인 복원)
-- [ ] [W1] `PATCH /api/users/me/nickname` — 2~12자 한글·영문·숫자, 중복 시 `409 NICKNAME_EXIST`
+- [ ] [W1] `PATCH /api/users/me/nickname` — 2~12자 완성형 한글(`가-힣`)·영문·숫자, 영문 대소문자 무시 중복 검사(표시는 입력 대소문자 보존), 본인 기존 닉네임으로 변경 허용, 중복 시 `409 NICKNAME_EXIST`
 - [ ] [W1] 닉네임 미설정 사용자는 로그인·내 정보·닉네임 API 외 `403 NICKNAME_REQUIRED`
 - [ ] [W1] 인증 불필요 API 허용 — 로그인·재발급·로그아웃, `GET /api/cases`, `/uploads/covers/**`
 - [ ] [W1] 관리자 `role` 검사 인가 로직 (`/api/admin/**`, 아니면 `403 ACCESS_DENIED`)
 - [ ] [W1] 관리자 계정 수동 생성 절차 README에 문서화 (DB에서 직접 `role='ADMIN'`)
-- [ ] [W1] 테스트 — 토큰 만료·위조, 재발급 rotation, 로그아웃 후 재발급 거부, 닉네임 중복·검증
+- [ ] [W1] 테스트 — 토큰 만료·위조, 재발급 rotation, 같은 리프레시 토큰 동시 재발급 시 한 번만 성공, 로그아웃 후 재발급 거부, 닉네임 중복(대소문자만 다른 경우 포함)·검증
 
 ## 3. 사건 조회 & 랭킹 (7.2절, 3.10절, `docs/api/cases-ranking.md`)
 
@@ -183,7 +185,7 @@
 - [ ] [W2] `POST /api/rooms/{roomId}/start` — `READY`만(`409 ROOM_NOT_READY`), `started_at`·`active_since` 설정, `connectionId` 발급
 - [ ] [W2] `X-Connection-Id` 검사 공통 로직 — 없으면 `400 CONNECTION_ID_REQUIRED`, 현재 연결 아니면 `409 CONNECTION_REPLACED` (적용 대상은 `docs/api/README.md` 표)
 - [ ] [W2] `POST /api/rooms/{roomId}/heartbeat` — `last_seen_at` 갱신, `IN_PROGRESS`가 아니면 연결 검사 없이 상태만 반환, 자동 재개 금지
-- [ ] [W2] `POST /api/rooms/{roomId}/pause` — `IN_PROGRESS`일 때만 누적 후 `PAUSED`, 그 외 상태는 현재 상태 반환(중복 안전), 연결 헤더 불필요, 현재 연결 무효화
+- [ ] [W2] `POST /api/rooms/{roomId}/pause` — `IN_PROGRESS`일 때만 상태 변경, 그 외 상태는 현재 상태 반환(중복 안전), 연결 헤더 불필요, 현재 연결 무효화. 시간 정산 순서는 `docs/api/room.md`의 "일시정지의 시간 정산 순서"를 따름: `pause`는 `last_seen_at`을 갱신하지 않고 먼저 정산 → 이탈 기준 이상이면 마지막 접속 확인 시각까지, 미만이면 `pause` 접수 시각까지 누적 → 시간 소진 시 미해결 지목이 없으면 `EXPIRED`, 있으면 보류한 채 `PAUSED`
 - [ ] [W2] `POST /api/rooms/{roomId}/resume` — `PAUSED`만(`409 ROOM_NOT_PAUSED`), 남은 시간 없으면 `409 ROOM_TIME_EXPIRED`, 새 `connectionId` 발급
 - [ ] [W2] 유효한 플레이 요청도 `last_seen_at` 갱신 (접속 확인으로 취급)
 - [ ] [W2] 이탈 감지 스케줄러 — 15초 미수신 시 마지막 접속 확인 시각 기준으로 일시정지, AI 대기 요청 때문에 막히지 않음 (`scheduler` 패키지는 Service 호출만)
@@ -191,7 +193,7 @@
 - [ ] [W2] 세션 상태 변경 직렬화 — `rooms` 행 비관적 잠금(`PESSIMISTIC_WRITE`), 시간 중복 누적·결과 중복 생성 방지 (backend.md 15)
 - [ ] [W4] 시간 소진 시 종료 처리 — 유효한 미해결 지목이 없으면 `EXPIRED`로 종료·결과 저장, 있으면 `awaitingGrading=true`로 보류
 - [ ] [W4] `GET /api/rooms/{roomId}/result` — 종료 세션만(`409 ROOM_NOT_ENDED`), 원작·범인·트릭·리빌 해설·지목 기록·플레이 기록
-- [ ] [W2~W4] 테스트 — 상태 전이 거부, 일시정지 구간 제외, 연결 교체 후 이전 연결 거부, 이탈 판정, 중복 pause·resume, 일시정지 중 만료 금지, 결과 1건 (고정 `Clock`)
+- [ ] [W2~W4] 테스트 — 상태 전이 거부, 일시정지 구간 제외, 연결 교체 후 이전 연결 거부, 이탈 판정, 이탈 기준 직전·직후의 pause 정산, 중복 pause·resume, 일시정지 중 만료 금지, 결과 1건 (고정 `Clock`)
 
 ## 5. AI 요청 공통 인프라 (3.6절, 6.4~6.5절, backend.md AI 연동 규칙)
 
@@ -202,13 +204,15 @@
 - [ ] [W3] `AI_REQUESTS` 접수 서비스 — 같은 `requestId` + 같은 입력이면 기존 결과·처리 중 상태 반환, 입력 다르면 `409 AI_REQUEST_ID_REUSED`, 대상별 동시 1건(`409 AI_REQUEST_IN_PROGRESS`), 한도 = 완료 + 처리 중 임시 확보
 - [ ] [W3] 짧은 트랜잭션 분리 — 접수(임시 확보) → 트랜잭션 밖 AI 호출 → 결과 확정 (backend.md 13)
 - [ ] [W3] 결과 확정 — 정상 결과·게임 데이터 저장과 `SUCCEEDED`·횟수 사용을 한 트랜잭션에서 확정, 실패 시 `FAILED`·임시 확보 해제·`502` 유형별 코드
+- [ ] [W3] 완료 결과 스냅샷 — 최초 성공 응답을 `AI_REQUESTS.result_json`에 저장하고, 같은 `requestId` 재전송·상태 조회 시 당시 값 그대로 반환(남은 횟수·세션 상태를 현재 값으로 재계산하지 않음, 서버 재시작 후에도 복원)
 - [ ] [W3] 재시도 — 같은 `requestId`·입력으로 재실행 시 `execution_no` 증가, 이전 실행의 늦은 응답은 게임 데이터·횟수에 미반영
 - [ ] [W3] 최종 종료 후 도착한 응답은 기록·횟수에 미반영, `409 ROOM_ENDED_DURING_REQUEST`, 사용량 로그만 기록 (일시정지는 정상 저장)
 - [ ] [W3] 처리 중 `202 Accepted` + `AiRequestStatusResponse` 반환
 - [ ] [W3] `GET /api/rooms/{roomId}/ai-requests/{requestId}` — 참가자 권한 검사, 일시정지·종료 후에도 조회, 내부 입력 컨텍스트 미노출
 - [ ] [W3] 작업 시간 제한·서버 재시작 복구 — 오래된 `PROCESSING`을 `FAILED`로 정리하는 스케줄러·시작 시 복구
-- [ ] [W3] 직접 정답 요구 차단 모듈 — 의도 기반 판정(단순 금칙어 금지), AI 요청 접수·기회 확보 전에 수행, 차단 질문은 기록하지 않음, `400 QUESTION_BLOCKED`. **판정 방식(별도 AI 분류 호출 여부 등)은 착수 전 소유자와 결정**
-- [ ] [W3] 테스트 — 같은 `requestId` 재전송 시 같은 결과, 동시 요청 한도 초과·중복 저장 없음(Testcontainers 통합 테스트), AI 실패 시 미차감, 늦은 응답 미반영, 재시작 복구
+- [ ] [W3] 직접 정답 요구 차단 모듈 — NPC 질문·새 힌트·보충 질문마다 작은 모델(`shelved.llm.filter-model`)로 의도 분류 호출(단순 금칙어 금지), AI 요청 접수·기회 확보 전에 수행, 차단 질문은 기록하지 않음(`400 QUESTION_BLOCKED`), 분류 호출은 `QUESTION_FILTER`로 사용량 기록, 분류 실패·형식 오류 시 접수하지 않고 해당 API의 `502` 반환(기회 미차감)
+- [ ] [W3] 분류 프롬프트·판정 예시 — 차단: 범인 정체·범행 여부를 직접 또는 우회적으로 묻는 질문 / 허용: 행적·목격 사실·물증 질문, 증거 기반 추궁 (가상 사건 예시로 단위 테스트)
+- [ ] [W3] 테스트 — 같은 `requestId` 재전송 시 같은 결과(이후 횟수가 바뀌어도 당시 스냅샷), 동시 요청 한도 초과·중복 저장 없음(Testcontainers 통합 테스트), AI 실패 시 미차감, 늦은 응답 미반영, 재시작 복구
 
 ## 6. NPC 대화 (2.4절, 3.7절, `docs/api/investigation.md`)
 
@@ -228,7 +232,7 @@
 ## 8. 개인 노트 (3.7절, `docs/api/investigation.md`)
 
 - [ ] [W2] `GET /api/rooms/{roomId}/notes/me` — `content`, `revision`, `updatedAt`, `maxLength`, `editable`(진행 중이고 시간이 남을 때만 true)
-- [ ] [W2] `PUT /api/rooms/{roomId}/notes/me` — 세션 상태 공통 검사, 글자 수 제한, `revision` 일치 시에만 저장·버전 증가, 불일치 시 `409 NOTE_REVISION_CONFLICT`(`detail.currentRevision`, `currentContent`)
+- [ ] [W2] `PUT /api/rooms/{roomId}/notes/me` — 세션 상태 공통 검사, 글자 수 제한, `content`는 trim·공백·줄바꿈 정규화 없이 원문 보존, `revision` 일치 시에만 저장·버전 증가, 불일치 시 `409 NOTE_REVISION_CONFLICT`(`detail.currentRevision`, `currentContent`)
 - [ ] [W2] 테스트 — 오래된 `revision` 거부, 다른 사용자 노트 접근 차단, 일시정지·종료 후 저장 거부
 
 ## 9. 힌트 & 무료 보충 질문 (3.4절, `docs/api/hint-accusation.md`)
@@ -266,13 +270,15 @@
 - [ ] [W5] `POST /api/admin/cases/{caseId}/cover-image` — jpg/png/webp·5MB, 로컬 디스크 저장(무작위 파일명), `/uploads/covers/{파일명}` 정적 제공, 이전 파일 삭제(복제본과 공유 시 유지)
 - [ ] [W5] 제작 채팅 tool 정의 (`casebuilder` 도메인) — `set_card_info`, `set_source_info`, `set_briefing`, `add/update/remove_suspect`, `add/update/remove_evidence`, `set_trick_summary`, `add/update/remove_trick_element`, `set_reveal_explanation`, `set_glossary_term`, `remove_glossary_term`
 - [ ] [W5] tool 실행기 — 메모리 사본에 적용, 키(`sus-N`/`evi-N`/`trk-N`/`trk-N-iM`) 서버 발급·재사용 금지, 인자 검증 실패는 해당 tool 오류 `tool_result`로 반환, 응답 완료 시 대화·초안 한 번에 저장
-- [ ] [W5] `POST /api/admin/cases/{caseId}/chat` — `requestId` 중복 처리, 사건당 동시 1건, 원문 필수(`409 SOURCE_TEXT_REQUIRED`), 실패 시 초안 유지(`502 CASE_CHAT_FAILED`), 응답에 전체 초안·`draftIssues`
+- [ ] [W5] `POST /api/admin/cases/{caseId}/chat` — `requestId`는 사건 안에서 유일, 사건당 동시 1건, 원문 필수(`409 SOURCE_TEXT_REQUIRED`), 실패 시 초안 유지(`502 CASE_CHAT_FAILED`), 응답에 전체 초안·`draftIssues`
+- [ ] [W5] 제작 채팅 재시도 기준 — `chat_context_revision`은 원문 업로드·교체, 새 채팅 성공 저장, 확정·수정 재개마다 +1(표지·맵·좌표 변경은 제외). 접수 시 버전을 관리자 발화에 저장하고, 실패 요청은 `DRAFT`이고 버전이 같을 때만 같은 `requestId`로 재실행, 다르면 `409 CASE_CHAT_CONTEXT_CHANGED`(`detail.currentRevision`). 재시도는 기존 관리자 발화 상태만 갱신(중복 발화 금지), 실패한 발화는 생성용 대화 이력에서 제외
+- [ ] [W5] 완료 채팅 재전송 — 관리자 발화의 `response_json` 스냅샷 반환(확정·출시 후에도, AI 재호출 없음). 같은 ID의 입력 비교·완료 조회는 사건 수정 가능 상태 검사보다 먼저 수행
 - [ ] [W5] 원문 입력 구성 — 원문·시스템 지시·대화 이력·초안·용어집·tool 정의·출력 여유 합산 → 초과 시 오래된 대화 요약 → 그래도 초과 시 원문 장·문단 분할. 맞출 수 없으면 `400 LLM_INPUT_TOO_LARGE`, 구성 방식은 `inputInfo`로 저장·반환 (8.4절)
-- [ ] [W5] 초안 검사(`DraftIssue` ERROR/WARNING) — `admin-draft-schema.md` 검사 표 전체
+- [ ] [W5] 초안 검사(`DraftIssue` ERROR/WARNING) — `admin-draft-schema.md` 검사 표 전체, "문자열·배열·숫자 제약" 표의 상한(이름 1~100자, 키워드 1~5개, 트릭 요소 최대 5개, `rubric.items` 1~20개 등)과 `orderIndex` 중복 금지, 대화 불가 인물의 `persona`·`spriteKey`는 `null` 허용
 - [ ] [W5] `POST /api/admin/cases/{caseId}/confirm` — ERROR 있으면 `409 DRAFT_INVALID`, `persona` → `persona_prompt` 템플릿 변환, `rubric` 키 → 엔티티 ID 변환, 재확정 시 `entityId` 있는 항목은 같은 행 갱신·삭제 항목 행 삭제, 무효 배치 제거(`removedHotspots`), `content_updated_at` 갱신·`test_verified_at` 초기화
 - [ ] [W5] `POST /api/admin/cases/{caseId}/reopen` — 미종료 테스트 거부, 종료된 테스트 세션과 종속 데이터 삭제(채팅·초안·사용량 로그 유지), `deletedTestRoomCount` 반환
 - [ ] [W5] 서버 재시작 시 처리 중 제작 채팅을 실패로 복구
-- [ ] [W5] 테스트 — tool 인자 오류 처리, 키 재사용 금지, 실패 시 초안 불변, 재확정 ID 보존, 공개 사건 수정 차단
+- [ ] [W5] 테스트 — tool 인자 오류 처리, 키 재사용 금지, 실패 시 초안 불변, 재확정 ID 보존, 공개 사건 수정 차단, 원문 교체·다른 채팅 성공 후 과거 실패 요청 재시도 시 `CASE_CHAT_CONTEXT_CHANGED`, 완료 요청 재전송 시 당시 스냅샷
 
 ## 12. 관리자 — 맵 & 출시 (4.4절, 4.6절, `docs/api/admin-casebuilder.md`)
 
@@ -309,6 +315,7 @@
 - [ ] [W1] 로그인 화면 — Google Identity Services 버튼, ID 토큰 → `POST /api/auth/google`
 - [ ] [W1] 닉네임 설정 화면 — 검증 메시지·`409 NICKNAME_EXIST` 표시
 - [ ] [W1] 인증 상태 — 액세스 토큰은 Zustand 메모리, 리프레시 토큰은 `localStorage`, 앱 시작 시 한 곳에서 `refresh → users/me` 복원
+- [ ] [W1] 여러 탭 토큰 조정 — Web Locks(`shelved-auth`)로 저장·재발급·로그아웃 직렬화, 잠금 안에서 최신 리프레시 토큰 재확인, `INVALID_REFRESH_TOKEN` 시 저장값이 바뀌었으면 최신 값으로 1회 재시도, 네트워크·서버 오류에서는 토큰 유지, `storage` 이벤트로 다른 탭 로그아웃 반영 (`docs/api/auth-user.md`)
 - [ ] [W1] 로그아웃 — 토큰 삭제, Query 캐시·사용자·세션 메모리 상태 정리
 - [ ] [W1] 라우트 보호 — 로그인 필요 화면, 관리자 화면(`role=ADMIN`), 닉네임 미설정 시 닉네임 화면으로
 - [ ] [W1] 공통 UI 컴포넌트 — Button, Modal, 입력창, 로딩·에러 표시 (`shared/components`)
@@ -331,7 +338,7 @@
 
 - [ ] [W2] 게임 UI 상태 한 곳에서 관리 — 열린 창 목록, Esc는 가장 최근 창 하나만 닫기, 텍스트 입력 중 WASD·E 무시
 - [ ] [W2] 입력 허용 조건 계산 훅 — 맵 준비·유효한 연결·열린 창 없음·`IN_PROGRESS`·남은 시간 > 0 → `SET_INPUT_ENABLED` (단위 테스트 필수)
-- [ ] [W2] 입장·재접속 흐름 — 최초: state·briefing·map → 맵 로딩 → `PLACE_AT_SPAWN` → `MAP_READY` → 수사 시작 / 재접속·새로고침: pause → state·notes·hints·accusations·map 복원 → 이어하기 (`docs/api/room.md`)
+- [ ] [W2] 입장·재접속 흐름 — 최초: state·briefing·map → 맵 로딩 → `PLACE_AT_SPAWN` → `MAP_READY` → 수사 시작 / 재접속·새로고침: pause → state·notes·hints·accusations·map 복원 → 이어하기. 종료 상태면 결과 화면, `awaitingGrading`이면 채점 대기 화면(맵 로딩 안 함), `READY`면 수사 시작, `PAUSED`이고 시간이 남았으면 이어하기, start·resume이 409면 state 재조회 후 분기 (`docs/api/room.md`)
 - [ ] [W2] 시작·이어하기 오버레이 — `READY` 수사 준비 화면(사전 정보), `PAUSED` 복원 화면(남은 시간·횟수·처리 중·실패 요청·미저장 노트 초안 안내)
 - [ ] [W2] HUD — 사건명·난이도·상태 칩, 타이머(서버 값으로 매번 재보정, 0이면 입력 잠정 차단 후 서버 확인), 남은 힌트·지목(사용 완료와 처리 중 구분), 상시 표시
 - [ ] [W2] `useHeartbeat` — `heartbeatIntervalMs`마다, 창·입력·AI 대기·백그라운드 탭과 무관하게 전송, 응답 `timer.status`에 따라 이어하기·결과 화면 이동
@@ -356,10 +363,12 @@
 - [ ] [W3] 대화 기록 패널 — 대화한 NPC 목록(`conversations` + map 이름 조인), NPC별 원문 읽기 전용
 - [ ] [W3] 힌트 대화창 — 기록 시간순, 전송 전 "전송하면 힌트 1회를 사용합니다(남은 N회)", 새 힌트·"이 힌트에 대해 다시 묻기(무료 1회)" 버튼 구분, 실패 시 "횟수는 차감되지 않았습니다"·재시도, 힌트 0회여도 미사용 보충 질문 가능
 - [ ] [W3] 재접속 시 `aiRequests`·`pendingRequests`로 처리 중·실패 요청 복원
+- [ ] [W3] 완료 결과 복구 후 현재 상태 재조회 — 재전송·폴링으로 받은 결과는 대화·답안 복원에만 쓰고, 남은 횟수·세션 상태·화면 전환은 `GET state`, 보충 질문 버튼은 `GET hints`로 갱신
+- [ ] [W3] 보충 질문 전송 버튼 — 최신 `followupAvailable=true` + `IN_PROGRESS` + 남은 시간 > 0 + 현재 조작 연결일 때만 활성화
 
 ### 지목
 
-- [ ] [W4] 범인 지목 창 — 대상은 `map.suspects`(배치 안 된 인물 포함), 트릭 설명 10~3000자, 명확한 제출 버튼만(Enter 제출 금지), 채점 중 입력·제출 잠금
+- [ ] [W4] 범인 지목 창 — 대상은 `map.suspects`(배치 안 된 인물 포함, 스프라이트 없으면 기본 실루엣), 트릭 설명 10~3000자, 명확한 제출 버튼만(Enter 제출 금지), 채점 중 입력·제출 잠금
 - [ ] [W4] 채점 결과·이전 지목 기록 표시(`verdict`, `feedback`, `attemptNo`), 응답 `roomStatus`가 종료면 결과 화면으로
 - [ ] [W4] 채점 실패 — "같은 답안 다시 채점"(`retryAvailableAt` 전 비활성화), "나중에 다시 시도"로 메인 이동, 자동 반복 재시도 금지
 - [ ] [W4] 시간 종료·채점 대기 화면 — `awaitingGrading=true`, 새 행동 금지·기록 조회 가능, 연결 헤더 없이 재채점
@@ -367,7 +376,7 @@
 
 ## 17. 프론트엔드 — 결과/랭킹 (3.8절, 3.10절)
 
-- [ ] [W4] 리빌 화면 — 결과 머리말(CLEARED/FAILED/EXPIRED), 원작 공개(`source`), 범인(스프라이트는 map 조인), 트릭·해설, 플레이 기록, 내 지목 기록
+- [ ] [W4] 리빌 화면 — 결과 머리말(CLEARED/FAILED/EXPIRED), 원작 공개(`source`), 범인(스프라이트는 map 조인, `spriteKey`가 null이면 기본 실루엣), 트릭·해설, 플레이 기록, 내 지목 기록
 - [ ] [W4] 결과 화면 랭킹 영역 — 내 최고 기록, 랭킹 목록, 다시 도전(`POST /api/rooms`)
 - [ ] [W4] 관리자 테스트 결과 — 랭킹·다시 도전 숨김, "관리자 테스트 · 랭킹 제외", 맵·테스트 화면으로 복귀
 - [ ] [W4] 랭킹 페이지 — 로그인 필요(비로그인이면 로그인 화면으로), 공동 순위 표시, 기록 없음 상태, 페이지 이동
@@ -377,7 +386,7 @@
 - [ ] [W5] 관리자 레이아웃 — 사건 목록·AI 사용량 메뉴, 예산 경고 배지(`currentMonth.alertLevel`)
 - [ ] [W5] 사건 목록 — 상태 필터·개수, 새 사건, 상태별 이동(DRAFT → 제작, CONTENT_CONFIRMED → 맵·테스트, PUBLISHED → 읽기 전용·복제)
 - [ ] [W5] 원문·표지 업로드 UI — 업로드 중 중복 방지, 실패 사유·재시도, 원문 없으면 채팅 비활성화
-- [ ] [W5] 제작 채팅 — 말풍선, `toolChanges` 칩, `inputInfo` 표시, 처리 중 잠금(채팅·확정·원문 교체), `202`면 messages 폴링, 실패 시 같은 메시지로 재시도, ⌘+Enter 전송
+- [ ] [W5] 제작 채팅 — 말풍선, `toolChanges` 칩, `inputInfo` 표시, 처리 중 잠금(채팅·확정·원문 교체), `202`면 messages 폴링, 실패 시 같은 메시지로 재시도(`409 CASE_CHAT_CONTEXT_CHANGED`면 최신 상세·메시지를 다시 받고 새 `requestId`로 보내도록 안내), 복구·폴링 후에는 상세를 다시 조회해 메모장 갱신(과거 초안으로 덮어쓰지 않음), ⌘+Enter 전송
 - [ ] [W5] 메모장 패널(읽기 전용) — 카드·원작 / 등장인물(persona ↔ 원작 근거) / 물증 / 트릭·판정 기준·뒷받침 단서 / 사전 정보·리빌 / 용어집 탭, 매 응답 `draft`로 다시 그림, "방금 변경" 강조
 - [ ] [W5] 확정 전 검사 목록(`draftIssues`) 상시 표시, 콘텐츠 확정 버튼(`DRAFT_INVALID` 결과 표시)
 - [ ] [W6] 맵·테스트·출시 화면 — 맵 설정 폼(에셋 목록 선택), 저장 오류 표시, Phaser 맵 미리보기(시작점·배치·반경), 배치 표(미배치·맵 밖 표시)
@@ -401,7 +410,7 @@
 - [ ] [W1~W2] 사건 A 개발용 시드 — 인물·persona·물증·트릭 판정 기준·사전 정보·리빌 해설·용어집 (소유자 검수, 로컬 전용)
 - [ ] [W2] 사건 A 맵 제작 (Tiled, 충돌 레이어 포함) 및 좌표 배치
 - [ ] [W5] 사건 카드 표시명·키워드 태그 3편 확정 (소유자, `project-spec.md` 9절)
-- [ ] [W5] 사건 B·C 원문 `.txt` 준비 (소유자)
+- [ ] [W1~W4] 사건 B·C 원문 `.txt` 미리 준비 — 5주차 실측 전까지 (소유자)
 - [ ] [W5~W6] 사건 B·C 관리자 채팅으로 초안 작성 → 원작 일치·자백 없이 해결 가능한지 검수 → 확정 (소유자)
 - [ ] [W6] 사건 B·C 맵 제작 및 좌표 배치
 - [ ] [W6] 사건 3편 표지 이미지 준비·업로드 (원작 표지 금지) (소유자)
@@ -425,7 +434,7 @@
 - [ ] [W4] 정답 비공개 — 종료 전 API 응답·맵·에셋에 정답 필드 미포함 확인
 - [ ] [W4] 기록·랭킹 집계
 - [ ] [W6] 관리자 상태 전이·출시 검사·공개 후 수정 차단
-- [ ] [W2~W6] 프론트엔드 필수 테스트 — `utils` 함수, 입력 허용 조건, 노트 자동 저장(한 번에 하나·409 시 초안 보존), `requestId` 재사용
+- [ ] [W2~W6] 프론트엔드 필수 테스트 — `utils` 함수, 입력 허용 조건, 노트 자동 저장(한 번에 하나·409 시 초안 보존), `requestId` 재사용, 재접속 상태 분기(READY 복귀·종료·채점 대기), 여러 탭의 재발급·로그아웃
 
 ### 수동 플레이테스트 (로컬 `playtest/{YYYY-MM-DD}-{사건 식별명}.md`)
 
@@ -439,12 +448,20 @@
 
 ---
 
+## 결정 사항 (2026-10-30)
+
+- [x] 시연일 — 잠정 2026-12-14(월)
+- [x] 닉네임 대소문자 무시 UNIQUE — 정규화 컬럼 `nickname_lower` + UNIQUE (1절)
+- [x] 직접 정답 요구 차단 — 질문마다 작은 모델로 의도 분류 호출, `QUESTION_FILTER`로 사용량 기록 (5절)
+- [x] 구현 세부값 — 잠정 초기값으로 시작, 사건 A 플레이테스트(4주차) 후 조정 (0절)
+- [x] 개발용 시드의 카드 표시명·태그 — 임시 이름 사용
+- [x] 사건 B·C 원문 — 소유자가 5주차 전에 미리 준비
+
 ## 아직 정해야 할 것 (확정 전까지 관련 개발을 시작하지 않음)
 
-`project-spec.md` 9절 "남은 항목"과 개발 중 필요한 결정입니다. 결정 시한은 해당 기능을 시작하는 주차입니다.
+`project-spec.md` 9절 "남은 항목"입니다. 결정 시한은 해당 기능을 시작하는 주차입니다.
 
-- [ ] 시연(데모) 날짜 확정 — 가능한 빨리 (7주차 일정 기준)
-- [ ] [W3 전] 직접 정답 요구 차단 판정 방식 (별도 AI 분류 호출 여부, 비용·지연 고려)
-- [ ] [W2~W4] 구현 세부값 — 노트 자동 저장 간격·글자 수 제한, AI 작업 시간 제한·재시도 운영값, 하트비트 간격(플레이테스트로 조정)
-- [ ] [W5 전] 사건 카드 표시명 / 키워드 태그 확정
-- [ ] [W5] 실제 원문 3편 실측 기반 업로드 한도·입출력 예산·분할 크기 확정
+- [ ] [W5 전] 사건 카드 표시명 / 키워드 태그 확정 (출시 검사 필수 항목)
+- [ ] [W5] 실제 원문 3편 실측 기반 업로드 한도·입출력 예산·분할 크기·사용 모델 확정
+- [ ] [W4 이후] 사건 A 플레이테스트 결과로 구현 세부값 조정
+- [ ] [W7] 시연 환경 결정 (로컬 시연 또는 배포)
