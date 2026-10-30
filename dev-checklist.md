@@ -121,7 +121,7 @@
 - [x] [W1] npm 스크립트 — `lint`, `typecheck`, `test -- --run`, `build` (담당: FE-1)
 - [x] [W1] React Router, TanStack Query, Zustand 설정 (`src/app`) (담당: FE-1)
 - [x] [W1] 폴더 구조 — `app`/`pages`/`features/{도메인}`/`game`/`mocks`/`shared` (frontend.md) (담당: FE-1)
-- [~] [W1] `shared/api/client.ts` — 기본 주소, 액세스 토큰 첨부, `401 EXPIRED_TOKEN`일 때만 재발급 후 1회 재전송(동시 만료 시 재발급 Promise 공유), `X-Connection-Id` 헤더 첨부, 실패를 HTTP 상태·`message`·`data.code`·`data.detail` 보존 공통 에러로 변환 (담당: FE-1, 메모: 기본 주소·토큰 첨부·연결 헤더·공통 에러 변환 완료. 401 재발급·1회 재전송은 FE-2)
+- [x] [W1] `shared/api/client.ts` — 기본 주소, 액세스 토큰 첨부, `401 EXPIRED_TOKEN`일 때만 재발급 후 1회 재전송(동시 만료 시 재발급 Promise 공유), `X-Connection-Id` 헤더 첨부, 실패를 HTTP 상태·`message`·`data.code`·`data.detail` 보존 공통 에러로 변환 (담당: FE-1, FE-2)
 - [x] [W1] `shared/api/types.ts` — `CommonResponse<T>`, `ErrorData`, `PageResponse<T>`, 공통 enum 타입 (`docs/api/README.md` 공통 enum) (담당: FE-1)
 - [x] [W1] MSW 설정 — `VITE_USE_MOCK=true`일 때만 동작, 배포 빌드 제외, `src/mocks/handlers/{도메인}.ts`, 가상 사건 데이터만 사용 (담당: FE-1)
 - [x] [W1] `frontend/.env.example` — `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, `VITE_USE_MOCK` (담당: FE-1)
@@ -129,7 +129,7 @@
 ### README
 
 - [x] [W1] README에 기술 버전, 실행 명령(작업 디렉터리 포함), 필수 환경 변수 이름·용도, `.env` 주입 방법, DB 초기화 방법 기록 (common.md README 관리) (담당: BE-1, FE-1)
-- [ ] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록
+- [~] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록 (담당: FE-2, 메모: 토큰 방식 기록 완료, 정적 에셋 경로는 2주차)
 
 ## 1. 데이터베이스 (엔티티, 6절)
 
@@ -312,16 +312,16 @@
 
 ## 15. 프론트엔드 — 공통 (3.9절, 5.2절, frontend.md)
 
-- [ ] [W1] 로그인 화면 — Google Identity Services 버튼, ID 토큰 → `POST /api/auth/google`
-- [ ] [W1] 닉네임 설정 화면 — 검증 메시지·`409 NICKNAME_EXIST` 표시
-- [ ] [W1] 인증 상태 — 액세스 토큰은 Zustand 메모리, 리프레시 토큰은 `localStorage`, 앱 시작 시 한 곳에서 `refresh → users/me` 복원
-- [ ] [W1] 여러 탭 토큰 조정 — Web Locks(`shelved-auth`)로 저장·재발급·로그아웃 직렬화, 잠금 안에서 최신 리프레시 토큰 재확인, `INVALID_REFRESH_TOKEN` 시 저장값이 바뀌었으면 최신 값으로 1회 재시도, 네트워크·서버 오류에서는 토큰 유지, `storage` 이벤트로 다른 탭 로그아웃 반영 (`docs/api/auth-user.md`)
-- [ ] [W1] 로그아웃 — 토큰 삭제, Query 캐시·사용자·세션 메모리 상태 정리
-- [ ] [W1] 라우트 보호 — 로그인 필요 화면, 관리자 화면(`role=ADMIN`), 닉네임 미설정 시 닉네임 화면으로
-- [ ] [W1] 공통 UI 컴포넌트 — Button, Modal, 입력창, 로딩·에러 표시 (`shared/components`)
+- [~] [W1] 로그인 화면 — Google Identity Services 버튼, ID 토큰 → `POST /api/auth/google` (담당: FE-2, 메모: 목 로그인으로 확인 완료. 실제 Google 로그인은 INT에서 확인)
+- [x] [W1] 닉네임 설정 화면 — 검증 메시지·`409 NICKNAME_EXIST` 표시 (담당: FE-2)
+- [x] [W1] 인증 상태 — 액세스 토큰은 Zustand 메모리, 리프레시 토큰은 `localStorage`, 앱 시작 시 한 곳에서 `refresh → users/me` 복원 (담당: FE-2)
+- [x] [W1] 여러 탭 토큰 조정 — Web Locks(`shelved-auth`)로 저장·재발급·로그아웃 직렬화, 잠금 안에서 최신 리프레시 토큰 재확인, `INVALID_REFRESH_TOKEN` 시 저장값이 바뀌었으면 최신 값으로 1회 재시도, 네트워크·서버 오류에서는 토큰 유지, `storage` 이벤트로 다른 탭 로그아웃 반영 (`docs/api/auth-user.md`) (담당: FE-2)
+- [x] [W1] 로그아웃 — 토큰 삭제, Query 캐시·사용자·세션 메모리 상태 정리 (담당: FE-2)
+- [x] [W1] 라우트 보호 — 로그인 필요 화면, 관리자 화면(`role=ADMIN`), 닉네임 미설정 시 닉네임 화면으로 (담당: FE-2)
+- [x] [W1] 공통 UI 컴포넌트 — Button, Modal, 입력창, 로딩·에러 표시 (`shared/components`) (담당: FE-2)
 - [ ] [W2] 메인 화면 — 사건 카드 목록(비로그인 열람 가능), 진행 중 수사(이어하기·다시 채점하기), 지난 수사(결과 보기), "진행 중" 배지, 빈 목록·조회 실패 상태
 - [ ] [W2] 수사 시작 — 비로그인이면 로그인 후 고른 사건으로 복귀, `409 ROOM_ALREADY_EXISTS`면 이어하기 안내 창
-- [ ] [W1~W6] 도메인별 MSW 목 핸들러 — 정상 응답과 `202`·`409`·`502` 등 명세 오류 재현
+- [~] [W1~W6] 도메인별 MSW 목 핸들러 — 정상 응답과 `202`·`409`·`502` 등 명세 오류 재현 (담당: FE-2, 메모: auth 완료)
 
 ## 16. 프론트엔드 — 게임 화면 (3.5절, 3.9절, 5.2절, frontend.md)
 
@@ -434,7 +434,7 @@
 - [ ] [W4] 정답 비공개 — 종료 전 API 응답·맵·에셋에 정답 필드 미포함 확인
 - [ ] [W4] 기록·랭킹 집계
 - [ ] [W6] 관리자 상태 전이·출시 검사·공개 후 수정 차단
-- [ ] [W2~W6] 프론트엔드 필수 테스트 — `utils` 함수, 입력 허용 조건, 노트 자동 저장(한 번에 하나·409 시 초안 보존), `requestId` 재사용, 재접속 상태 분기(READY 복귀·종료·채점 대기), 여러 탭의 재발급·로그아웃
+- [~] [W2~W6] 프론트엔드 필수 테스트 — `utils` 함수, 입력 허용 조건, 노트 자동 저장(한 번에 하나·409 시 초안 보존), `requestId` 재사용, 재접속 상태 분기(READY 복귀·종료·채점 대기), 여러 탭의 재발급·로그아웃 (담당: FE-2, 메모: 여러 탭 재발급·로그아웃 완료)
 
 ### 수동 플레이테스트 (로컬 `playtest/{YYYY-MM-DD}-{사건 식별명}.md`)
 

@@ -11,6 +11,11 @@
   --color-ink: #2b2620;
   --color-muted: #7a7064;
   --color-accent: #8c3b2e;
+  --color-accent-strong: #6f2e24;
+  --color-surface: #fffdf8;
+  --color-line: #d9cfbf;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
 
   --font-sans: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
 }
