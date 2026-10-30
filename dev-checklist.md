@@ -99,7 +99,7 @@
 ### 백엔드 기반
 
 - [x] [W1] Spring Boot 스캐폴드 — Java 21, Spring Boot 4.1.0, Gradle Wrapper 커밋, 루트 패키지 `com.shelved` (`common`/`infra`/`domain` 구조, backend.md) (담당: BE-1)
-- [~] [W1] 의존성 — Web, Validation, Data JPA, PostgreSQL, Security, springdoc-openapi, Lombok, Testcontainers (담당: BE-1, Security 외 추가 완료. Security는 BE-3에서 추가)
+- [x] [W1] 의존성 — Web, Validation, Data JPA, PostgreSQL, Security, springdoc-openapi, Lombok, Testcontainers (담당: BE-1, BE-3)
 - [x] [W1] PostgreSQL 로컬 실행 환경 (`docker-compose.yml`) (담당: BE-1)
 - [x] [W1] 환경별 프로필 — 테스트 `create-drop`, 폐기 가능한 로컬 `update`, 보존할 개발·시연 DB `validate` (backend.md 환경별 스키마 관리) (담당: BE-1)
 - [x] [W1] `application.yml` + `@ConfigurationProperties` (`common/config`, 키 `shelved.{영역}.{항목}`) — 난이도별 제한시간·힌트 횟수, 지목 기회(3), 하트비트 간격(5s)·이탈 판정(15s), AI 작업 시간 제한, 채점 재시도 최소 간격(10s), 노트 최대 글자 수, 원문 업로드 크기 한도, 표지 크기 한도(5MB), Claude 모델명(본 응답용·질문 분류용 `shelved.llm.filter-model`), 입·출력 토큰 예산, 에셋 경로(`shelved.assets.base-path`), 표지 저장 경로 (담당: BE-1)
@@ -109,7 +109,7 @@
 - [x] [W1] `ErrorCode` — `docs/api/errors.md`의 전체 코드·상태·메시지를 그대로 정의 (담당: BE-1)
 - [x] [W1] 공통 입력 검증 — 문자열은 앞뒤 공백 제거 후 검증(개인 노트 `content`는 예외로 원문 보존), 길이는 UTF-16 코드 단위, 숫자 ID는 양의 정수·페이지·횟수·버전은 0 이상의 정수·좌표는 정수 픽셀, 위반 시 본문 `INVALID_INPUT` / 경로·쿼리 `INVALID_PARAMETER` (`docs/api/README.md` 공통 규칙) (담당: BE-1, 공통 처리 완료. 필드별 범위 제약(`@Positive` 등)은 각 DTO 작성 시 추가)
 - [x] [W1] `CustomException(ErrorCode)` / `CustomException(ErrorCode, detail)`, `GlobalExceptionHandler` — `@Valid` 실패, 본문 파싱 오류, 지원하지 않는 메서드, 타입 불일치, 외부 API 실패, 기타 런타임 예외를 공통 응답으로 변환 (담당: BE-1)
-- [ ] [W1] 인증 필터 오류 처리 — `AuthenticationEntryPoint`·`AccessDeniedHandler`·JWT 필터에서도 같은 `CommonResponse.exception(...)` 형식 반환
+- [x] [W1] 인증 필터 오류 처리 — `AuthenticationEntryPoint`·`AccessDeniedHandler`·JWT 필터에서도 같은 `CommonResponse.exception(...)` 형식 반환 (담당: BE-3)
 - [x] [W1] springdoc Swagger UI 로컬 노출 (담당: BE-1)
 - [x] [W1] 로그 정책 — 토큰·API 키·인증 헤더·원문·프롬프트·정답·노트 전문을 로그에 남기지 않도록 HTTP 클라이언트·SQL 바인딩 디버그 로그 설정 확인 (담당: BE-1)
 - [x] [W1] `backend/.env.example` — DB 접속 정보, `GOOGLE_CLIENT_ID`, JWT 서명 키, `CLAUDE_API_KEY`, `CLAUDE_MODEL`, `CLAUDE_FILTER_MODEL` (가짜 값만) (담당: BE-1)
@@ -155,17 +155,17 @@
 
 ## 2. 인증 (7.1절, 6.1절, `docs/api/auth-user.md`)
 
-- [ ] [W1] `POST /api/auth/google` — Google ID 토큰 검증(발급자·대상 client ID·만료), `google_sub`로 사용자 조회·생성(`role=PLAYER`, `nickname=null`)
-- [ ] [W1] JWT 액세스 토큰 발급(1시간)/검증 필터, 만료 시 `401 EXPIRED_TOKEN`, 위조 시 `401 INVALID_TOKEN`
-- [ ] [W1] 리프레시 토큰 발급(2주)·해시 저장, `POST /api/auth/refresh` — 재발급 시 rotation(이전 토큰 무효화와 새 토큰 저장을 한 트랜잭션에서 원자적으로, 같은 토큰 중복 rotation 금지), 실패 시 `401 INVALID_REFRESH_TOKEN`
-- [ ] [W1] `POST /api/auth/logout` — 리프레시 토큰 무효화, 이미 무효·없는 토큰도 `200`
-- [ ] [W1] `GET /api/users/me` — 내 정보 조회 (새로고침 후 로그인 복원)
-- [ ] [W1] `PATCH /api/users/me/nickname` — 2~12자 완성형 한글(`가-힣`)·영문·숫자, 영문 대소문자 무시 중복 검사(표시는 입력 대소문자 보존), 본인 기존 닉네임으로 변경 허용, 중복 시 `409 NICKNAME_EXIST`
-- [ ] [W1] 닉네임 미설정 사용자는 로그인·내 정보·닉네임 API 외 `403 NICKNAME_REQUIRED`
-- [ ] [W1] 인증 불필요 API 허용 — 로그인·재발급·로그아웃, `GET /api/cases`, `/uploads/covers/**`
-- [ ] [W1] 관리자 `role` 검사 인가 로직 (`/api/admin/**`, 아니면 `403 ACCESS_DENIED`)
-- [ ] [W1] 관리자 계정 수동 생성 절차 README에 문서화 (DB에서 직접 `role='ADMIN'`)
-- [ ] [W1] 테스트 — 토큰 만료·위조, 재발급 rotation, 같은 리프레시 토큰 동시 재발급 시 한 번만 성공, 로그아웃 후 재발급 거부, 닉네임 중복(대소문자만 다른 경우 포함)·검증
+- [~] [W1] `POST /api/auth/google` — Google ID 토큰 검증(발급자·대상 client ID·만료), `google_sub`로 사용자 조회·생성(`role=PLAYER`, `nickname=null`) (담당: BE-3, 구현·대체 구현 테스트 완료. 실제 Google 토큰 확인은 INT)
+- [x] [W1] JWT 액세스 토큰 발급(1시간)/검증 필터, 만료 시 `401 EXPIRED_TOKEN`, 위조 시 `401 INVALID_TOKEN` (담당: BE-3)
+- [x] [W1] 리프레시 토큰 발급(2주)·해시 저장, `POST /api/auth/refresh` — 재발급 시 rotation(이전 토큰 무효화와 새 토큰 저장을 한 트랜잭션에서 원자적으로, 같은 토큰 중복 rotation 금지), 실패 시 `401 INVALID_REFRESH_TOKEN` (담당: BE-3)
+- [x] [W1] `POST /api/auth/logout` — 리프레시 토큰 무효화, 이미 무효·없는 토큰도 `200` (담당: BE-3)
+- [x] [W1] `GET /api/users/me` — 내 정보 조회 (새로고침 후 로그인 복원) (담당: BE-3)
+- [x] [W1] `PATCH /api/users/me/nickname` — 2~12자 완성형 한글(`가-힣`)·영문·숫자, 영문 대소문자 무시 중복 검사(표시는 입력 대소문자 보존), 본인 기존 닉네임으로 변경 허용, 중복 시 `409 NICKNAME_EXIST` (담당: BE-3)
+- [x] [W1] 닉네임 미설정 사용자는 로그인·내 정보·닉네임 API 외 `403 NICKNAME_REQUIRED` (담당: BE-3)
+- [x] [W1] 인증 불필요 API 허용 — 로그인·재발급·로그아웃, `GET /api/cases`, `/uploads/covers/**` (담당: BE-3)
+- [x] [W1] 관리자 `role` 검사 인가 로직 (`/api/admin/**`, 아니면 `403 ACCESS_DENIED`) (담당: BE-3)
+- [x] [W1] 관리자 계정 수동 생성 절차 README에 문서화 (DB에서 직접 `role='ADMIN'`) (담당: BE-3)
+- [x] [W1] 테스트 — 토큰 만료·위조, 재발급 rotation, 같은 리프레시 토큰 동시 재발급 시 한 번만 성공, 로그아웃 후 재발급 거부, 닉네임 중복(대소문자만 다른 경우 포함)·검증 (담당: BE-3)
 
 ## 3. 사건 조회 & 랭킹 (7.2절, 3.10절, `docs/api/cases-ranking.md`)
 

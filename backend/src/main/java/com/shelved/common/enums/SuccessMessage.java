@@ -11,6 +11,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum SuccessMessage {
 
+    // 인증
+    AUTH_LOGIN_SUCCESS("로그인 성공"),
+    AUTH_TOKEN_REISSUE_SUCCESS("토큰 재발급 성공"),
+    AUTH_LOGOUT_SUCCESS("로그아웃 성공"),
+
+    // 사용자
+    USER_ME_GET_SUCCESS("내 정보 조회 성공"),
+    USER_NICKNAME_UPDATE_SUCCESS("닉네임 설정 성공"),
+
     ;
 
     private final String message;

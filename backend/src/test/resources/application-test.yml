@@ -3,3 +3,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+shelved:
+  jwt:
+    # 테스트 전용 가짜 서명 키 (32바이트 이상)
+    secret-key: test-only-fake-jwt-secret-key-0123456789
