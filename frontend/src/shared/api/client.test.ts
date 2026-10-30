@@ -1,8 +1,16 @@
-import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it } from 'vitest';
+import { CanceledError } from 'axios';
+import { delay, http, HttpResponse } from 'msw';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mockErrorResponse } from '../../mocks/handlers/auth';
 import { server } from '../../mocks/node';
 import { ApiError, NETWORK_ERROR_MESSAGE } from './apiError';
-import { apiClient, setAccessTokenGetter, setConnectionId } from './client';
+import {
+  apiClient,
+  resetApiSession,
+  setAccessTokenGetter,
+  setConnectionId,
+  setTokenRefresher,
+} from './client';
 import type { CommonResponse, ErrorData } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -28,6 +36,7 @@ async function captureError(request: Promise<unknown>): Promise<unknown> {
 
 afterEach(() => {
   setAccessTokenGetter(null);
+  setTokenRefresher(null);
   setConnectionId(null);
 });
 
@@ -246,5 +255,209 @@ describe('apiClient Authorization 헤더', () => {
 
     // then
     expect(response.data.authorization).toBeNull();
+  });
+});
+
+describe('apiClient 토큰 재발급', () => {
+  const EXPIRED = () => mockErrorResponse(401, 'EXPIRED_TOKEN', '로그인이 만료되었습니다.');
+
+  /** 메모리 토큰을 흉내 내고, 재발급하면 'new-token'으로 바꾸는 테스트용 재발급 함수를 등록한다 */
+  function setupTokens(beforeRefresh?: () => void) {
+    let accessToken = 'old-token';
+    setAccessTokenGetter(() => accessToken);
+    const refresher = vi.fn(async () => {
+      beforeRefresh?.();
+      await delay(10);
+      accessToken = 'new-token';
+      return accessToken;
+    });
+    setTokenRefresher(refresher);
+    return refresher;
+  }
+
+  /** 새 토큰이면 성공하고, 아니면 401 EXPIRED_TOKEN을 돌려주는 핸들러 */
+  function expiresUnlessNewToken(path: string) {
+    return http.get(`${API_BASE_URL}${path}`, ({ request }) =>
+      request.headers.get('Authorization') === 'Bearer new-token'
+        ? HttpResponse.json({ success: true, message: '성공', data: path, timestamp: '' })
+        : EXPIRED(),
+    );
+  }
+
+  it('401 EXPIRED_TOKEN이면 재발급 후 새 토큰으로 원래 요청을 다시 보낸다', async () => {
+    // given
+    const refresher = setupTokens();
+    server.use(expiresUnlessNewToken('/api/users/me'));
+
+    // when
+    const response = await apiClient.get('/api/users/me');
+
+    // then
+    expect(refresher).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(200);
+    expect(response.data.data).toBe('/api/users/me');
+  });
+
+  it('EXPIRED_TOKEN이 아닌 401은 재발급하지 않고 ApiError로 실패한다', async () => {
+    // given
+    const refresher = setupTokens();
+    server.use(
+      http.get(`${API_BASE_URL}/api/users/me`, () =>
+        mockErrorResponse(401, 'INVALID_TOKEN', '유효하지 않은 토큰입니다.'),
+      ),
+    );
+
+    // when
+    const error = (await captureError(apiClient.get('/api/users/me'))) as ApiError;
+
+    // then
+    expect(refresher).not.toHaveBeenCalled();
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.code).toBe('INVALID_TOKEN');
+  });
+
+  it('동시에 만료된 요청 여러 개는 재발급을 한 번만 하고 함께 기다린다', async () => {
+    // given
+    const refresher = setupTokens();
+    server.use(
+      expiresUnlessNewToken('/api/users/me'),
+      expiresUnlessNewToken('/api/rooms'),
+      expiresUnlessNewToken('/api/rooms/1/state'),
+    );
+
+    // when
+    const responses = await Promise.all([
+      apiClient.get('/api/users/me'),
+      apiClient.get('/api/rooms'),
+      apiClient.get('/api/rooms/1/state'),
+    ]);
+
+    // then
+    expect(refresher).toHaveBeenCalledTimes(1);
+    expect(responses.map((response) => response.data.data)).toEqual([
+      '/api/users/me',
+      '/api/rooms',
+      '/api/rooms/1/state',
+    ]);
+  });
+
+  it('재전송한 요청이 다시 만료되면 또 재발급하지 않고 실패한다', async () => {
+    // given
+    const refresher = setupTokens();
+    let requestCount = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/users/me`, () => {
+        requestCount += 1;
+        return EXPIRED();
+      }),
+    );
+
+    // when
+    const error = (await captureError(apiClient.get('/api/users/me'))) as ApiError;
+
+    // then
+    expect(refresher).toHaveBeenCalledTimes(1);
+    expect(requestCount).toBe(2);
+    expect(error.code).toBe('EXPIRED_TOKEN');
+  });
+
+  it('재전송할 때 원래 본문·requestId·X-Connection-Id를 그대로 보낸다', async () => {
+    // given
+    setConnectionId('conn-original');
+    // 재발급 사이에 연결 식별자가 바뀌어도 재전송은 처음 보낸 값을 유지해야 한다
+    setupTokens(() => setConnectionId('conn-changed'));
+    const received: { authorization: string | null; connectionId: string | null; body: unknown }[] =
+      [];
+    server.use(
+      http.post(`${API_BASE_URL}/api/rooms/1/npc/2/ask`, async ({ request }) => {
+        received.push({
+          authorization: request.headers.get('Authorization'),
+          connectionId: request.headers.get('X-Connection-Id'),
+          body: await request.json(),
+        });
+        return received.length === 1
+          ? EXPIRED()
+          : HttpResponse.json({ success: true, message: '성공', data: null, timestamp: '' });
+      }),
+    );
+    const requestBody = { requestId: 'req-123', question: '어젯밤 서재에 있었나요?' };
+
+    // when
+    await apiClient.post('/api/rooms/1/npc/2/ask', requestBody, { requiresConnectionId: true });
+
+    // then
+    expect(received).toHaveLength(2);
+    expect(received[1].body).toEqual(requestBody);
+    expect(received[1].connectionId).toBe('conn-original');
+    expect(received[0].authorization).toBe('Bearer old-token');
+    expect(received[1].authorization).toBe('Bearer new-token');
+  });
+
+  it('재발급이 실패하면 원래 요청은 재발급 실패 ApiError로 실패한다', async () => {
+    // given
+    setAccessTokenGetter(() => 'old-token');
+    setTokenRefresher(async () => {
+      throw new ApiError({
+        status: 401,
+        message: '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.',
+        code: 'INVALID_REFRESH_TOKEN',
+        detail: null,
+        isNetworkError: false,
+      });
+    });
+    server.use(expiresUnlessNewToken('/api/users/me'));
+
+    // when
+    const error = (await captureError(apiClient.get('/api/users/me'))) as ApiError;
+
+    // then
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.code).toBe('INVALID_REFRESH_TOKEN');
+  });
+
+  it('로그인·재발급·로그아웃처럼 skipAuth로 표시한 요청은 토큰을 붙이지 않고 재발급하지 않는다', async () => {
+    // given
+    const refresher = setupTokens();
+    let authorization: string | null = 'not-called';
+    server.use(
+      http.post(`${API_BASE_URL}/api/auth/refresh`, ({ request }) => {
+        authorization = request.headers.get('Authorization');
+        return EXPIRED();
+      }),
+    );
+
+    // when
+    const error = (await captureError(
+      apiClient.post('/api/auth/refresh', { refreshToken: 'r' }, { skipAuth: true }),
+    )) as ApiError;
+
+    // then
+    expect(authorization).toBeNull();
+    expect(refresher).not.toHaveBeenCalled();
+    expect(error.code).toBe('EXPIRED_TOKEN');
+  });
+
+  it('API 세션을 초기화(로그아웃)하기 전에 보낸 요청의 늦은 응답은 취소로 버린다', async () => {
+    // given
+    let markArrived: () => void = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      markArrived = resolve;
+    });
+    server.use(
+      http.get(`${API_BASE_URL}/api/rooms`, async () => {
+        markArrived();
+        await delay(20);
+        return HttpResponse.json({ success: true, message: '성공', data: [], timestamp: '' });
+      }),
+    );
+    const request = apiClient.get('/api/rooms');
+    await arrived;
+
+    // when
+    resetApiSession();
+    const error = await captureError(request);
+
+    // then
+    expect(error).toBeInstanceOf(CanceledError);
   });
 });
