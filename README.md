@@ -233,8 +233,8 @@ npm run format          # Prettier로 코드 정렬
 | 항목 | 방식 |
 |---|---|
 | 액세스 토큰 | 메모리(Zustand)에만 보관하고 모든 인증 API에 `Authorization: Bearer` 헤더로 보냅니다. 새로고침하면 사라집니다 |
-| 리프레시 토큰 | `localStorage`의 `shelved.auth.refreshToken`에만 보관합니다. 브라우저 저장소에 두는 인증 정보는 이것 하나입니다 |
+| 리프레시 토큰 | `localStorage`의 `shelved.auth.refreshToken`에만 보관합니다. 브라우저 저장소에 두는 인증 정보는 이것 하나입니다. 계정 변경 감지용으로 비밀이 아닌 `userId`를 `shelved.auth.userId`에 함께 둡니다 |
 | 새로고침 후 복원 | 앱 시작 시 리프레시 토큰이 있으면 `POST /api/auth/refresh` → `GET /api/users/me` 순서로 복원하고, 그동안 로딩 화면을 보여줍니다 |
 | 만료 시 재발급 | API가 `401 EXPIRED_TOKEN`이면 공통 axios 인스턴스가 한 번 재발급한 뒤 원래 요청을 한 번만 다시 보냅니다. 동시에 만료된 요청은 재발급 하나를 함께 기다립니다 |
-| 여러 탭 조정 | 토큰 저장·재발급·로그아웃은 Web Locks(`shelved-auth` 잠금)로 탭 간 순서를 맞추고, 다른 탭의 로그아웃은 `storage` 이벤트로 반영합니다 |
+| 여러 탭 조정 | 토큰 저장·재발급·로그아웃은 Web Locks(`shelved-auth` 잠금)로 탭 간 순서를 맞추고, 다른 탭의 로그아웃과 다른 계정 로그인은 `storage` 이벤트로 반영합니다 |
 | 로그아웃 | `POST /api/auth/logout` 후 메모리·`localStorage` 토큰과 TanStack Query 캐시를 지웁니다. 요청이 실패해도 이 브라우저의 로그인 상태는 정리합니다 |
