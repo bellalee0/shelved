@@ -7,6 +7,7 @@ import com.shelved.common.exception.CustomException;
 import java.time.Clock;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtAudienceValidator;
@@ -33,7 +34,13 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
     // GOOGLE_CLIENT_ID가 없으면 null
     private final JwtDecoder jwtDecoder;
 
+    @Autowired
     public NimbusGoogleIdTokenVerifier(GoogleProperties googleProperties, Clock clock) {
+        this(googleProperties, clock, NimbusJwtDecoder.withJwkSetUri(JWK_SET_URI).build());
+    }
+
+    // 테스트에서 원격 JWK 대신 로컬 키로 만든 디코더를 넣는다. 검증 규칙은 이 생성자에서 한 곳으로 구성한다
+    NimbusGoogleIdTokenVerifier(GoogleProperties googleProperties, Clock clock, NimbusJwtDecoder decoder) {
 
         if (!StringUtils.hasText(googleProperties.clientId())) {
             log.warn("GOOGLE_CLIENT_ID가 설정되지 않아 Google 로그인 요청은 모두 실패합니다.");
@@ -45,7 +52,6 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
         timestampValidator.setClock(clock);
         timestampValidator.setAllowEmptyExpiryClaim(false);
 
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(JWK_SET_URI).build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 timestampValidator,
                 new JwtClaimValidator<Object>(JwtClaimNames.ISS, iss -> iss != null && ISSUERS.contains(iss.toString())),
