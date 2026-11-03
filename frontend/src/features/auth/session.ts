@@ -41,22 +41,33 @@ export function subscribeAuthCleared(listener: () => void) {
   };
 }
 
+/** 로그인 요청을 보내기 전에 만든 시도 식별자. 응답이 돌아왔을 때 아직 유효한 시도인지 가리는 데 쓴다 */
+export interface LoginAttempt {
+  readonly number: number;
+  readonly sessionId: number;
+}
+
+/**
+ * 로그인 요청(POST /api/auth/google)을 보내기 **전에** 부른다.
+ * 요청 대기 중에 로그아웃하거나 더 늦게 시작한 로그인이 있으면, 이 시도의 응답은 completeLogin에서 버려진다.
+ */
+export function beginLoginAttempt(): LoginAttempt {
+  latestLoginAttempt += 1;
+  return { number: latestLoginAttempt, sessionId: getApiSessionId() };
+}
+
 /**
  * Google 로그인 응답을 반영한다. 리프레시 토큰은 다른 탭과 순서를 맞추기 위해 잠금 안에서 저장한다.
- * 잠금을 기다리는 사이 로그아웃하거나 다른 로그인이 시작되었으면 이 응답은 반영하지 않고,
+ * 요청·잠금을 기다리는 사이 로그아웃하거나 다른 로그인이 시작되었으면 이 응답은 반영하지 않고,
  * 받은 리프레시 토큰을 서버에서 무효화해 유효한 토큰이 남지 않게 한다.
  */
-export async function completeLogin(response: AuthTokenResponse) {
-  // 이미 다른 사용자로 로그인한 상태였다면 이전 사용자의 요청·캐시를 먼저 정리한다
-  clearAuthState();
-  latestLoginAttempt += 1;
-  const attempt = latestLoginAttempt;
-  const sessionId = getApiSessionId();
-
+export async function completeLogin(attempt: LoginAttempt, response: AuthTokenResponse) {
   const applied = await withAuthLock(async () => {
-    if (attempt !== latestLoginAttempt || getApiSessionId() !== sessionId) {
+    if (attempt.number !== latestLoginAttempt || getApiSessionId() !== attempt.sessionId) {
       return false;
     }
+    // 이미 다른 사용자로 로그인한 상태였다면 이전 사용자의 요청·캐시를 먼저 정리한다
+    clearAuthState();
     // 저장과 메모리 반영 사이에 await가 없어, 확인 후 끼어드는 로그아웃이 없다.
     // 이후 로그아웃은 메모리를 비운 뒤 잠금 안에서 방금 저장한 토큰을 읽어 무효화한다
     saveRefreshToken(response.refreshToken, response.user.userId);
@@ -190,6 +201,7 @@ async function runRestore() {
  * 메모리 상태는 바로 비워 화면과 진행 중인 요청을 먼저 끊고, 리프레시 토큰은 잠금 안에서 최신 값을 읽어 무효화·삭제한다.
  */
 export async function logoutSession() {
+  // force로 API 세션 번호를 바꾸므로, 응답을 기다리는 중인 로그인 시도(beginLoginAttempt가 세션 번호를 기록)도 무효가 된다
   clearAuthState({ force: true });
   await withAuthLock(async () => {
     const token = readRefreshToken();

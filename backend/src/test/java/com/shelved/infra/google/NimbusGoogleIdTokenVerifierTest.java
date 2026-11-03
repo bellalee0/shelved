@@ -120,6 +120,31 @@ class NimbusGoogleIdTokenVerifierTest {
     }
 
     @Test
+    void verify_sub없음_예외() throws Exception {
+
+        // given
+        JWTClaimsSet noSub = new JWTClaimsSet.Builder()
+                .issuer(ISSUER).audience(CLIENT_ID)
+                .issueTime(Date.from(NOW.minusSeconds(60)))
+                .expirationTime(Date.from(NOW.plusSeconds(600))).build();
+        String token = sign(signingKey, noSub);
+
+        // when & then
+        assertInvalid(token);
+    }
+
+    @Test
+    void verify_sub가_공백_예외() throws Exception {
+
+        // given
+        JWTClaimsSet blankSub = claims(ISSUER, CLIENT_ID, NOW.plusSeconds(600)).subject("   ").build();
+        String token = sign(signingKey, blankSub);
+
+        // when & then
+        assertInvalid(token);
+    }
+
+    @Test
     void verify_clientId비어있음_예외() throws Exception {
 
         // given

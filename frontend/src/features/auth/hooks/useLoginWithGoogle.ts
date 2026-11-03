@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { loginWithGoogle } from '../api';
-import { completeLogin } from '../session';
+import { beginLoginAttempt, completeLogin } from '../session';
 
 /**
  * Google ID 토큰(credential)으로 로그인한다.
@@ -9,8 +9,9 @@ import { completeLogin } from '../session';
 export function useLoginWithGoogle() {
   return useMutation({
     mutationFn: async (idToken: string) => {
+      const attempt = beginLoginAttempt();
       const response = await loginWithGoogle({ idToken });
-      await completeLogin(response);
+      await completeLogin(attempt, response);
       return response.user;
     },
   });

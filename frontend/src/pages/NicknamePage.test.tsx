@@ -4,7 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { routes } from '../app/routes';
 import { loginWithGoogle } from '../features/auth/api';
-import { completeLogin, connectAuthToApiClient } from '../features/auth/session';
+import { beginLoginAttempt, completeLogin, connectAuthToApiClient } from '../features/auth/session';
 import { INITIAL_AUTH_STATE, useAuthStore } from '../features/auth/store';
 import { createMockGoogleIdToken } from '../mocks/mockGoogleIdToken';
 import { setAccessTokenGetter, setTokenRefresher } from '../shared/api/client';
@@ -13,7 +13,11 @@ beforeEach(async () => {
   useAuthStore.setState({ ...INITIAL_AUTH_STATE, restoreStatus: 'ready' }, true);
   connectAuthToApiClient();
   // 목 서버에 닉네임이 없는 새 사용자로 로그인한다
-  await completeLogin(await loginWithGoogle({ idToken: createMockGoogleIdToken('new-player') }));
+  const attempt = beginLoginAttempt();
+  await completeLogin(
+    attempt,
+    await loginWithGoogle({ idToken: createMockGoogleIdToken('new-player') }),
+  );
 });
 
 afterEach(() => {

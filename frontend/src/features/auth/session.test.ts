@@ -21,6 +21,7 @@ import {
   saveRefreshToken,
 } from './refreshTokenStorage';
 import {
+  beginLoginAttempt,
   completeLogin,
   connectAuthToApiClient,
   logoutSession,
@@ -57,7 +58,11 @@ afterEach(() => {
 
 /** 목 서버로 Google 로그인한 상태를 만든다 */
 async function loginAs(googleSub: string) {
-  await completeLogin(await loginWithGoogle({ idToken: createMockGoogleIdToken(googleSub) }));
+  const attempt = beginLoginAttempt();
+  await completeLogin(
+    attempt,
+    await loginWithGoogle({ idToken: createMockGoogleIdToken(googleSub) }),
+  );
 }
 
 /** 새로고침처럼 메모리 상태만 비운다 (localStorage의 리프레시 토큰은 남는다) */
@@ -478,12 +483,13 @@ describe('completeLogin 로그인 응답 반영', () => {
 
   it('잠금을 기다리는 사이 로그아웃하면 로그인을 반영하지 않고 받은 토큰을 서버에서 무효화한다', async () => {
     // given
+    const attempt = beginLoginAttempt();
     const response = await loginWithGoogle({ idToken: createMockGoogleIdToken('abandoned') });
     const logoutTokens = recordLogoutTokens();
     const release = holdAuthLock();
 
     // when
-    const login = completeLogin(response);
+    const login = completeLogin(attempt, response);
     const logout = logoutSession();
     release();
     await Promise.all([login, logout]);
@@ -497,16 +503,55 @@ describe('completeLogin 로그인 응답 반영', () => {
 
   it('잠금을 기다리는 사이 다른 로그인이 시작되면 앞의 로그인 응답은 버리고 무효화한다', async () => {
     // given
+    const firstAttempt = beginLoginAttempt();
     const first = await loginWithGoogle({ idToken: createMockGoogleIdToken('first-login') });
+    const secondAttempt = beginLoginAttempt();
     const second = await loginWithGoogle({ idToken: createMockGoogleIdToken('second-login') });
     const logoutTokens = recordLogoutTokens();
     const release = holdAuthLock();
 
     // when
-    const firstLogin = completeLogin(first);
-    const secondLogin = completeLogin(second);
+    const firstLogin = completeLogin(firstAttempt, first);
+    const secondLogin = completeLogin(secondAttempt, second);
     release();
     await Promise.all([firstLogin, secondLogin]);
+
+    // then
+    expect(useAuthStore.getState().user?.userId).toBe(second.user.userId);
+    expect(readRefreshToken()).toBe(second.refreshToken);
+    expect(logoutTokens).toEqual([first.refreshToken]);
+  });
+
+  it('로그인 요청을 기다리는 사이 로그아웃하면 응답이 도착해도 로그인되지 않고 받은 토큰을 무효화한다', async () => {
+    // given: 로그인 전 상태에서 요청을 보낸 시점
+    const logoutTokens = recordLogoutTokens();
+    const attempt = beginLoginAttempt();
+    const response = await loginWithGoogle({
+      idToken: createMockGoogleIdToken('logout-in-flight'),
+    });
+
+    // when: 응답을 반영하기 전에 로그아웃
+    await logoutSession();
+    await completeLogin(attempt, response);
+
+    // then
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(readRefreshToken()).toBeNull();
+    expect(logoutTokens).toEqual([response.refreshToken]);
+  });
+
+  it('로그인 응답이 역순으로 도착하면 나중에 시작한 시도만 반영하고 먼저 시작한 시도는 무효화한다', async () => {
+    // given: 두 요청을 차례로 시작
+    const logoutTokens = recordLogoutTokens();
+    const firstAttempt = beginLoginAttempt();
+    const secondAttempt = beginLoginAttempt();
+    const first = await loginWithGoogle({ idToken: createMockGoogleIdToken('first-in-flight') });
+    const second = await loginWithGoogle({ idToken: createMockGoogleIdToken('second-in-flight') });
+
+    // when: 나중에 시작한 쪽 응답이 먼저 도착
+    await completeLogin(secondAttempt, second);
+    await completeLogin(firstAttempt, first);
 
     // then
     expect(useAuthStore.getState().user?.userId).toBe(second.user.userId);
