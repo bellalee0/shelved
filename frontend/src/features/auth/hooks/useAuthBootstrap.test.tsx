@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createMockGoogleIdToken } from '../../../mocks/mockGoogleIdToken';
 import { setAccessTokenGetter, setTokenRefresher } from '../../../shared/api/client';
 import { loginWithGoogle } from '../api';
-import { completeLogin, logoutSession } from '../session';
+import { beginLoginAttempt, completeLogin, logoutSession } from '../session';
 import { INITIAL_AUTH_STATE, useAuthStore } from '../store';
 import { useAuthBootstrap } from './useAuthBootstrap';
 
@@ -43,7 +43,9 @@ describe('useAuthBootstrap', () => {
     const { result } = renderBootstrap(queryClient);
     await waitFor(() => expect(result.current.restoreStatus).toBe('ready'));
     await act(async () => {
+      const attempt = beginLoginAttempt();
       await completeLogin(
+        attempt,
         await loginWithGoogle({ idToken: createMockGoogleIdToken('cache-user') }),
       );
     });
