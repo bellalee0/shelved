@@ -1,11 +1,13 @@
 import { http, HttpResponse } from 'msw';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { CanceledError } from 'axios';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockErrorResponse } from '../../mocks/handlers/auth';
 import { createMockGoogleIdToken } from '../../mocks/mockGoogleIdToken';
 import { server } from '../../mocks/node';
 import { NETWORK_ERROR_MESSAGE } from '../../shared/api/apiError';
 import {
   apiClient,
+  getApiSessionId,
   setAccessTokenGetter,
   setConnectionId,
   setTokenRefresher,
@@ -13,6 +15,7 @@ import {
 import { loginWithGoogle } from './api';
 import { AUTH_LOCK_NAME } from './authLock';
 import {
+  AUTH_USER_ID_STORAGE_KEY,
   readRefreshToken,
   REFRESH_TOKEN_STORAGE_KEY,
   saveRefreshToken,
@@ -24,6 +27,7 @@ import {
   refreshSession,
   restoreSession,
   startAuthStorageSync,
+  subscribeAuthCleared,
 } from './session';
 import { INITIAL_AUTH_STATE, useAuthStore } from './store';
 import { installFakeWebLocks } from './testing/fakeWebLocks';
@@ -120,7 +124,7 @@ describe('restoreSession 로그인 복원', () => {
 
   it('INVALID_REFRESH_TOKEN이면 토큰을 지우고 비로그인 상태로 시작한다', async () => {
     // given
-    saveRefreshToken('revoked-refresh-token');
+    saveRefreshToken('revoked-refresh-token', 9);
 
     // when
     await restoreSession();
@@ -134,7 +138,7 @@ describe('restoreSession 로그인 복원', () => {
 
   it('네트워크 오류면 토큰을 지우지 않고 재시도 안내 상태가 된다', async () => {
     // given
-    saveRefreshToken('kept-refresh-token');
+    saveRefreshToken('kept-refresh-token', 9);
     server.use(http.post(`${API_BASE_URL}/api/auth/refresh`, () => HttpResponse.error()));
 
     // when
@@ -179,7 +183,7 @@ describe('refreshSession 여러 탭 조정', () => {
 
   it('INVALID_REFRESH_TOKEN인데 저장값이 바뀌었으면 최신 값으로 한 번 다시 재발급한다', async () => {
     // given
-    saveRefreshToken('stale-token');
+    saveRefreshToken('stale-token', 9);
     const usedTokens = recordRefreshRequests();
     server.use(
       http.post(`${API_BASE_URL}/api/auth/refresh`, async ({ request }) => {
@@ -231,7 +235,7 @@ describe('refreshSession 여러 탭 조정', () => {
 
   it('최신 값으로 다시 보내도 실패하면 더 재시도하지 않고, 다른 탭이 저장한 값은 지우지 않는다', async () => {
     // given
-    saveRefreshToken('token-0');
+    saveRefreshToken('token-0', 9);
     const usedTokens = recordRefreshRequests();
     let rotation = 0;
     server.use(
@@ -352,5 +356,161 @@ describe('logoutSession 로그아웃', () => {
     // then
     expect(readRefreshToken()).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
+  });
+});
+
+describe('계정 변경 감지', () => {
+  /** 다른 탭에서 다른 사용자로 로그인해 저장소 값만 바뀐 상황을 만든다 */
+  async function loginInOtherTab(googleSub: string) {
+    const response = await loginWithGoogle({ idToken: createMockGoogleIdToken(googleSub) });
+    localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, response.refreshToken);
+    localStorage.setItem(AUTH_USER_ID_STORAGE_KEY, String(response.user.userId));
+    return response.user;
+  }
+
+  it('재발급 응답의 사용자가 다르면 이전 사용자 상태를 정리하고, 기다리던 요청은 재전송하지 않는다', async () => {
+    // given
+    await loginAs('account-a');
+    const userA = useAuthStore.getState().user!;
+    const userB = await loginInOtherTab('account-b');
+    const sessionBefore = getApiSessionId();
+    const cleared = vi.fn();
+    const unsubscribe = subscribeAuthCleared(cleared);
+    let protectedCalls = 0;
+    server.use(
+      http.get(`${API_BASE_URL}/api/test/protected`, () => {
+        protectedCalls += 1;
+        return mockErrorResponse(401, 'EXPIRED_TOKEN', '로그인이 만료되었습니다.');
+      }),
+    );
+
+    // when
+    const result = apiClient.get('/api/test/protected');
+
+    // then
+    await expect(result).rejects.toBeInstanceOf(CanceledError);
+    unsubscribe();
+    expect(protectedCalls).toBe(1);
+    expect(getApiSessionId()).toBeGreaterThan(sessionBefore);
+    expect(cleared).toHaveBeenCalled();
+    expect(useAuthStore.getState().user?.userId).toBe(userB.userId);
+    expect(userB.userId).not.toBe(userA.userId);
+  });
+
+  it('storage 이벤트로 다른 사용자를 감지하면 정리한 뒤 그 사용자로 복원한다', async () => {
+    // given
+    await loginAs('storage-a');
+    const userB = await loginInOtherTab('storage-b');
+    const cleared = vi.fn();
+    const unsubscribe = subscribeAuthCleared(cleared);
+    const stop = startAuthStorageSync();
+
+    // when
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: AUTH_USER_ID_STORAGE_KEY,
+        newValue: String(userB.userId),
+        oldValue: 'x',
+      }),
+    );
+    await restoreSession();
+    stop();
+    unsubscribe();
+
+    // then
+    expect(cleared).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().user?.userId).toBe(userB.userId);
+    expect(useAuthStore.getState().restoreStatus).toBe('ready');
+  });
+
+  it('같은 사용자의 토큰 값만 바뀌면 재발급하지 않는다', async () => {
+    // given
+    await loginAs('same-user');
+    const user = useAuthStore.getState().user!;
+    const usedTokens = recordRefreshRequests();
+    const stop = startAuthStorageSync();
+
+    // when
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: REFRESH_TOKEN_STORAGE_KEY,
+        newValue: 'rotated-in-other-tab',
+        oldValue: 'x',
+      }),
+    );
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: AUTH_USER_ID_STORAGE_KEY,
+        newValue: String(user.userId),
+        oldValue: String(user.userId),
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stop();
+
+    // then
+    expect(usedTokens).toHaveLength(0);
+    expect(useAuthStore.getState().user?.userId).toBe(user.userId);
+  });
+});
+
+describe('completeLogin 로그인 응답 반영', () => {
+  /** 다른 탭이 잠금을 잡고 있는 상황을 만든다. 반환한 함수를 부르면 잠금을 푼다 */
+  function holdAuthLock() {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    void navigator.locks.request(AUTH_LOCK_NAME, () => held);
+    return release;
+  }
+
+  function recordLogoutTokens() {
+    const tokens: string[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (request.url.endsWith('/api/auth/logout')) {
+        const body = (await request.clone().json()) as { refreshToken: string };
+        tokens.push(body.refreshToken);
+      }
+    });
+    return tokens;
+  }
+
+  it('잠금을 기다리는 사이 로그아웃하면 로그인을 반영하지 않고 받은 토큰을 서버에서 무효화한다', async () => {
+    // given
+    const response = await loginWithGoogle({ idToken: createMockGoogleIdToken('abandoned') });
+    const logoutTokens = recordLogoutTokens();
+    const release = holdAuthLock();
+
+    // when
+    const login = completeLogin(response);
+    const logout = logoutSession();
+    release();
+    await Promise.all([login, logout]);
+
+    // then
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(readRefreshToken()).toBeNull();
+    expect(logoutTokens).toEqual([response.refreshToken]);
+  });
+
+  it('잠금을 기다리는 사이 다른 로그인이 시작되면 앞의 로그인 응답은 버리고 무효화한다', async () => {
+    // given
+    const first = await loginWithGoogle({ idToken: createMockGoogleIdToken('first-login') });
+    const second = await loginWithGoogle({ idToken: createMockGoogleIdToken('second-login') });
+    const logoutTokens = recordLogoutTokens();
+    const release = holdAuthLock();
+
+    // when
+    const firstLogin = completeLogin(first);
+    const secondLogin = completeLogin(second);
+    release();
+    await Promise.all([firstLogin, secondLogin]);
+
+    // then
+    expect(useAuthStore.getState().user?.userId).toBe(second.user.userId);
+    expect(readRefreshToken()).toBe(second.refreshToken);
+    expect(logoutTokens).toEqual([first.refreshToken]);
   });
 });

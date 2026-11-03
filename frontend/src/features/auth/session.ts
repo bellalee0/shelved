@@ -8,6 +8,7 @@ import {
 import * as authApi from './api';
 import { withAuthLock } from './authLock';
 import {
+  AUTH_USER_ID_STORAGE_KEY,
   readRefreshToken,
   REFRESH_TOKEN_STORAGE_KEY,
   removeRefreshToken,
@@ -23,6 +24,8 @@ const INVALID_REFRESH_TOKEN = 'INVALID_REFRESH_TOKEN';
 
 const authClearedListeners = new Set<() => void>();
 let pendingRestore: Promise<void> | null = null;
+// 마지막으로 시작한 로그인 시도 번호. 뒤에 시작한 로그인이 있으면 앞의 로그인 응답은 버린다
+let latestLoginAttempt = 0;
 
 /** 공통 axios 인스턴스에 액세스 토큰 getter와 재발급 함수를 등록한다. 앱 시작 시 한 번 호출한다 */
 export function connectAuthToApiClient() {
@@ -38,19 +41,41 @@ export function subscribeAuthCleared(listener: () => void) {
   };
 }
 
-/** Google 로그인 응답을 반영한다. 리프레시 토큰은 다른 탭과 순서를 맞추기 위해 잠금 안에서 저장한다 */
+/**
+ * Google 로그인 응답을 반영한다. 리프레시 토큰은 다른 탭과 순서를 맞추기 위해 잠금 안에서 저장한다.
+ * 잠금을 기다리는 사이 로그아웃하거나 다른 로그인이 시작되었으면 이 응답은 반영하지 않고,
+ * 받은 리프레시 토큰을 서버에서 무효화해 유효한 토큰이 남지 않게 한다.
+ */
 export async function completeLogin(response: AuthTokenResponse) {
   // 이미 다른 사용자로 로그인한 상태였다면 이전 사용자의 요청·캐시를 먼저 정리한다
   clearAuthState();
-  await withAuthLock(async () => {
-    saveRefreshToken(response.refreshToken);
+  latestLoginAttempt += 1;
+  const attempt = latestLoginAttempt;
+  const sessionId = getApiSessionId();
+
+  const applied = await withAuthLock(async () => {
+    if (attempt !== latestLoginAttempt || getApiSessionId() !== sessionId) {
+      return false;
+    }
+    // 저장과 메모리 반영 사이에 await가 없어, 확인 후 끼어드는 로그아웃이 없다.
+    // 이후 로그아웃은 메모리를 비운 뒤 잠금 안에서 방금 저장한 토큰을 읽어 무효화한다
+    saveRefreshToken(response.refreshToken, response.user.userId);
+    useAuthStore.setState({
+      accessToken: response.accessToken,
+      user: response.user,
+      restoreStatus: 'ready',
+      restoreErrorMessage: null,
+    });
+    return true;
   });
-  useAuthStore.setState({
-    accessToken: response.accessToken,
-    user: response.user,
-    restoreStatus: 'ready',
-    restoreErrorMessage: null,
-  });
+
+  if (!applied) {
+    try {
+      await authApi.logout({ refreshToken: response.refreshToken });
+    } catch {
+      // 무효화하지 못해도 이 토큰은 저장하지 않았으므로 이 브라우저에서는 쓰이지 않는다
+    }
+  }
 }
 
 /** 닉네임 변경 등으로 받은 최신 사용자 정보를 반영한다 */
@@ -67,6 +92,8 @@ export function applyUser(user: UserMeResponse) {
  * - INVALID_REFRESH_TOKEN이면 요청에 쓴 토큰과 현재 저장값을 비교한다.
  *   달라졌으면(다른 탭이 먼저 갱신) 최신 값으로 한 번만 다시 재발급하고, 같으면 토큰을 지우고 로그아웃 상태로 만든다.
  * - 네트워크·서버 오류는 토큰을 지우지 않고 그대로 던진다.
+ * - 응답의 사용자가 메모리의 사용자와 다르면(다른 탭에서 다른 계정으로 로그인) 이전 사용자 상태를 정리한 뒤 반영한다.
+ *   API 세션 번호가 바뀌므로 재발급을 기다리던 이전 사용자의 요청은 재전송되지 않고 취소된다.
  */
 export function refreshSession(): Promise<string> {
   const sessionId = getApiSessionId();
@@ -105,9 +132,13 @@ export function refreshSession(): Promise<string> {
 
       // 서버에서 이전 토큰은 이미 무효가 되었으므로, 기다리는 사이 로그아웃했더라도 새 토큰을 저장해 둔다.
       // 잠금 순서상 바로 뒤에 실행되는 로그아웃이 이 값을 읽어 서버에서 무효화하고 지운다.
-      saveRefreshToken(response.refreshToken);
+      saveRefreshToken(response.refreshToken, response.user.userId);
       if (getApiSessionId() !== sessionId) {
         throw createLoginRequiredError();
+      }
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser && currentUser.userId !== response.user.userId) {
+        clearAuthState();
       }
       useAuthStore.setState({ accessToken: response.accessToken, user: response.user });
       return response.accessToken;
@@ -176,8 +207,11 @@ export async function logoutSession() {
 }
 
 /**
- * 다른 탭의 로그아웃(리프레시 토큰 삭제)을 감지해 이 탭의 메모리 로그인 상태도 비운다.
- * 다른 탭의 재발급(rotation)으로 값만 바뀐 경우는 로그인을 유지한다. 반환값은 감지 해제 함수다.
+ * 다른 탭의 로그인 상태 변화를 storage 이벤트로 이 탭에 반영한다. 반환값은 감지 해제 함수다.
+ * - 리프레시 토큰 삭제(로그아웃): 메모리 로그인 상태를 비운다.
+ * - 저장된 userId가 이 탭의 사용자와 다름(다른 계정 로그인): 이전 사용자 상태를 정리하고 저장된 토큰으로 복원한다.
+ * - 같은 사용자의 재발급(rotation)으로 토큰 값만 바뀜: 아무것도 하지 않는다.
+ *   탭마다 rotation 때 다시 재발급하면 서로의 storage 이벤트로 끝없이 재발급하게 되기 때문이다.
  */
 export function startAuthStorageSync() {
   function handleStorage(event: StorageEvent) {
@@ -186,6 +220,14 @@ export function startAuthStorageSync() {
       (event.key === REFRESH_TOKEN_STORAGE_KEY || event.key === null) && event.newValue === null;
     if (isRefreshTokenRemoved) {
       clearAuthState();
+      return;
+    }
+    if (event.key === AUTH_USER_ID_STORAGE_KEY && event.newValue !== null) {
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser && String(currentUser.userId) !== event.newValue) {
+        clearAuthState();
+        void restoreSession();
+      }
     }
   }
   window.addEventListener('storage', handleStorage);

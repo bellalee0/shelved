@@ -11,7 +11,7 @@ import { useAuthStore } from '../store';
 /**
  * 앱 시작 시 인증 초기화를 한 곳에서 한다. app의 AuthBootstrap 컴포넌트만 사용한다.
  * - 공통 axios 인스턴스에 토큰 getter·재발급 함수 등록
- * - 다른 탭 로그아웃 감지(storage 이벤트)
+ * - 다른 탭의 로그아웃·다른 계정 로그인 감지(storage 이벤트)
  * - 로그인 상태가 지워지면 Query 캐시 전체 정리
  * - 저장된 리프레시 토큰으로 로그인 복원
  */
