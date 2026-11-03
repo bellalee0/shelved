@@ -8,6 +8,13 @@ spring:
     # 로그인은 JWT로만 하므로 Spring Security 기본 사용자(임시 비밀번호를 로그에 출력)를 만들지 않는다
     exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
 
+  datasource:
+    hikari:
+      data-source-properties:
+        # PostgreSQL 오류의 Detail(제약 위반 키 값 등)을 예외 메시지에 넣지 않는다 (common.md 비밀 값 및 로그 관리).
+        # 모든 프로필(Testcontainers 포함)에 적용되도록 공통 설정에 둔다.
+        logServerErrorDetail: false
+
   jpa:
     # 외부 AI 호출 중 DB 커넥션을 붙잡지 않도록 끈다 (backend.md 13). 지연 로딩은 트랜잭션 안에서만 사용한다.
     open-in-view: false
@@ -136,6 +143,8 @@ logging:
     # SQL 바인딩 값(토큰 해시·원문·노트 등)이 로그에 남지 않도록 고정 (common.md 비밀 값 및 로그 관리)
     org.hibernate.orm.jdbc.bind: OFF
     org.hibernate.orm.jdbc.extract: OFF
+    # JDBC 오류(SQL 상태·DB 오류 상세)를 따로 출력하는 Hibernate 로거. 처리되지 않은 예외는 GlobalExceptionHandler가 ERROR로 남긴다
+    org.hibernate.orm.jdbc.error: OFF
     # HTTP 클라이언트 요청·응답 본문·헤더(API 키) 로그 차단 (W3 Claude API 연동 대비)
     org.apache.hc.client5.http.wire: OFF
     org.apache.hc.client5.http.headers: OFF
