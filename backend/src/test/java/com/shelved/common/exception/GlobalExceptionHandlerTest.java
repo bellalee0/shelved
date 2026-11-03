@@ -14,7 +14,10 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -33,10 +36,12 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 // 예외 변환만 확인하므로 Security 필터는 끈다 (인증 오류 응답은 SecurityIntegrationTest에서 확인)
 @AutoConfigureMockMvc(addFilters = false)
 @Import({GlobalExceptionHandlerTest.ExceptionTestController.class, JacksonConfig.class})
+@ExtendWith(OutputCaptureExtension.class)
 class GlobalExceptionHandlerTest {
 
     private static final String TIMESTAMP_PATTERN = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?$";
     private static final String INTERNAL_MESSAGE = "내부 구현 정보가 담긴 메시지";
+    private static final String SENSITIVE_MARKER = "SENSITIVE-MARKER-1234";
 
     @Autowired
     private MockMvc mockMvc;
@@ -251,6 +256,27 @@ class GlobalExceptionHandlerTest {
         assertThat(responseBody).doesNotContain(INTERNAL_MESSAGE, "IllegalStateException", "at com.shelved");
     }
 
+    @Test
+    void handleException_예상하지못한예외_로그에예외메시지없이종류와위치만기록(CapturedOutput output) throws Exception {
+
+        // given
+        String url = "/test/unexpected-sensitive";
+
+        // when
+        ResultActions result = mockMvc.perform(get(url).queryParam("q", SENSITIVE_MARKER));
+
+        // then
+        result.andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()))
+                .andExpect(jsonPath("$.data.code").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.data.detail").isEmpty());
+        assertThat(output.getAll())
+                .doesNotContain(SENSITIVE_MARKER)
+                .contains("code=INTERNAL_SERVER_ERROR", "method=GET", "path=" + url,
+                        "java.lang.IllegalStateException <- java.lang.IllegalArgumentException",
+                        "at com.shelved.common.exception.GlobalExceptionHandlerTest$ExceptionTestController.unexpectedSensitive");
+    }
+
     private ResultActions postJson(String url, String body) throws Exception {
         return mockMvc.perform(post(url)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -294,6 +320,12 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/unexpected")
         public void unexpected() {
             throw new IllegalStateException(INTERNAL_MESSAGE);
+        }
+
+        @GetMapping("/test/unexpected-sensitive")
+        public void unexpectedSensitive() {
+            throw new IllegalStateException("wrapper " + SENSITIVE_MARKER,
+                    new IllegalArgumentException("cause " + SENSITIVE_MARKER));
         }
     }
 }

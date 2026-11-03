@@ -4,6 +4,8 @@ import static com.shelved.common.constants.ValidationMessage.INPUT_TYPE_MISMATCH
 
 import com.shelved.common.dto.CommonResponse;
 import com.shelved.common.dto.ErrorData;
+import com.shelved.common.utils.SafeExceptionLog;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -46,7 +48,7 @@ import tools.jackson.databind.exc.MismatchedInputException;
 /**
  * 모든 예외를 CommonResponse.exception(...) 형식으로 변환한다.
  * 필터(Security 등)에서 발생한 예외는 여기까지 오지 않으므로 각 필터의 오류 처리기에서 같은 형식으로 응답한다.
- * 로그에는 오류 코드만 남기고 요청 본문·detail(노트 내용 등)은 남기지 않는다.
+ * 로그에는 오류 코드만 남기고 요청 본문·detail(노트 내용 등)·예외 메시지는 남기지 않는다.
  */
 @Slf4j
 @RestControllerAdvice
@@ -177,13 +179,18 @@ public class GlobalExceptionHandler {
         return error(ErrorCode.FILE_TOO_LARGE, Map.of("maxBytes", multipartMaxFileBytes));
     }
 
-    // 그 외 예외. 스택 트레이스·내부 메시지는 서버 로그에만 남기고 응답에 넣지 않는다
+    // 그 외 예외. 응답에는 내부 정보를 넣지 않는다.
+    // 로그에는 예외 메시지(DB 제약 위반 값 등이 들어갈 수 있음) 없이 예외 종류·원인 체인·요청 위치·오류 코드·스택 위치만 남긴다.
+    // 경로는 쿼리 문자열을 제외한 getRequestURI()를 쓴다.
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<CommonResponse<ErrorData>> handleException(Exception e) {
+    public ResponseEntity<CommonResponse<ErrorData>> handleException(Exception e, HttpServletRequest request) {
 
-        log.error("Unhandled exception", e);
+        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
+        log.error("Unhandled exception: code={}, method={}, path={}, exception={}{}",
+                errorCode.name(), request.getMethod(), request.getRequestURI(),
+                SafeExceptionLog.causeChain(e), SafeExceptionLog.rootCauseFrames(e));
 
-        return error(ErrorCode.INTERNAL_SERVER_ERROR, null);
+        return error(errorCode, null);
     }
 
     private ResponseEntity<CommonResponse<ErrorData>> error(ErrorCode errorCode, Object detail) {
