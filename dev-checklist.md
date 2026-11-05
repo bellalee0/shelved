@@ -151,7 +151,7 @@
 - [x] [W1] UNIQUE 제약이 엔티티에 모두 선언되었는지 확인 (서비스 중복 검사로 대신하지 않음) (담당: BE-2)
 - [x] [W1] 커밋용 가상 샘플 사건 데이터 (예: 「시계탑 저택의 마지막 종소리」) — 테스트 픽스처·MSW 목에서 공유 (담당: BE-2, 메모: 백엔드 테스트 픽스처 `ClocktowerCaseFixture`. MSW 목은 2주차)
 - [ ] [W1~W2] 사건 A 개발용 시드 데이터 작성 — 로컬 전용 `backend/src/main/resources/dev-data/`, 커밋 금지, 카드 표시명·태그는 개발용 임시 이름 (소유자 검수)
-- [ ] [W2] 로컬 프로필에서 시드를 읽어 `PUBLISHED` 사건으로 넣는 로더
+- [x] [W2] 로컬 프로필에서 시드를 읽어 `PUBLISHED` 사건으로 넣는 로더 (담당: BE-4, 메모: 형식은 초안 JSON + `map`, 예시 `src/test/resources/dev-seed/clocktower-sample.json`, persona_prompt는 3주차)
 
 ## 2. 인증 (7.1절, 6.1절, `docs/api/auth-user.md`)
 
@@ -169,19 +169,19 @@
 
 ## 3. 사건 조회 & 랭킹 (7.2절, 3.10절, `docs/api/cases-ranking.md`)
 
-- [ ] [W2] `GET /api/cases` — `PUBLISHED`만, 비로그인 허용, 정답 필드 미포함, `timeLimitSec`·`hintLimit`·`accusationLimit`은 설정값
+- [x] [W2] `GET /api/cases` — `PUBLISHED`만, 비로그인 허용, 정답 필드 미포함, `timeLimitSec`·`hintLimit`·`accusationLimit`은 설정값 (담당: BE-4)
 - [ ] [W4] `GET /api/rankings/{caseId}` — `cleared=true` & `is_test=false`만, 사용자별 최소 `durationSec` 1건, 공동 순위(1·2·2·4), 같은 순위는 `clearedAt` 순, `myRanking`, 페이지네이션, 비공개 사건 `404 CASE_NOT_FOUND`
 - [ ] [W4] 테스트 — 실패·만료·테스트 세션 제외, 재도전 최고 기록 갱신, 공동 순위, 힌트 횟수 무관
 
 ## 4. 게임 세션 라이프사이클 (3.5절, 6.4절, 7.3절, `docs/api/room.md`)
 
-- [ ] [W2] 세션 참가자 검사 공통 로직 — 본인 세션이 아니면 `404 ROOM_NOT_FOUND`, 테스트 세션은 관리자만
-- [ ] [W2] `POST /api/rooms` — `PUBLISHED` 사건만, 같은 사건 미종료 세션이 있으면 `409 ROOM_ALREADY_EXISTS`(`detail.roomId`), 제한시간은 난이도 설정값 복사, 빈 노트(`revision=0`) 함께 생성
-- [ ] [W2] `GET /api/rooms` — `status=ACTIVE|ENDED` 필터, 테스트 세션 제외, 최신순, `pendingGradingStatus`·`endedAt`·`durationSec` 포함
+- [x] [W2] 세션 참가자 검사 공통 로직 — 본인 세션이 아니면 `404 ROOM_NOT_FOUND`, 테스트 세션은 관리자만 (담당: BE-4)
+- [x] [W2] `POST /api/rooms` — `PUBLISHED` 사건만, 같은 사건 미종료 세션이 있으면 `409 ROOM_ALREADY_EXISTS`(`detail.roomId`), 제한시간은 난이도 설정값 복사, 빈 노트(`revision=0`) 함께 생성 (담당: BE-4)
+- [x] [W2] `GET /api/rooms` — `status=ACTIVE|ENDED` 필터, 테스트 세션 제외, 최신순, `pendingGradingStatus`·`endedAt`·`durationSec` 포함 (담당: BE-4)
 - [ ] [W2] `GET /api/rooms/{roomId}/state` — `timer`, `heartbeatIntervalMs`, `hintCount`·`accusationCount`(`UsageCount`: limit/used/reserved/remaining), `pendingAccusation`, `aiRequests`, `conversations`
-- [ ] [W2] `GET /api/rooms/{roomId}/briefing` — 사전 정보, 정답·용어집 제외
-- [ ] [W2] `GET /api/rooms/{roomId}/map` — 맵 설정, `suspects`(배치 안 된 인물은 x·y null, 지목 대상 목록 겸용), `evidences`(설명 제외)
-- [ ] [W2] 서버 경과시간 계산 — `elapsed_active_ms + (now - active_since)`, `Clock` 주입, `duration_sec`는 초 단위 내림
+- [x] [W2] `GET /api/rooms/{roomId}/briefing` — 사전 정보, 정답·용어집 제외 (담당: BE-4)
+- [x] [W2] `GET /api/rooms/{roomId}/map` — 맵 설정, `suspects`(배치 안 된 인물은 x·y null, 지목 대상 목록 겸용), `evidences`(설명 제외) (담당: BE-4)
+- [x] [W2] 서버 경과시간 계산 — `elapsed_active_ms + (now - active_since)`, `Clock` 주입, `duration_sec`는 초 단위 내림 (담당: BE-4, 메모: 순수 계산만, 상태 정산은 BE-5)
 - [ ] [W2] `POST /api/rooms/{roomId}/start` — `READY`만(`409 ROOM_NOT_READY`), `started_at`·`active_since` 설정, `connectionId` 발급
 - [ ] [W2] `X-Connection-Id` 검사 공통 로직 — 없으면 `400 CONNECTION_ID_REQUIRED`, 현재 연결 아니면 `409 CONNECTION_REPLACED` (적용 대상은 `docs/api/README.md` 표)
 - [ ] [W2] `POST /api/rooms/{roomId}/heartbeat` — `last_seen_at` 갱신, `IN_PROGRESS`가 아니면 연결 검사 없이 상태만 반환, 자동 재개 금지
