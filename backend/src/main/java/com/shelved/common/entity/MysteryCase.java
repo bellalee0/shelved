@@ -166,4 +166,19 @@ public class MysteryCase {
     public void markUpdated(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+
+    /**
+     * 콘텐츠·맵·배치 변경 시각 기록. 이전 테스트 완료 확인은 무효가 된다
+     */
+    public void markContentUpdated(LocalDateTime contentUpdatedAt) {
+        this.contentUpdatedAt = contentUpdatedAt;
+        this.testVerifiedAt = null;
+    }
+
+    /**
+     * 현재 내용의 테스트 완료 확인 시각 기록
+     */
+    public void markTestVerified(LocalDateTime testVerifiedAt) {
+        this.testVerifiedAt = testVerifiedAt;
+    }
 }
