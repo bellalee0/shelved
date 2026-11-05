@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * 필터 단계 인증·인가 오류와 CORS. 오류 응답이 모두 CommonResponse 형식(success=false, data.code)인지 함께 확인한다.
- * 아직 컨트롤러가 없는 경로(/api/rooms, /api/admin/**, /api/cases)는 보안 필터를 통과하면 404 API_NOT_FOUND가 된다.
+ * 아직 컨트롤러가 없는 경로(/api/admin/**)는 보안 필터를 통과하면 404 API_NOT_FOUND가 된다.
  */
 class SecurityIntegrationTest extends IntegrationTestSupport {
 
@@ -179,7 +179,8 @@ class SecurityIntegrationTest extends IntegrationTestSupport {
         updateResult.andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.nickname").value(nickname))
                 .andExpect(jsonPath("$.data.nicknameRequired").value(false));
-        expectError(roomsResult, ErrorCode.API_NOT_FOUND);
+        roomsResult.andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test
@@ -215,7 +216,8 @@ class SecurityIntegrationTest extends IntegrationTestSupport {
                 .content("{\"refreshToken\": \"unknown-token\"}"));
 
         // then: 인증 오류(401) 대신 각 API의 결과가 나온다
-        expectError(casesResult, ErrorCode.API_NOT_FOUND);
+        casesResult.andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
         expectError(coverResult, ErrorCode.API_NOT_FOUND);
         logoutResult.andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -235,7 +237,8 @@ class SecurityIntegrationTest extends IntegrationTestSupport {
         ResultActions result = mockMvc.perform(get("/api/cases").header(HttpHeaders.AUTHORIZATION, bearer(expiredToken)));
 
         // then
-        expectError(result, ErrorCode.API_NOT_FOUND);
+        result.andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

@@ -21,4 +21,7 @@ public final class ValidationMessage {
     public static final String NICKNAME_NOT_BLANK = "닉네임은 필수입니다.";
     public static final String NICKNAME_SIZE = "닉네임은 2~12자로 입력해 주세요.";
     public static final String NICKNAME_PATTERN = "닉네임은 한글, 영문, 숫자만 사용할 수 있습니다.";
+
+    // --- 세션 ---
+    public static final String CASE_ID_NOT_NULL = "사건을 선택해 주세요.";
 }

@@ -10,3 +10,8 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+shelved:
+  dev-seed:
+    # 개발용 시드 폴더. 기동 시 이 폴더의 *.json을 PUBLISHED 사건으로 1회 반영한다 (README 개발용 시드)
+    path: classpath:dev-data/
