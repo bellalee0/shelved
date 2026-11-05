@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PlayResultRepository extends JpaRepository<PlayResult, Long> {
 
     List<PlayResult> findAllByRoomIdIn(Collection<Long> roomIds);
+
+    boolean existsByRoomId(Long roomId);
 }

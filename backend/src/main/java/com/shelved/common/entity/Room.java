@@ -90,4 +90,65 @@ public class Room {
         this.status = RoomStatus.READY;
         this.elapsedActiveMs = 0L;
     }
+
+    // --- 상태 전이. 호출 전에 세션 행을 잠그고 허용 여부를 검사한다 (domain/room/service/RoomTimeSettler) ---
+
+    /**
+     * READY → IN_PROGRESS. 최초 시작 시각·진행 구간·접속 확인 시각을 모두 now로 맞춘다
+     */
+    public void start(LocalDateTime now, String newConnectionId) {
+        this.status = RoomStatus.IN_PROGRESS;
+        this.startedAt = now;
+        this.activeSince = now;
+        this.lastSeenAt = now;
+        this.connectionId = newConnectionId;
+    }
+
+    /**
+     * PAUSED → IN_PROGRESS. 새 연결을 발급해 이전 연결을 무효화한다
+     */
+    public void resume(LocalDateTime now, String newConnectionId) {
+        this.status = RoomStatus.IN_PROGRESS;
+        this.activeSince = now;
+        this.lastSeenAt = now;
+        this.connectionId = newConnectionId;
+    }
+
+    /**
+     * 접속 확인 (하트비트·유효한 플레이 요청)
+     */
+    public void touch(LocalDateTime now) {
+        this.lastSeenAt = now;
+    }
+
+    /**
+     * IN_PROGRESS → PAUSED. 정산한 누적 시간으로 확정하고 연결을 무효화한다.
+     * 시간 소진 후 채점 대기로 보류할 때도 쓴다 (settledElapsedMs = 제한시간)
+     */
+    public void pause(long settledElapsedMs) {
+        this.status = RoomStatus.PAUSED;
+        closeActiveSegment(settledElapsedMs);
+    }
+
+    /**
+     * 시간 만료 종료. 누적 시간은 제한시간으로 고정한다
+     */
+    public void expire() {
+        this.status = RoomStatus.EXPIRED;
+        closeActiveSegment(timeLimitMs());
+    }
+
+    public long timeLimitMs() {
+        return timeLimitSec * 1000L;
+    }
+
+    public boolean isCurrentConnection(String requestConnectionId) {
+        return connectionId != null && connectionId.equals(requestConnectionId);
+    }
+
+    private void closeActiveSegment(long settledElapsedMs) {
+        this.elapsedActiveMs = settledElapsedMs;
+        this.activeSince = null;
+        this.connectionId = null;
+    }
 }

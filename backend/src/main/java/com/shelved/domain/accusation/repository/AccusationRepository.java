@@ -22,4 +22,8 @@ public interface AccusationRepository extends JpaRepository<Accusation, Long> {
             @Param("roomIds") Collection<Long> roomIds,
             @Param("gradingStatuses") Collection<GradingStatus> gradingStatuses
     );
+
+    boolean existsByRoomIdAndGradingStatusIn(Long roomId, Collection<GradingStatus> gradingStatuses);
+
+    long countByRoomIdAndGradingStatus(Long roomId, GradingStatus gradingStatus);
 }
