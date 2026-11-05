@@ -87,6 +87,8 @@ shelved:
     # 하트비트 간격 / 이탈 판정 — 잠정, 사건 A 플레이테스트(W4) 후 조정
     heartbeat-interval: 5s
     heartbeat-timeout: 15s
+    # 이탈 감지 스케줄러 점검 주기 (하트비트 미수신 세션 일시정지) — 잠정
+    disconnect-check-interval: 5s
     # 채점 재시도 최소 간격 — 잠정, 사건 A 플레이테스트(W4) 후 조정
     grading-retry-min-interval: 10s
 
