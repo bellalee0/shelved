@@ -432,6 +432,61 @@ export type GameEventPayloads = {
 - 사건 카드 표지 이미지는 관리자가 업로드하여 백엔드가 제공하므로, 프론트엔드 저장소에 넣지 않는다.
 - 지원 환경은 PC 웹 브라우저(키보드·마우스)다. 모바일 대응은 MVP에서 만들지 않는다.
 
+### 맵 제작 규칙 (Tiled)
+
+Tiled(맵 편집기)로 사건 맵을 만들 때 따르는 규칙이다. 용어는 다음과 같다. **타일셋**은 32×32 조각 그림이 격자로 모인 이미지(`tilesets/*.png`), **타일 레이어**는 그 조각을 칸마다 깔아 둔 층, **맵 JSON**은 "어느 칸에 어느 조각을 놓았는지"를 적은 파일이다. 캐릭터 이미지(**스프라이트 시트**)는 맵과 별개이며 `manifest.json`으로 찾는다.
+
+**1. 새 맵 만들기**
+
+- Tiled → 파일 → 새로 만들기 → 새 맵: 방향 `직교`, 타일 레이어 형식 `CSV`, 타일 크기 `32 × 32`, 맵 크기는 고정(무한 맵 끔). 권장 크기는 30×20 타일 안팎이다.
+- 타일셋은 `public/assets/tilesets/`의 이미지를 **"이미지 기반"** 으로 추가하고 **"맵에 포함(Embed in map)"** 을 켠다. 외부 `.tsx` 파일은 쓰지 않는다. (Phaser가 읽지 못한다.) 타일셋 이름은 이미지 파일 이름에서 `.png`를 뺀 것으로 한다. (예: `interior-floors`)
+- 저장은 `파일 → 다른 이름으로 저장 → JSON 맵 파일(*.json)`, 위치는 `public/assets/maps/`, 이름은 kebab-case 영어다. 사건 이름이나 원작을 짐작할 수 있는 이름은 쓰지 않는다.
+- 맵에서 쓰는 모든 타일셋 이미지는 `CREDITS.md`에 있어야 한다. 새 이미지를 쓰기 전에 먼저 기록한다.
+
+**2. 레이어 이름과 순서** (아래가 먼저 그려진다. 이름은 소문자 그대로 쓴다)
+
+| 순서 | 이름 | 내용 |
+|---|---|---|
+| 1 | `ground` | 바닥, 러그, 잔디·길 |
+| 2 | `walls` | 벽 |
+| 3 | `decor` | 가구·소품 (캐릭터보다 아래에 그려짐) |
+| 4 | `above` | 캐릭터보다 **위에** 그려질 부분 (키 큰 가구의 윗줄, 문틀 윗부분 등) |
+| 5 | `collision` | 충돌 표시. 게임에서 보이지 않음 |
+
+- `collision` 레이어는 `RoomMapResponse.collisionLayer`(시드 JSON `map.collisionLayer`)와 **같은 이름**이어야 한다. 이름을 바꾸려면 시드의 값도 함께 바꾼다.
+- 충돌 표시: 지나갈 수 없는 칸에 `collision-marker` 타일셋의 빨간 타일을 찍는다. **빈 칸이 아닌 칸 = 막힘**이다. 벽과 가구가 놓인 칸은 모두 찍어야 한다. 레이어는 Tiled에서 `보이기`를 끈 채로 저장한다(Phaser에서도 그리지 않는다).
+- `above`는 쓰지 않아도 되지만 레이어는 비워서라도 둔다. 필수 레이어(`ground`, `walls`, `decor`, `above`, `collision`)는 `assetManifest.test.ts`가 검사한다.
+
+**3. 시작 위치·NPC·물증 좌표**
+
+맵 파일에는 NPC·물증·시작 위치를 넣지 않는다(오브젝트 레이어 금지). 배치의 기준은 DB(시드 JSON의 `map` 블록)뿐이다.
+
+- 좌표는 맵 좌상단 원점의 **월드 픽셀**이다. 타일 `(열, 행)`의 가운데 픽셀은 `x = 열 × 32 + 16`, `y = 행 × 32 + 16`이다. (예: 열 3, 행 11 → `x=112, y=368`)
+- Tiled에서는 아래 상태 표시줄에 마우스를 올린 칸의 `열, 행`이 나온다. 걸어갈 수 있는 칸(`collision`이 빈 칸) 위의 좌표만 고른다.
+- 고른 값을 시드 JSON의 `map.spawnX/spawnY`와 `hotspots[].x/y`에 적는다. 맵 밖이거나 충돌 칸 위의 좌표는 안 된다.
+
+**4. 공개 파일 주의**
+
+`public/`의 파일은 누구나 내려받는다. 레이어·타일셋·속성(사용자 지정 속성 포함) 이름에 범인 여부, 정답, 인물 역할, 물증 설명, 원작 제목을 쓰지 않는다. `assetManifest.test.ts`가 금지어를 검사하지만, 테스트가 못 잡는 표현도 쓰지 않는다.
+
+**5. `manifest.json` 형식과 추가 순서**
+
+```json
+{
+  "version": 1,
+  "player": { "path": "/assets/sprites/player.png", "frameWidth": 64, "frameHeight": 64,
+              "animations": { "walk": { "frameCount": 9, "frameRate": 8, "idleFrame": 0,
+                                        "rows": { "up": 0, "left": 1, "down": 2, "right": 3 } } } },
+  "sprites": { "npc-maid-01": { "...": "player와 같은 구조" } },
+  "maps": { "clocktower-mansion": "/assets/maps/clocktower-mansion.json" }
+}
+```
+
+- 경로는 사이트 루트 기준(`/assets/...`)이다. `sprites`의 키가 사건 데이터의 `spriteKey`이고, `maps`의 경로가 `mapUrl`이다. 걷기 시트는 64×64 프레임이 9열 × 4행이며 행 번호는 `rows`가 정한다.
+- NPC 키는 **외형 기준 중립 이름**(`npc-maid-01`)으로 짓는다. 역할·범인 여부·사건 인물을 짐작할 수 있는 이름은 쓰지 않는다.
+- 새 스프라이트·맵 추가 순서: ① 파일을 `sprites/` 또는 `maps/`에 넣는다 → ② `CREDITS.md`에 출처를 적는다 → ③ `manifest.json`에 키를 추가한다 → ④ 시드 JSON의 `spriteKey`·`mapUrl`에 쓴다 → ⑤ `npm run test`로 점검한다.
+- 이미 사건 데이터에서 쓰는 키·경로를 **제거하거나 이름·형식을 바꾸는 것은 Breaking Change**다. 키 추가는 일반 변경이다.
+
 ---
 
 ## 테스트 코드 작성 규칙

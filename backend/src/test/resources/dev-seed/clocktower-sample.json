@@ -23,7 +23,7 @@
       "role": "저택의 집사. 20년째 근무",
       "canConverse": true,
       "isCulprit": true,
-      "spriteKey": "npc-butler-01",
+      "spriteKey": "npc-gentleman-01",
       "persona": {
         "speechStyle": "정중하고 짧게 말한다",
         "knownFacts": [
@@ -51,7 +51,7 @@
       "role": "저택의 가정부",
       "canConverse": true,
       "isCulprit": false,
-      "spriteKey": "npc-housekeeper-01",
+      "spriteKey": "npc-maid-01",
       "persona": {
         "speechStyle": "차분하고 자세히 말한다",
         "knownFacts": [],
@@ -73,7 +73,7 @@
       "role": "저택의 정원사",
       "canConverse": true,
       "isCulprit": false,
-      "spriteKey": "npc-gardener-01",
+      "spriteKey": "npc-workman-01",
       "persona": {
         "speechStyle": "퉁명스럽게 말한다",
         "knownFacts": [],
@@ -162,16 +162,16 @@
   ],
   "map": {
     "mapUrl": "/assets/maps/clocktower-mansion.json",
-    "spawnX": 64,
-    "spawnY": 64,
+    "spawnX": 112,
+    "spawnY": 368,
     "collisionLayer": "collision",
     "interactionRadiusPx": 48,
     "hotspots": [
-      { "type": "SUSPECT", "key": "sus-1", "x": 320, "y": 192 },
-      { "type": "SUSPECT", "key": "sus-2", "x": 480, "y": 256 },
-      { "type": "SUSPECT", "key": "sus-3", "x": 640, "y": 448 },
-      { "type": "EVIDENCE", "key": "evi-1", "x": 160, "y": 128 },
-      { "type": "EVIDENCE", "key": "evi-2", "x": 224, "y": 160 }
+      { "type": "SUSPECT", "key": "sus-1", "x": 368, "y": 208 },
+      { "type": "SUSPECT", "key": "sus-2", "x": 656, "y": 208 },
+      { "type": "SUSPECT", "key": "sus-3", "x": 432, "y": 560 },
+      { "type": "EVIDENCE", "key": "evi-1", "x": 176, "y": 176 },
+      { "type": "EVIDENCE", "key": "evi-2", "x": 848, "y": 208 }
     ]
   }
 }

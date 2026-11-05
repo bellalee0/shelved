@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "player": {
+    "path": "/assets/sprites/player.png",
+    "frameWidth": 64,
+    "frameHeight": 64,
+    "animations": {
+      "walk": {
+        "frameCount": 9,
+        "frameRate": 8,
+        "rows": {
+          "up": 0,
+          "left": 1,
+          "down": 2,
+          "right": 3
+        },
+        "idleFrame": 0
+      }
+    }
+  },
+  "sprites": {
+    "npc-gentleman-01": {
+      "path": "/assets/sprites/npc-gentleman-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
+    "npc-lady-01": {
+      "path": "/assets/sprites/npc-lady-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
+    "npc-maid-01": {
+      "path": "/assets/sprites/npc-maid-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
+    "npc-old-man-01": {
+      "path": "/assets/sprites/npc-old-man-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
+    "npc-old-woman-01": {
+      "path": "/assets/sprites/npc-old-woman-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
+    "npc-workman-01": {
+      "path": "/assets/sprites/npc-workman-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
+    "npc-young-man-01": {
+      "path": "/assets/sprites/npc-young-man-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    }
+  },
+  "maps": {
+    "clocktower-mansion": "/assets/maps/clocktower-mansion.json"
+  }
+}

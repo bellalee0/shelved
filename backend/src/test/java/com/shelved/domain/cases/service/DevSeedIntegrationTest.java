@@ -83,9 +83,9 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
             assertThat(suspects)
                     .extracting(Suspect::getName, Suspect::isCulprit, Suspect::isCanConverse, Suspect::getSpriteKey)
                     .containsExactly(
-                            tuple("해리스", true, true, "npc-butler-01"),
-                            tuple("마거릿", false, true, "npc-housekeeper-01"),
-                            tuple("톰", false, true, "npc-gardener-01"),
+                            tuple("해리스", true, true, "npc-gentleman-01"),
+                            tuple("마거릿", false, true, "npc-maid-01"),
+                            tuple("톰", false, true, "npc-workman-01"),
                             tuple("엘리스", false, false, null));
             assertThat(suspects).allSatisfy(suspect -> assertThat(suspect.getPersonaPrompt()).isNull());
 
