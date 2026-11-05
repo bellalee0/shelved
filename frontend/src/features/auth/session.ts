@@ -3,6 +3,7 @@ import {
   getApiSessionId,
   resetApiSession,
   setAccessTokenGetter,
+  setAuthFailureHandler,
   setTokenRefresher,
 } from '../../shared/api/client';
 import * as authApi from './api';
@@ -24,6 +25,8 @@ const INVALID_REFRESH_TOKEN = 'INVALID_REFRESH_TOKEN';
 
 const authClearedListeners = new Set<() => void>();
 let pendingRestore: Promise<void> | null = null;
+// 진행 중인 인증 실패 정리. 동시에 여러 요청이 401을 받아도 정리는 한 번만 한다
+let pendingAuthFailure: Promise<void> | null = null;
 // 마지막으로 시작한 로그인 시도 번호. 뒤에 시작한 로그인이 있으면 앞의 로그인 응답은 버린다
 let latestLoginAttempt = 0;
 
@@ -31,6 +34,27 @@ let latestLoginAttempt = 0;
 export function connectAuthToApiClient() {
   setAccessTokenGetter(() => useAuthStore.getState().accessToken);
   setTokenRefresher(refreshSession);
+  setAuthFailureHandler(handleAuthFailure);
+}
+
+/**
+ * 401 INVALID_TOKEN·LOGIN_REQUIRED를 받았을 때 로그아웃과 같은 정리를 한다. 서버 무효화 실패는 무시한다.
+ * 정리할 로그인 상태가 이미 없거나 정리가 진행 중이면 아무것도 하지 않는다.
+ * 이전 세션 요청의 응답은 공통 클라이언트가 걸러 이 함수까지 오지 않는다.
+ */
+function handleAuthFailure() {
+  if (pendingAuthFailure) {
+    return;
+  }
+  const { accessToken, user } = useAuthStore.getState();
+  if (!accessToken && !user && !readRefreshToken()) {
+    return;
+  }
+  pendingAuthFailure = logoutSession()
+    .catch(() => undefined)
+    .finally(() => {
+      pendingAuthFailure = null;
+    });
 }
 
 /** 로그인 상태가 지워질 때(로그아웃·재발급 실패·다른 탭 로그아웃) 호출할 함수를 등록한다. Query 캐시 정리에 쓴다 */

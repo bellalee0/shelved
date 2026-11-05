@@ -26,8 +26,12 @@ const UNEXPECTED_ERROR_MESSAGE = '요청을 처리하지 못했습니다. 잠시
 /** 재발급한 액세스 토큰을 돌려주는 함수. 실패하면 ApiError를 던진다 */
 export type TokenRefresher = () => Promise<string>;
 
+/** 인증이 필요한 요청이 401 INVALID_TOKEN·LOGIN_REQUIRED를 받았을 때 부를 함수 */
+export type AuthFailureHandler = () => void;
+
 let getAccessToken: (() => string | null) | null = null;
 let refreshAccessToken: TokenRefresher | null = null;
+let handleAuthFailure: AuthFailureHandler | null = null;
 let connectionId: string | null = null;
 let apiSessionId = 0;
 // 동시에 만료된 요청들이 함께 기다리는 재발급 Promise. 재발급이 끝나면 비운다
@@ -47,6 +51,14 @@ export function setAccessTokenGetter(getter: (() => string | null) | null) {
  */
 export function setTokenRefresher(refresher: TokenRefresher | null) {
   refreshAccessToken = refresher;
+}
+
+/**
+ * 401 INVALID_TOKEN·LOGIN_REQUIRED(재발급해도 소용없는 인증 실패)일 때 호출할 함수를 등록한다.
+ * 로그인 상태를 정리하는 일은 features/auth가 맡고, shared는 등록된 함수만 부른다(setTokenRefresher와 같은 방식).
+ */
+export function setAuthFailureHandler(handler: AuthFailureHandler | null) {
+  handleAuthFailure = handler;
 }
 
 /** 시작·재개 API가 발급한 connectionId를 메모리에 보관한다. 화면을 떠나거나 연결이 끝나면 null로 지운다 */
@@ -109,6 +121,12 @@ apiClient.interceptors.response.use(
     if (config && isStaleRequest(config)) {
       return Promise.reject(createStaleResponseError());
     }
+    if (config && isAuthFailure(error, config)) {
+      // 위에서 이전 세션의 응답은 걸러냈으므로, 새로 로그인한 사용자를 이전 요청 때문에 로그아웃시키지 않는다.
+      // 정리는 기다리지 않는다. 메모리 상태는 바로 비워지고, 원래 요청은 받은 ApiError로 실패한다
+      handleAuthFailure?.();
+      return Promise.reject(toApiError(error));
+    }
     if (!config || !shouldRefreshToken(error, config)) {
       return Promise.reject(toApiError(error));
     }
@@ -144,6 +162,16 @@ function shouldRefreshToken(error: unknown, config: InternalAxiosRequestConfig):
   }
   const body: unknown = error.response.data;
   return readString(isRecord(body) ? body.data : null, 'code') === 'EXPIRED_TOKEN';
+}
+
+/** 인증이 필요한 요청이 401 INVALID_TOKEN 또는 LOGIN_REQUIRED를 받았는지 확인한다. INVALID_TOKEN은 재발급하지 않는다 */
+function isAuthFailure(error: unknown, config: InternalAxiosRequestConfig): boolean {
+  if (config.skipAuth || !(error instanceof AxiosError) || error.response?.status !== 401) {
+    return false;
+  }
+  const body: unknown = error.response.data;
+  const code = readString(isRecord(body) ? body.data : null, 'code');
+  return code === 'INVALID_TOKEN' || code === 'LOGIN_REQUIRED';
 }
 
 function refreshSharedAccessToken(): Promise<string> {

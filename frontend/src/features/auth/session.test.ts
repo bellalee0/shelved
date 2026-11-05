@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { CanceledError } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockErrorResponse } from '../../mocks/handlers/auth';
@@ -9,6 +9,7 @@ import {
   apiClient,
   getApiSessionId,
   setAccessTokenGetter,
+  setAuthFailureHandler,
   setConnectionId,
   setTokenRefresher,
 } from '../../shared/api/client';
@@ -53,6 +54,7 @@ afterEach(() => {
   fakeLocks.uninstall();
   setAccessTokenGetter(null);
   setTokenRefresher(null);
+  setAuthFailureHandler(null);
   setConnectionId(null);
 });
 
@@ -557,5 +559,106 @@ describe('completeLogin 로그인 응답 반영', () => {
     expect(useAuthStore.getState().user?.userId).toBe(second.user.userId);
     expect(readRefreshToken()).toBe(second.refreshToken);
     expect(logoutTokens).toEqual([first.refreshToken]);
+  });
+});
+
+describe('인증 실패(401 INVALID_TOKEN·LOGIN_REQUIRED) 처리', () => {
+  const failWith = (code: string) =>
+    http.get(`${API_BASE_URL}/api/rooms/me`, () => mockErrorResponse(401, code, '인증 실패'));
+
+  /** 로그아웃 API 요청 수를 센다 */
+  function countLogoutRequests() {
+    const count = { value: 0 };
+    server.events.on('request:start', ({ request }) => {
+      if (request.url.endsWith('/api/auth/logout')) {
+        count.value += 1;
+      }
+    });
+    return count;
+  }
+
+  async function expectCleared() {
+    await vi.waitFor(() => expect(readRefreshToken()).toBeNull());
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(localStorage.getItem(AUTH_USER_ID_STORAGE_KEY)).toBeNull();
+  }
+
+  it.each(['INVALID_TOKEN', 'LOGIN_REQUIRED'])(
+    '401 %s를 받으면 로그아웃과 같이 정리하고 재발급은 하지 않는다',
+    async (code) => {
+      // given
+      await loginAs(`auth-failure-${code}`);
+      const refreshRequests = recordRefreshRequests();
+      const cleared = vi.fn();
+      subscribeAuthCleared(cleared);
+      server.use(failWith(code));
+
+      // when
+      const error = await apiClient.get('/api/rooms/me').catch((e: unknown) => e);
+
+      // then
+      expect((error as { code: string }).code).toBe(code);
+      await expectCleared();
+      expect(cleared).toHaveBeenCalled();
+      expect(refreshRequests).toHaveLength(0);
+    },
+  );
+
+  it('동시에 두 요청이 INVALID_TOKEN을 받아도 정리와 로그아웃 API 호출은 한 번만 한다', async () => {
+    // given
+    await loginAs('auth-failure-concurrent');
+    const logoutCount = countLogoutRequests();
+    const cleared = vi.fn();
+    subscribeAuthCleared(cleared);
+    server.use(failWith('INVALID_TOKEN'));
+
+    // when
+    await Promise.allSettled([apiClient.get('/api/rooms/me'), apiClient.get('/api/rooms/me')]);
+
+    // then
+    await expectCleared();
+    expect(logoutCount.value).toBe(1);
+    expect(cleared).toHaveBeenCalledTimes(1);
+  });
+
+  it('로그아웃·재로그인 뒤 이전 세션 요청의 INVALID_TOKEN은 새 사용자 상태를 지우지 않는다', async () => {
+    // given
+    await loginAs('auth-failure-old');
+    server.use(
+      http.get(`${API_BASE_URL}/api/rooms/me`, async () => {
+        await delay(30);
+        return mockErrorResponse(401, 'INVALID_TOKEN', '인증 실패');
+      }),
+    );
+    const oldRequest = apiClient.get('/api/rooms/me').catch((e: unknown) => e);
+    await delay(5); // 요청이 실제로 나가 세션 번호가 기록된 뒤에 로그아웃한다
+    await logoutSession();
+    await loginAs('auth-failure-new');
+
+    // when
+    const error = await oldRequest;
+
+    // then
+    expect(error).toBeInstanceOf(CanceledError);
+    expect(useAuthStore.getState().user).not.toBeNull();
+    expect(readRefreshToken()).not.toBeNull();
+  });
+
+  it('skipAuth 요청의 401은 정리를 타지 않는다', async () => {
+    // given
+    await loginAs('auth-failure-skip');
+    server.use(
+      http.post(`${API_BASE_URL}/api/auth/google`, () =>
+        mockErrorResponse(401, 'INVALID_TOKEN', '인증 실패'),
+      ),
+    );
+
+    // when
+    await apiClient.post('/api/auth/google', {}, { skipAuth: true }).catch(() => undefined);
+
+    // then
+    expect(useAuthStore.getState().user).not.toBeNull();
+    expect(readRefreshToken()).not.toBeNull();
   });
 });
