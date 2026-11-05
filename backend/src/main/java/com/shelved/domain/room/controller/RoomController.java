@@ -2,18 +2,27 @@ package com.shelved.domain.room.controller;
 
 import static com.shelved.common.enums.SuccessMessage.ROOM_BRIEFING_GET_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_CREATE_SUCCESS;
+import static com.shelved.common.enums.SuccessMessage.ROOM_HEARTBEAT_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_LIST_GET_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_MAP_GET_SUCCESS;
+import static com.shelved.common.enums.SuccessMessage.ROOM_PAUSE_SUCCESS;
+import static com.shelved.common.enums.SuccessMessage.ROOM_RESUME_SUCCESS;
+import static com.shelved.common.enums.SuccessMessage.ROOM_START_SUCCESS;
+import static com.shelved.common.enums.SuccessMessage.ROOM_STATE_GET_SUCCESS;
 
 import com.shelved.common.dto.CommonResponse;
 import com.shelved.common.dto.PageResponse;
 import com.shelved.common.jwt.AuthUser;
 import com.shelved.domain.room.dto.RoomBriefingResponse;
+import com.shelved.domain.room.dto.RoomConnectionResponse;
 import com.shelved.domain.room.dto.RoomCreateRequest;
 import com.shelved.domain.room.dto.RoomCreateResponse;
 import com.shelved.domain.room.dto.RoomMapResponse;
+import com.shelved.domain.room.dto.RoomStateResponse;
 import com.shelved.domain.room.dto.RoomStatusFilter;
 import com.shelved.domain.room.dto.RoomSummaryResponse;
+import com.shelved.domain.room.dto.RoomTimerResponse;
+import com.shelved.domain.room.service.RoomLifecycleService;
 import com.shelved.domain.room.service.RoomService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,17 +39,21 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "세션", description = "플레이 세션 생성·목록·사전 정보·맵")
+@Tag(name = "세션", description = "플레이 세션 생성·목록·사전 정보·맵·상태·시작·하트비트·일시정지·이어하기")
 @RestController
 @RequestMapping("/api/rooms")
 @RequiredArgsConstructor
 public class RoomController {
 
+    private static final String CONNECTION_ID_HEADER = "X-Connection-Id";
+
     private final RoomService roomService;
+    private final RoomLifecycleService roomLifecycleService;
 
     @Operation(summary = "내 세션 목록", description = "이어하기·결과 보기 목록. 테스트 세션 제외, 최신 생성순. status: ACTIVE | ENDED, 생략 시 전체")
     @GetMapping
@@ -92,5 +105,66 @@ public class RoomController {
 
         return ResponseEntity.status(HttpStatus.OK)
                 .body(CommonResponse.success(ROOM_MAP_GET_SUCCESS, response));
+    }
+
+    @Operation(summary = "세션 상태", description = "재접속 복원용. 모든 상태에서 조회할 수 있다. 하트비트 이탈만 정산하며 접속 확인으로 보지 않는다")
+    @GetMapping("/{roomId}/state")
+    public ResponseEntity<CommonResponse<RoomStateResponse>> getRoomState(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId
+    ) {
+        RoomStateResponse response = roomLifecycleService.getRoomState(authUser, roomId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(ROOM_STATE_GET_SUCCESS, response));
+    }
+
+    @Operation(summary = "수사 시작", description = "READY에서만 가능 (409 ROOM_NOT_READY). 서버 타이머를 시작하고 connectionId를 발급한다")
+    @PostMapping("/{roomId}/start")
+    public ResponseEntity<CommonResponse<RoomConnectionResponse>> startRoom(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId
+    ) {
+        RoomConnectionResponse response = roomLifecycleService.startRoom(authUser, roomId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(ROOM_START_SUCCESS, response));
+    }
+
+    @Operation(summary = "하트비트", description = "X-Connection-Id 필수 (400 CONNECTION_ID_REQUIRED). IN_PROGRESS가 아니면 연결 검사 없이 상태만 반환하며 자동 재개하지 않는다. 다른 연결이면 409 CONNECTION_REPLACED")
+    @PostMapping("/{roomId}/heartbeat")
+    public ResponseEntity<CommonResponse<RoomTimerResponse>> recordHeartbeat(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId,
+            @RequestHeader(value = CONNECTION_ID_HEADER, required = false) String connectionId
+    ) {
+        RoomTimerResponse response = roomLifecycleService.recordHeartbeat(authUser, roomId, connectionId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(ROOM_HEARTBEAT_SUCCESS, response));
+    }
+
+    @Operation(summary = "일시정지", description = "연결 헤더 불필요. IN_PROGRESS일 때만 누적 시간을 확정하고 연결을 무효화한다. 그 외 상태는 현재 상태를 반환한다")
+    @PostMapping("/{roomId}/pause")
+    public ResponseEntity<CommonResponse<RoomTimerResponse>> pauseRoom(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId
+    ) {
+        RoomTimerResponse response = roomLifecycleService.pauseRoom(authUser, roomId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(ROOM_PAUSE_SUCCESS, response));
+    }
+
+    @Operation(summary = "수사 이어하기", description = "PAUSED에서만 가능 (409 ROOM_NOT_PAUSED), 남은 시간이 없으면 409 ROOM_TIME_EXPIRED. 새 connectionId를 발급해 이전 연결을 무효화한다")
+    @PostMapping("/{roomId}/resume")
+    public ResponseEntity<CommonResponse<RoomConnectionResponse>> resumeRoom(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId
+    ) {
+        RoomConnectionResponse response = roomLifecycleService.resumeRoom(authUser, roomId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(ROOM_RESUME_SUCCESS, response));
     }
 }

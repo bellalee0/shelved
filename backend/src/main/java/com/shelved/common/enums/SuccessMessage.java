@@ -28,6 +28,11 @@ public enum SuccessMessage {
     ROOM_CREATE_SUCCESS("세션 생성 성공"),
     ROOM_BRIEFING_GET_SUCCESS("사전 정보 조회 성공"),
     ROOM_MAP_GET_SUCCESS("맵 정보 조회 성공"),
+    ROOM_STATE_GET_SUCCESS("세션 상태 조회 성공"),
+    ROOM_START_SUCCESS("수사 시작 성공"),
+    ROOM_HEARTBEAT_SUCCESS("접속 확인 성공"),
+    ROOM_PAUSE_SUCCESS("일시정지 성공"),
+    ROOM_RESUME_SUCCESS("수사 이어하기 성공"),
 
     ;
 
