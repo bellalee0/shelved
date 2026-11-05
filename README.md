@@ -243,6 +243,21 @@ npm run format          # Prettier로 코드 정렬
 - `목 로그인 · 관리자`: `role=ADMIN` 사용자로 로그인합니다.
 - 목 사용자·토큰은 새로고침 후 복원을 확인할 수 있도록 브라우저 `localStorage`의 `shelved.mock.authDb`에 저장됩니다. 처음 상태로 되돌리려면 개발자 도구에서 이 값을 지웁니다.
 
+목 모드에는 2주차 API(`GET /api/cases`, 세션 생성·조회·시작·하트비트·일시정지·이어하기, 물증 조사, 개인 노트)도 들어 있습니다. 가상 사건 「시계탑 저택의 마지막 종소리」와 「안개 낀 등대의 빈 의자」 두 건만 쓰며(`frontend/src/mocks/data/clocktowerCase.ts`), 세션은 로그인한 목 사용자별로 `localStorage`의 `shelved.mock.roomDb`에 저장됩니다. 하트비트가 15초 넘게 없으면 `PAUSED`로, 제한시간이 지나면 `EXPIRED`로 바뀝니다.
+
+정상 흐름으로는 나오지 않는 상황은 브라우저 개발자 도구 콘솔의 `window.shelvedMock`으로 재현합니다. (목 모드에서 로그인한 뒤 사용합니다.)
+
+| 호출 | 효과 |
+|---|---|
+| `shelvedMock.setScenario('casesError')` | 사건 목록 조회가 `500`으로 실패 (`false`를 두 번째 인자로 주면 끔) |
+| `shelvedMock.setScenario('roomsError')` | 내 세션 목록 조회가 `500`으로 실패 |
+| `shelvedMock.setScenario('networkError')` | 사건·세션·물증·노트 요청이 네트워크 오류로 실패 |
+| `shelvedMock.clearScenarios()` | 켜 둔 스위치를 모두 끔 (스위치는 `shelved.mock.scenario`에 저장되어 새로고침 후에도 유지) |
+| `shelvedMock.seedRooms('active')` | 시계탑 사건의 일시정지 세션 추가 → 카드에 "진행 중" 배지. 종류: `active`, `gradingError`(다시 채점하기), `gradingPending`(채점 대기), `ended`(지난 수사) |
+| `shelvedMock.replaceConnection()` | 다른 탭에서 이어하기를 한 상황: 진행 중 세션의 다음 하트비트·조작이 `409 CONNECTION_REPLACED` |
+| `shelvedMock.conflictNote(roomId)` | 다른 탭에서 노트를 먼저 저장한 상황: 다음 저장이 `409 NOTE_REVISION_CONFLICT` |
+| `shelvedMock.resetRooms()` | 목 세션·노트를 모두 지움 (목 사용자·토큰은 유지) |
+
 #### 로그인 토큰 처리
 
 상세 흐름은 [docs/api/auth-user.md](docs/api/auth-user.md#토큰-처리-흐름)를 따릅니다.
