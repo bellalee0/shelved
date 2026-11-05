@@ -20,6 +20,15 @@ public enum SuccessMessage {
     USER_ME_GET_SUCCESS("내 정보 조회 성공"),
     USER_NICKNAME_UPDATE_SUCCESS("닉네임 설정 성공"),
 
+    // 사건
+    CASE_LIST_GET_SUCCESS("사건 목록 조회 성공"),
+
+    // 세션
+    ROOM_LIST_GET_SUCCESS("세션 목록 조회 성공"),
+    ROOM_CREATE_SUCCESS("세션 생성 성공"),
+    ROOM_BRIEFING_GET_SUCCESS("사전 정보 조회 성공"),
+    ROOM_MAP_GET_SUCCESS("맵 정보 조회 성공"),
+
     ;
 
     private final String message;
