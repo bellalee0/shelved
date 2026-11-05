@@ -178,19 +178,19 @@
 - [x] [W2] 세션 참가자 검사 공통 로직 — 본인 세션이 아니면 `404 ROOM_NOT_FOUND`, 테스트 세션은 관리자만 (담당: BE-4)
 - [x] [W2] `POST /api/rooms` — `PUBLISHED` 사건만, 같은 사건 미종료 세션이 있으면 `409 ROOM_ALREADY_EXISTS`(`detail.roomId`), 제한시간은 난이도 설정값 복사, 빈 노트(`revision=0`) 함께 생성 (담당: BE-4)
 - [x] [W2] `GET /api/rooms` — `status=ACTIVE|ENDED` 필터, 테스트 세션 제외, 최신순, `pendingGradingStatus`·`endedAt`·`durationSec` 포함 (담당: BE-4)
-- [ ] [W2] `GET /api/rooms/{roomId}/state` — `timer`, `heartbeatIntervalMs`, `hintCount`·`accusationCount`(`UsageCount`: limit/used/reserved/remaining), `pendingAccusation`, `aiRequests`, `conversations`
+- [x] [W2] `GET /api/rooms/{roomId}/state` — `timer`, `heartbeatIntervalMs`, `hintCount`·`accusationCount`(`UsageCount`: limit/used/reserved/remaining), `pendingAccusation`, `aiRequests`, `conversations` (담당: BE-5, 메모: `pendingAccusation`·`aiRequests`·`conversations`는 W3~W4에서 채움)
 - [x] [W2] `GET /api/rooms/{roomId}/briefing` — 사전 정보, 정답·용어집 제외 (담당: BE-4)
 - [x] [W2] `GET /api/rooms/{roomId}/map` — 맵 설정, `suspects`(배치 안 된 인물은 x·y null, 지목 대상 목록 겸용), `evidences`(설명 제외) (담당: BE-4)
 - [x] [W2] 서버 경과시간 계산 — `elapsed_active_ms + (now - active_since)`, `Clock` 주입, `duration_sec`는 초 단위 내림 (담당: BE-4, 메모: 순수 계산만, 상태 정산은 BE-5)
-- [ ] [W2] `POST /api/rooms/{roomId}/start` — `READY`만(`409 ROOM_NOT_READY`), `started_at`·`active_since` 설정, `connectionId` 발급
-- [ ] [W2] `X-Connection-Id` 검사 공통 로직 — 없으면 `400 CONNECTION_ID_REQUIRED`, 현재 연결 아니면 `409 CONNECTION_REPLACED` (적용 대상은 `docs/api/README.md` 표)
-- [ ] [W2] `POST /api/rooms/{roomId}/heartbeat` — `last_seen_at` 갱신, `IN_PROGRESS`가 아니면 연결 검사 없이 상태만 반환, 자동 재개 금지
-- [ ] [W2] `POST /api/rooms/{roomId}/pause` — `IN_PROGRESS`일 때만 상태 변경, 그 외 상태는 현재 상태 반환(중복 안전), 연결 헤더 불필요, 현재 연결 무효화. 시간 정산 순서는 `docs/api/room.md`의 "일시정지의 시간 정산 순서"를 따름: `pause`는 `last_seen_at`을 갱신하지 않고 먼저 정산 → 이탈 기준 이상이면 마지막 접속 확인 시각까지, 미만이면 `pause` 접수 시각까지 누적 → 시간 소진 시 미해결 지목이 없으면 `EXPIRED`, 있으면 보류한 채 `PAUSED`
-- [ ] [W2] `POST /api/rooms/{roomId}/resume` — `PAUSED`만(`409 ROOM_NOT_PAUSED`), 남은 시간 없으면 `409 ROOM_TIME_EXPIRED`, 새 `connectionId` 발급
-- [ ] [W2] 유효한 플레이 요청도 `last_seen_at` 갱신 (접속 확인으로 취급)
-- [ ] [W2] 이탈 감지 스케줄러 — 15초 미수신 시 마지막 접속 확인 시각 기준으로 일시정지, AI 대기 요청 때문에 막히지 않음 (`scheduler` 패키지는 Service 호출만)
-- [ ] [W2] 접속 종료·시간 만료 순서 처리 — 하트비트 유예 구간에서는 만료 보류, 접속 확인 시점에 이미 소진했으면 만료, 일시정지 중 만료 금지 (3.5절)
-- [ ] [W2] 세션 상태 변경 직렬화 — `rooms` 행 비관적 잠금(`PESSIMISTIC_WRITE`), 시간 중복 누적·결과 중복 생성 방지 (backend.md 15)
+- [x] [W2] `POST /api/rooms/{roomId}/start` — `READY`만(`409 ROOM_NOT_READY`), `started_at`·`active_since` 설정, `connectionId` 발급 (담당: BE-5)
+- [x] [W2] `X-Connection-Id` 검사 공통 로직 — 없으면 `400 CONNECTION_ID_REQUIRED`, 현재 연결 아니면 `409 CONNECTION_REPLACED` (적용 대상은 `docs/api/README.md` 표) (담당: BE-5)
+- [x] [W2] `POST /api/rooms/{roomId}/heartbeat` — `last_seen_at` 갱신, `IN_PROGRESS`가 아니면 연결 검사 없이 상태만 반환, 자동 재개 금지 (담당: BE-5)
+- [x] [W2] `POST /api/rooms/{roomId}/pause` — `IN_PROGRESS`일 때만 상태 변경, 그 외 상태는 현재 상태 반환(중복 안전), 연결 헤더 불필요, 현재 연결 무효화. 시간 정산 순서는 `docs/api/room.md`의 "일시정지의 시간 정산 순서"를 따름: `pause`는 `last_seen_at`을 갱신하지 않고 먼저 정산 → 이탈 기준 이상이면 마지막 접속 확인 시각까지, 미만이면 `pause` 접수 시각까지 누적 → 시간 소진 시 미해결 지목이 없으면 `EXPIRED`, 있으면 보류한 채 `PAUSED` (담당: BE-5)
+- [x] [W2] `POST /api/rooms/{roomId}/resume` — `PAUSED`만(`409 ROOM_NOT_PAUSED`), 남은 시간 없으면 `409 ROOM_TIME_EXPIRED`, 새 `connectionId` 발급 (담당: BE-5)
+- [x] [W2] 유효한 플레이 요청도 `last_seen_at` 갱신 (접속 확인으로 취급) (담당: BE-5, 메모: 공통 검사로 구현, 적용은 BE-6부터)
+- [x] [W2] 이탈 감지 스케줄러 — 15초 미수신 시 마지막 접속 확인 시각 기준으로 일시정지, AI 대기 요청 때문에 막히지 않음 (`scheduler` 패키지는 Service 호출만) (담당: BE-5)
+- [x] [W2] 접속 종료·시간 만료 순서 처리 — 하트비트 유예 구간에서는 만료 보류, 접속 확인 시점에 이미 소진했으면 만료, 일시정지 중 만료 금지 (3.5절) (담당: BE-5)
+- [x] [W2] 세션 상태 변경 직렬화 — `rooms` 행 비관적 잠금(`PESSIMISTIC_WRITE`), 시간 중복 누적·결과 중복 생성 방지 (backend.md 15) (담당: BE-5)
 - [ ] [W4] 시간 소진 시 종료 처리 — 유효한 미해결 지목이 없으면 `EXPIRED`로 종료·결과 저장, 있으면 `awaitingGrading=true`로 보류
 - [ ] [W4] `GET /api/rooms/{roomId}/result` — 종료 세션만(`409 ROOM_NOT_ENDED`), 원작·범인·트릭·리빌 해설·지목 기록·플레이 기록
 - [ ] [W2~W4] 테스트 — 상태 전이 거부, 일시정지 구간 제외, 연결 교체 후 이전 연결 거부, 이탈 판정, 이탈 기준 직전·직후의 pause 정산, 중복 pause·resume, 일시정지 중 만료 금지, 결과 1건 (고정 `Clock`)
