@@ -13,6 +13,17 @@ describe('getRedirectPath', () => {
     expect(result).toBe('/rooms/3?view=notes');
   });
 
+  it('사건을 고른 메인 화면 주소(?case=)도 쿼리까지 그대로 돌려준다', () => {
+    // given
+    const state = { from: '/?case=2' };
+
+    // when
+    const result = getRedirectPath(state);
+
+    // then
+    expect(result).toBe('/?case=2');
+  });
+
   it('값이 없거나 다른 사이트 주소·로그인 흐름 화면이면 메인으로 보낸다', () => {
     // given
     const states = [
