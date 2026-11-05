@@ -6,7 +6,9 @@ import com.shelved.common.entity.Room;
 import com.shelved.common.enums.RoomStatus;
 import com.shelved.common.exception.CustomException;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -66,6 +68,15 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
             @Param("userId") Long userId,
             @Param("statuses") Collection<RoomStatus> statuses,
             Pageable pageable
+    );
+
+    /**
+     * 이탈 감지 대상 후보 (주어진 상태이고 마지막 접속 확인이 기준 시각 이전). 잠금 없이 ID만 읽고, 세션별 정산에서 다시 확인한다
+     */
+    @Query("select r.id from Room r where r.status = :status and r.lastSeenAt <= :seenBefore order by r.id asc")
+    List<Long> findIdsByStatusAndLastSeenAtLessThanEqual(
+            @Param("status") RoomStatus status,
+            @Param("seenBefore") LocalDateTime seenBefore
     );
 
     default Room findRoomWithCaseById(Long roomId) {

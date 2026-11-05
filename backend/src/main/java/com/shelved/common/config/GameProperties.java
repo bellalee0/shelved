@@ -14,7 +14,8 @@ public record GameProperties(
         int accusationLimit,
         Duration heartbeatInterval,
         Duration heartbeatTimeout,
-        Duration gradingRetryMinInterval
+        Duration gradingRetryMinInterval,
+        Duration disconnectCheckInterval
 ) {
 
     /**

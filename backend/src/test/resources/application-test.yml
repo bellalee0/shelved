@@ -5,6 +5,9 @@ spring:
       ddl-auto: create-drop
 
 shelved:
+  # 스케줄러가 테스트 데이터를 바꾸지 않도록 끈다. 점검 로직은 서비스 메서드를 직접 호출해 검증한다
+  scheduling:
+    enabled: false
   jwt:
     # 테스트 전용 가짜 서명 키 (32바이트 이상)
     secret-key: test-only-fake-jwt-secret-key-0123456789

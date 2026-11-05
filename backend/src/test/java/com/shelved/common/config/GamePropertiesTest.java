@@ -14,7 +14,8 @@ class GamePropertiesTest {
             3,
             Duration.ofSeconds(5),
             Duration.ofSeconds(15),
-            Duration.ofSeconds(10)
+            Duration.ofSeconds(10),
+            Duration.ofSeconds(5)
     );
 
     @Test
