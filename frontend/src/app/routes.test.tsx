@@ -1,7 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { http } from 'msw';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockErrorResponse } from '../mocks/handlers/auth';
+import { server } from '../mocks/node';
+import { apiClient } from '../shared/api/client';
+import { connectAuthToApiClient } from '../features/auth/session';
 import type { UserMeResponse } from '../features/auth/types';
 import { INITIAL_AUTH_STATE, useAuthStore } from '../features/auth/store';
 import { routes } from './routes';
@@ -43,6 +48,28 @@ describe('라우트 보호', () => {
     // then
     expect(router.state.location.pathname).toBe('/login');
     expect(router.state.location.state).toEqual({ from: '/admin?tab=cases' });
+  });
+
+  it('로그인 상태에서 401 INVALID_TOKEN을 받으면 정리 후 로그인 화면으로 보내고, 돌아갈 경로를 남긴다', async () => {
+    // given
+    connectAuthToApiClient();
+    setLoggedInUser({ ...PLAYER, role: 'ADMIN' });
+    const router = renderAt('/admin');
+    server.use(
+      http.get(`${import.meta.env.VITE_API_BASE_URL}/api/users/me`, () =>
+        mockErrorResponse(401, 'INVALID_TOKEN', '유효하지 않은 토큰입니다.'),
+      ),
+    );
+
+    // when
+    await act(async () => {
+      await apiClient.get('/api/users/me').catch(() => undefined);
+    });
+
+    // then
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/login'));
+    expect(router.state.location.state).toEqual({ from: '/admin' });
+    expect(useAuthStore.getState().user).toBeNull();
   });
 
   it('로그인하면 로그인 전에 가려던 화면으로 돌아간다', async () => {

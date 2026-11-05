@@ -35,6 +35,7 @@
 | 액세스 토큰 보관 | 프론트엔드 메모리(Zustand). 새로고침하면 사라진다 |
 | 리프레시 토큰 보관 | `localStorage` |
 | 액세스 토큰 만료 | API가 `401 EXPIRED_TOKEN` → 공통 axios 인스턴스가 `/api/auth/refresh` 호출 → 원래 요청 재시도 (동시에 여러 요청이 만료되어도 재발급은 한 번만) |
+| 유효하지 않은 액세스 토큰 | `401 INVALID_TOKEN`·`LOGIN_REQUIRED` → 재발급하지 않고 로그아웃과 같은 정리(토큰·캐시·`localStorage`) 후 로그인 화면. 동시에 여러 요청이 받아도 정리는 한 번만 |
 | 재발급 | 리프레시 토큰도 새로 발급(rotation)하고 이전 리프레시 토큰은 무효화 |
 | 새로고침 후 복원 | 앱 시작 시 `localStorage`에 리프레시 토큰이 있으면 `/api/auth/refresh` → `/api/users/me` 순서로 로그인 상태 복원 |
 | 재발급 실패 | `401 INVALID_REFRESH_TOKEN` → 아래 탭 간 조정 규칙으로 최신 토큰 재확인. 같은 토큰이 여전히 저장되어 있을 때만 삭제 후 로그인 화면 |
