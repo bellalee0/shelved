@@ -77,9 +77,10 @@ function saveDb() {
   }
 }
 
-function ok<T>(data: T, message: string) {
+/** 명세 형식의 성공 응답을 만든다. 다른 도메인 목도 같은 형식을 쓰도록 내보낸다 */
+export function ok<T>(data: T, message: string, status = 200) {
   const body: CommonResponse<T> = { success: true, message, data, timestamp: now() };
-  return HttpResponse.json(body);
+  return HttpResponse.json(body, { status });
 }
 
 /** 명세 형식의 실패 응답을 만든다. 테스트에서 server.use로 오류를 재현할 때도 쓴다 */
@@ -126,8 +127,11 @@ function issueTokens(user: MockUser): AuthTokenResponse {
   };
 }
 
-/** Authorization 헤더로 로그인 사용자를 찾는다. 실패하면 돌려줄 오류 응답을 담는다 */
-function authenticate(request: Request): { user: MockUser } | { error: Response } {
+/**
+ * Authorization 헤더로 로그인 사용자를 찾는다. 실패하면 돌려줄 오류 응답을 담는다.
+ * 사건·세션 등 다른 도메인 목도 같은 토큰 → 사용자 매핑을 쓰도록 내보낸다.
+ */
+export function authenticate(request: Request): { user: MockUser } | { error: Response } {
   const authorization = request.headers.get('Authorization');
   if (!authorization?.startsWith('Bearer ')) {
     return { error: mockErrorResponse(401, 'LOGIN_REQUIRED', '로그인이 필요합니다.') };
@@ -138,6 +142,11 @@ function authenticate(request: Request): { user: MockUser } | { error: Response 
     return { error: mockErrorResponse(401, 'INVALID_TOKEN', '유효하지 않은 토큰입니다.') };
   }
   return { user };
+}
+
+/** 액세스 토큰에 해당하는 사용자 ID. 모르는 토큰이면 null (개발용 도구·테스트에서 쓴다) */
+export function findMockUserIdByAccessToken(accessToken: string | null): number | null {
+  return (accessToken && db.accessTokens[accessToken]) || null;
 }
 
 async function readJson<T>(request: Request): Promise<Partial<T>> {
