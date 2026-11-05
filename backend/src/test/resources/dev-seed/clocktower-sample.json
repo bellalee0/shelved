@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "card": {
+    "displayTitle": "시계탑 저택의 마지막 종소리",
+    "difficulty": "EASY",
+    "keywordTags": ["저택", "밀실", "알리바이"]
+  },
+  "source": {
+    "novelTitle": "The Last Chime",
+    "novelAuthor": "가상 작가",
+    "novelIntro": "설명과 테스트를 위해 지어낸 가상의 원작입니다. 실제 소설과 관련이 없습니다."
+  },
+  "briefing": {
+    "introduction": "시계탑이 있는 저택에서 주인이 서재에서 숨진 채 발견되었다.",
+    "investigationGoal": "범인과 범행 방법을 밝혀라.",
+    "backgroundKnowledge": "사건 당시 저택에는 집사·가정부·정원사가 있었다."
+  },
+  "suspects": [
+    {
+      "key": "sus-1",
+      "entityId": null,
+      "name": "해리스",
+      "role": "저택의 집사. 20년째 근무",
+      "canConverse": true,
+      "isCulprit": true,
+      "spriteKey": "npc-butler-01",
+      "persona": {
+        "speechStyle": "정중하고 짧게 말한다",
+        "knownFacts": [
+          { "text": "서재에 녹음기가 있다는 것을 안다", "sourceRefs": [{ "location": "2장 4문단", "quote": "..." }] }
+        ],
+        "unknownFacts": [],
+        "statements": [
+          { "text": "9시에는 주방에서 은식기를 닦고 있었다", "sourceRefs": [] }
+        ],
+        "hiddenFacts": [
+          { "text": "8시 50분에 서재에 들어갔다", "sourceRefs": [] }
+        ],
+        "lies": [
+          { "topic": "9시의 행적", "lie": "주방에 있었다", "truth": "서재에서 녹음기를 설치했다", "sourceRefs": [] }
+        ],
+        "silenceTopics": [],
+        "pressureResponse": "모순을 추궁받아도 자백하지 않고 답변을 거부한다",
+        "statementChanges": []
+      }
+    },
+    {
+      "key": "sus-2",
+      "entityId": null,
+      "name": "마거릿",
+      "role": "저택의 가정부",
+      "canConverse": true,
+      "isCulprit": false,
+      "spriteKey": "npc-housekeeper-01",
+      "persona": {
+        "speechStyle": "차분하고 자세히 말한다",
+        "knownFacts": [],
+        "unknownFacts": [],
+        "statements": [
+          { "text": "9시 15분쯤 서재에서 주인의 목소리를 들었다", "sourceRefs": [] }
+        ],
+        "hiddenFacts": [],
+        "lies": [],
+        "silenceTopics": [],
+        "pressureResponse": "모르는 것은 모른다고 답한다",
+        "statementChanges": []
+      }
+    },
+    {
+      "key": "sus-3",
+      "entityId": null,
+      "name": "톰",
+      "role": "저택의 정원사",
+      "canConverse": true,
+      "isCulprit": false,
+      "spriteKey": "npc-gardener-01",
+      "persona": {
+        "speechStyle": "퉁명스럽게 말한다",
+        "knownFacts": [],
+        "unknownFacts": [],
+        "statements": [
+          { "text": "저녁 내내 정원에서 일했다", "sourceRefs": [] }
+        ],
+        "hiddenFacts": [],
+        "lies": [],
+        "silenceTopics": [],
+        "pressureResponse": "같은 질문을 반복하면 짜증을 낸다",
+        "statementChanges": []
+      }
+    },
+    {
+      "key": "sus-4",
+      "entityId": null,
+      "name": "엘리스",
+      "role": "주치의. 사건 당일 저택에 없었다",
+      "canConverse": false,
+      "isCulprit": false,
+      "spriteKey": null,
+      "persona": null
+    }
+  ],
+  "evidences": [
+    {
+      "key": "evi-1",
+      "entityId": null,
+      "name": "서재의 작은 상자",
+      "description": "책장 뒤에서 발견된 손바닥만 한 나무 상자. 안쪽에 태엽 장치가 들어 있다.",
+      "sourceRefs": []
+    },
+    {
+      "key": "evi-2",
+      "entityId": null,
+      "name": "찢긴 메모",
+      "description": "서재 휴지통에서 나온 메모 조각. '9시 15분'이라는 글자만 알아볼 수 있다.",
+      "sourceRefs": []
+    }
+  ],
+  "trick": {
+    "summary": "녹음기로 피해자가 살아 있는 시각을 조작했다",
+    "elements": [
+      {
+        "key": "trk-1",
+        "entityId": null,
+        "orderIndex": 1,
+        "description": "녹음기를 서재에 설치해 피해자가 살아 있는 시각을 조작했다",
+        "rubric": {
+          "items": [
+            {
+              "itemId": "trk-1-i1",
+              "label": "사용 도구",
+              "criterion": "녹음 장치를 사용했음을 밝힘",
+              "acceptExamples": ["녹음기", "소리를 재생하는 장치"],
+              "rejectExamples": []
+            },
+            {
+              "itemId": "trk-1-i2",
+              "label": "사용 목적",
+              "criterion": "피해자가 살아 있는 시각을 늦춰 보이게 함",
+              "acceptExamples": ["사망 시각을 속였다"],
+              "rejectExamples": ["비명을 가렸다"]
+            }
+          ],
+          "easyFeedback": {
+            "guideQuestion": "사람들이 피해자의 목소리를 언제 들었다고 했나요?",
+            "evidenceKeys": ["evi-1"],
+            "suspectKeys": ["sus-1"]
+          }
+        },
+        "supportingClues": [
+          { "type": "EVIDENCE", "refKey": "evi-1", "note": "태엽 장치가 녹음기의 흔적" },
+          { "type": "TESTIMONY", "refKey": "sus-2", "note": "9시 15분에 목소리를 들음" }
+        ]
+      }
+    ]
+  },
+  "revealExplanation": "해리스는 8시 50분에 서재에 녹음기를 설치해 9시 15분에 주인의 목소리가 들리게 만들었다. 실제로 주인은 그보다 먼저 숨졌다.",
+  "glossary": [
+    { "original": "Harris", "korean": "해리스", "note": "집사" },
+    { "original": "Margaret", "korean": "마거릿", "note": "가정부" },
+    { "original": "Tom", "korean": "톰", "note": "정원사" },
+    { "original": "Clocktower Hall", "korean": "시계탑 저택", "note": "지명" }
+  ],
+  "map": {
+    "mapUrl": "/assets/maps/clocktower-mansion.json",
+    "spawnX": 64,
+    "spawnY": 64,
+    "collisionLayer": "collision",
+    "interactionRadiusPx": 48,
+    "hotspots": [
+      { "type": "SUSPECT", "key": "sus-1", "x": 320, "y": 192 },
+      { "type": "SUSPECT", "key": "sus-2", "x": 480, "y": 256 },
+      { "type": "SUSPECT", "key": "sus-3", "x": 640, "y": 448 },
+      { "type": "EVIDENCE", "key": "evi-1", "x": 160, "y": 128 },
+      { "type": "EVIDENCE", "key": "evi-2", "x": 224, "y": 160 }
+    ]
+  }
+}
