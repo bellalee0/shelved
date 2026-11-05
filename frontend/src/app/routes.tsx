@@ -4,9 +4,11 @@ import { RequireLogin } from '../features/auth/components/RequireLogin';
 import { RequireNicknameSet } from '../features/auth/components/RequireNicknameSet';
 import { AdminHomePage } from '../pages/admin/AdminHomePage';
 import { CaseListPage } from '../pages/CaseListPage';
+import { GamePage } from '../pages/GamePage';
 import { LoginPage } from '../pages/LoginPage';
 import { NicknamePage } from '../pages/NicknamePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { ResultPage } from '../pages/ResultPage';
 
 /**
  * URL별 화면 목록. 새 화면은 알맞은 보호막(element) 아래 children에 추가한다.
@@ -28,6 +30,8 @@ export const routes: RouteObject[] = [
         element: <RequireLogin />,
         children: [
           // 로그인이 필요한 화면(게임, 결과, 랭킹 등)은 여기에 추가한다
+          { path: '/rooms/:roomId', element: <GamePage /> },
+          { path: '/rooms/:roomId/result', element: <ResultPage /> },
           {
             element: <RequireAdmin />,
             children: [{ path: '/admin', element: <AdminHomePage /> }],
