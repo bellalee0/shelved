@@ -258,6 +258,13 @@ npm run format          # Prettier로 코드 정렬
 | `shelvedMock.conflictNote(roomId)` | 다른 탭에서 노트를 먼저 저장한 상황: 다음 저장이 `409 NOTE_REVISION_CONFLICT` |
 | `shelvedMock.resetRooms()` | 목 세션·노트를 모두 지움 (목 사용자·토큰은 유지) |
 
+#### 정적 에셋
+
+- 맵(Tiled JSON)·타일셋·캐릭터 스프라이트는 `frontend/public/assets/`에 있고, 사이트에서는 `/assets/...` 경로로 제공됩니다.
+- `manifest.json`이 스프라이트 키·맵 경로의 유일한 목록이고, 출처·라이선스는 `CREDITS.md`에 기록합니다.
+- Tiled로 사건 맵을 만드는 규칙은 [docs/conventions/frontend.md](docs/conventions/frontend.md#맵-제작-규칙-tiled)에 있습니다.
+- 백엔드 `shelved.assets.base-path`(기본 `../frontend/public/assets`)가 같은 폴더를 가리킵니다.
+
 #### 로그인 토큰 처리
 
 상세 흐름은 [docs/api/auth-user.md](docs/api/auth-user.md#토큰-처리-흐름)를 따릅니다.

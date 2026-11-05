@@ -129,7 +129,7 @@
 ### README
 
 - [x] [W1] README에 기술 버전, 실행 명령(작업 디렉터리 포함), 필수 환경 변수 이름·용도, `.env` 주입 방법, DB 초기화 방법 기록 (common.md README 관리) (담당: BE-1, FE-1)
-- [~] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록 (담당: FE-2, 메모: 토큰 방식 기록 완료, 정적 에셋 경로는 2주차)
+- [x] [W2] README에 정적 에셋 경로, 로그인 토큰 전달·보관·갱신 방식 기록 (담당: FE-2, AS-1)
 
 ## 1. 데이터베이스 (엔티티, 6절)
 
@@ -399,11 +399,11 @@
 
 ### 에셋
 
-- [ ] [W1~W2] LPC 계열 타일셋·캐릭터 소싱 & 라이선스 확인 (코딩 에이전트 담당) — 출처 URL·제작자·라이선스·버전·수정 여부·고지 조건, 합성 캐릭터는 부품별로
-- [ ] [W2] `frontend/public/assets/CREDITS.md` 작성, 조건을 확인할 수 없는 에셋은 제외
-- [ ] [W2] 정적 에셋 폴더 구조 확정 (`maps/`, `tilesets/`, `sprites/`, kebab-case 파일명) 및 `manifest.json`(spriteKey·맵 경로), 백엔드 `shelved.assets.base-path` 연결
-- [ ] [W2] 플레이어 공통 스프라이트 1종, 사건별 NPC 스프라이트(3~5종씩)
-- [ ] [W2] 공개 에셋 점검 — 맵 JSON·manifest에 범인 여부·정답·NPC 설정·물증 설명·원작 제목 미포함
+- [x] [W1~W2] LPC 계열 타일셋·캐릭터 소싱 & 라이선스 확인 (코딩 에이전트 담당) — 출처 URL·제작자·라이선스·버전·수정 여부·고지 조건, 합성 캐릭터는 부품별로 (담당: AS-1, 메모: 실내 저택·정원 타일, 성·동굴·거리는 W6)
+- [x] [W2] `frontend/public/assets/CREDITS.md` 작성, 조건을 확인할 수 없는 에셋은 제외 (담당: AS-1)
+- [x] [W2] 정적 에셋 폴더 구조 확정 (`maps/`, `tilesets/`, `sprites/`, kebab-case 파일명) 및 `manifest.json`(spriteKey·맵 경로), 백엔드 `shelved.assets.base-path` 연결 (담당: AS-1, 메모: 백엔드 `base-path`는 기존 설정 확인, manifest 읽기는 W6 출시 검사)
+- [x] [W2] 플레이어 공통 스프라이트 1종, 사건별 NPC 스프라이트(3~5종씩) (담당: AS-1, 메모: 범용 NPC 7종, 사건별 배정은 시드에서)
+- [x] [W2] 공개 에셋 점검 — 맵 JSON·manifest에 범인 여부·정답·NPC 설정·물증 설명·원작 제목 미포함 (담당: AS-1, 메모: 자동 테스트 `assetManifest.test.ts`)
 
 ### 사건 콘텐츠 (정답 정보는 로컬에만)
 
