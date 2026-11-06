@@ -244,7 +244,7 @@ describe('메인 화면 · 수사 시작', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '수사 시작' }));
 
     // then
-    expect(await screen.findByRole('heading', { name: '수사 화면' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '수사 준비' })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/rooms/1');
   });
 
@@ -260,7 +260,7 @@ describe('메인 화면 · 수사 시작', () => {
     // 같은 틱에 연달아 두 번 누른다
     fireEvent.click(startButton);
     fireEvent.click(startButton);
-    await screen.findByRole('heading', { name: '수사 화면' });
+    await screen.findByRole('heading', { name: '수사 준비' });
 
     // then
     expect(requests.filter((request) => request === 'POST /api/rooms')).toHaveLength(1);
