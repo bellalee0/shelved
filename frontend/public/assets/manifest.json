@@ -147,6 +147,7 @@
     }
   },
   "maps": {
-    "clocktower-mansion": "/assets/maps/clocktower-mansion.json"
+    "clocktower-mansion": "/assets/maps/clocktower-mansion.json",
+    "townhouse-quarter": "/assets/maps/townhouse-quarter.json"
   }
 }
