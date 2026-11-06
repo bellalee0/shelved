@@ -106,7 +106,11 @@ export function NoteWindow({ note, onClose }: NoteWindowProps) {
               >
                 복사
               </Button>
-              <Button variant="secondary" disabled={readOnly} onClick={note.continueWithDraft}>
+              <Button
+                variant="secondary"
+                disabled={!state.operable}
+                onClick={note.continueWithDraft}
+              >
                 초안으로 이어 쓰기
               </Button>
               <Button variant="ghost" onClick={note.discardDraft}>
@@ -132,7 +136,7 @@ export function NoteWindow({ note, onClose }: NoteWindowProps) {
                 <Button variant="secondary" onClick={() => copyToClipboard(state.content)}>
                   복사
                 </Button>
-                <Button disabled={readOnly} onClick={note.overwriteWithMine}>
+                <Button disabled={!state.operable} onClick={note.overwriteWithMine}>
                   내 초안으로 덮어쓰기
                 </Button>
               </DraftBox>
