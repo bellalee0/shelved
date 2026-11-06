@@ -37,6 +37,10 @@ public enum SuccessMessage {
     // 물증
     EVIDENCE_INSPECT_SUCCESS("물증 조사 성공"),
 
+    // 노트
+    NOTE_GET_SUCCESS("노트 조회 성공"),
+    NOTE_UPDATE_SUCCESS("노트 저장 성공"),
+
     ;
 
     private final String message;
