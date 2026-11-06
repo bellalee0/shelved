@@ -225,15 +225,15 @@
 
 ## 7. 물증 (3.8절, `docs/api/investigation.md`)
 
-- [ ] [W2] `POST /api/rooms/{roomId}/evidences/{evidenceId}/inspect` — 세션 상태 공통 검사, 이 사건의 물증인지(`404 EVIDENCE_NOT_FOUND`), 검수된 고정 설명 반환(AI 미사용), 반복 조사 가능
-- [ ] [W2] 최초 조사 이력 `EVIDENCE_INSPECTIONS` 1건만 저장 (중복 요청에도 1건, 힌트 컨텍스트용)
-- [ ] [W2] 테스트 — 재조사 같은 설명, 이력 1건, 진행 중 아닐 때 거부
+- [x] [W2] `POST /api/rooms/{roomId}/evidences/{evidenceId}/inspect` — 세션 상태 공통 검사, 이 사건의 물증인지(`404 EVIDENCE_NOT_FOUND`), 검수된 고정 설명 반환(AI 미사용), 반복 조사 가능 (담당: BE-6)
+- [x] [W2] 최초 조사 이력 `EVIDENCE_INSPECTIONS` 1건만 저장 (중복 요청에도 1건, 힌트 컨텍스트용) (담당: BE-6)
+- [x] [W2] 테스트 — 재조사 같은 설명, 이력 1건, 진행 중 아닐 때 거부 (담당: BE-6)
 
 ## 8. 개인 노트 (3.7절, `docs/api/investigation.md`)
 
-- [ ] [W2] `GET /api/rooms/{roomId}/notes/me` — `content`, `revision`, `updatedAt`, `maxLength`, `editable`(진행 중이고 시간이 남을 때만 true)
-- [ ] [W2] `PUT /api/rooms/{roomId}/notes/me` — 세션 상태 공통 검사, 글자 수 제한, `content`는 trim·공백·줄바꿈 정규화 없이 원문 보존, `revision` 일치 시에만 저장·버전 증가, 불일치 시 `409 NOTE_REVISION_CONFLICT`(`detail.currentRevision`, `currentContent`)
-- [ ] [W2] 테스트 — 오래된 `revision` 거부, 다른 사용자 노트 접근 차단, 일시정지·종료 후 저장 거부
+- [x] [W2] `GET /api/rooms/{roomId}/notes/me` — `content`, `revision`, `updatedAt`, `maxLength`, `editable`(진행 중이고 시간이 남을 때만 true) (담당: BE-6)
+- [x] [W2] `PUT /api/rooms/{roomId}/notes/me` — 세션 상태 공통 검사, 글자 수 제한, `content`는 trim·공백·줄바꿈 정규화 없이 원문 보존, `revision` 일치 시에만 저장·버전 증가, 불일치 시 `409 NOTE_REVISION_CONFLICT`(`detail.currentRevision`, `currentContent`) (담당: BE-6)
+- [x] [W2] 테스트 — 오래된 `revision` 거부, 다른 사용자 노트 접근 차단, 일시정지·종료 후 저장 거부 (담당: BE-6)
 
 ## 9. 힌트 & 무료 보충 질문 (3.4절, `docs/api/hint-accusation.md`)
 

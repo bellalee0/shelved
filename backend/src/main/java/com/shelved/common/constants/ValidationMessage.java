@@ -24,4 +24,9 @@ public final class ValidationMessage {
 
     // --- 세션 ---
     public static final String CASE_ID_NOT_NULL = "사건을 선택해 주세요.";
+
+    // --- 노트 ---
+    public static final String NOTE_CONTENT_NOT_NULL = "노트 내용은 필수입니다.";
+    public static final String NOTE_REVISION_NOT_NULL = "노트 버전은 필수입니다.";
+    public static final String NOTE_REVISION_POSITIVE_OR_ZERO = "노트 버전은 0 이상이어야 합니다.";
 }

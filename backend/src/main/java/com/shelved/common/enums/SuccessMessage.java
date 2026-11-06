@@ -34,6 +34,13 @@ public enum SuccessMessage {
     ROOM_PAUSE_SUCCESS("일시정지 성공"),
     ROOM_RESUME_SUCCESS("수사 이어하기 성공"),
 
+    // 물증
+    EVIDENCE_INSPECT_SUCCESS("물증 조사 성공"),
+
+    // 노트
+    NOTE_GET_SUCCESS("노트 조회 성공"),
+    NOTE_UPDATE_SUCCESS("노트 저장 성공"),
+
     ;
 
     private final String message;
