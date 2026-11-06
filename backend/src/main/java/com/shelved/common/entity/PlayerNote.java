@@ -62,4 +62,13 @@ public class PlayerNote {
         this.revision = 0;
         this.updatedAt = createdAt;
     }
+
+    /**
+     * 노트 내용 저장. 호출하는 쪽에서 revision 일치를 확인한 뒤 호출한다. 내용은 정규화하지 않는다
+     */
+    public void update(String content, LocalDateTime now) {
+        this.content = content;
+        this.revision++;
+        this.updatedAt = now;
+    }
 }
