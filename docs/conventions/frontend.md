@@ -340,14 +340,18 @@ React와 Phaser는 각자 맡은 일만 하고, `EventBus`를 통해서만 대�
 |---|---|---|---|
 | Phaser → React | `INTERACT_REQUESTED` | `{ type: 'SUSPECT' \| 'EVIDENCE', targetId }` | E키로 선택한 NPC·물증. React가 대화창을 열거나 조사 API를 호출 |
 | Phaser → React | `MAP_READY` | 없음 | 맵·에셋 준비 완료. React가 시작/이어하기 버튼을 활성화 |
+| Phaser → React | `MAP_LOAD_FAILED` | 없음 | 맵 JSON·타일셋·스프라이트 로드 실패. React가 오류 안내와 다시 시도를 표시 |
 | React → Phaser | `SET_INPUT_ENABLED` | `{ enabled }` | 이동·상호작용 입력 허용 여부 |
 | React → Phaser | `PLACE_AT_SPAWN` | 없음 | 캐릭터를 사건 시작점에 배치 (최초 진입, 재접속) |
+
+- Phaser는 입력이 막힌 상태로 시작하고, 최초 배치(시작점)는 Scene이 직접 한 뒤 `MAP_READY`를 보낸다. React는 `MAP_READY`를 받은 뒤에 `SET_INPUT_ENABLED`·`PLACE_AT_SPAWN`을 보낸다. (그 전에 보낸 이벤트는 Scene이 아직 구독하지 않아 사라진다)
 
 ```ts
 // game/events.ts
 export const GameEvents = {
   INTERACT_REQUESTED: 'INTERACT_REQUESTED',
   MAP_READY: 'MAP_READY',
+  MAP_LOAD_FAILED: 'MAP_LOAD_FAILED',
   SET_INPUT_ENABLED: 'SET_INPUT_ENABLED',
   PLACE_AT_SPAWN: 'PLACE_AT_SPAWN',
 } as const;
@@ -355,6 +359,7 @@ export const GameEvents = {
 export type GameEventPayloads = {
   [GameEvents.INTERACT_REQUESTED]: { type: 'SUSPECT' | 'EVIDENCE'; targetId: number };
   [GameEvents.MAP_READY]: void;
+  [GameEvents.MAP_LOAD_FAILED]: void;
   [GameEvents.SET_INPUT_ENABLED]: { enabled: boolean };
   [GameEvents.PLACE_AT_SPAWN]: void;
 };

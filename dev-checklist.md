@@ -327,12 +327,12 @@
 
 ### Phaser·맵
 
-- [ ] [W2] `game/EventBus.ts`, `game/events.ts` — `INTERACT_REQUESTED`, `MAP_READY`, `SET_INPUT_ENABLED`, `PLACE_AT_SPAWN` 타입 정의
-- [ ] [W2] `PhaserGame.tsx` — 마운트·언마운트 시 인스턴스 생성·`destroy`, 리스너 정리
-- [ ] [W2] Boot/Preload/Investigation Scene — Tiled JSON·타일셋·스프라이트 로드 (`game/assets.ts`가 `manifest.json` 사용)
-- [ ] [W2] 플레이어 이동(WASD·방향키), 충돌 레이어, 캐릭터는 배열로 관리(MVP 1명)
-- [ ] [W2] NPC·물증 오브젝트 배치(`GET map`), 상호작용 반경 안에서 "E: 대화"/"E: 조사" 안내, E키로 `INTERACT_REQUESTED` (창 자동으로 열지 않음)
-- [ ] [W2] `PLACE_AT_SPAWN` 처리, 로딩 완료 시 `MAP_READY`
+- [x] [W2] `game/EventBus.ts`, `game/events.ts` — `INTERACT_REQUESTED`, `MAP_READY`, `SET_INPUT_ENABLED`, `PLACE_AT_SPAWN` 타입 정의 (담당: FE-4, 메모: `MAP_LOAD_FAILED` 추가)
+- [x] [W2] `PhaserGame.tsx` — 마운트·언마운트 시 인스턴스 생성·`destroy`, 리스너 정리 (담당: FE-4)
+- [x] [W2] Boot/Preload/Investigation Scene — Tiled JSON·타일셋·스프라이트 로드 (`game/assets.ts`가 `manifest.json` 사용) (담당: FE-4)
+- [x] [W2] 플레이어 이동(WASD·방향키), 충돌 레이어, 캐릭터는 배열로 관리(MVP 1명) (담당: FE-4)
+- [x] [W2] NPC·물증 오브젝트 배치(`GET map`), 상호작용 반경 안에서 "E: 대화"/"E: 조사" 안내, E키로 `INTERACT_REQUESTED` (창 자동으로 열지 않음) (담당: FE-4)
+- [x] [W2] `PLACE_AT_SPAWN` 처리, 로딩 완료 시 `MAP_READY` (담당: FE-4)
 
 ### 화면 상태·조작
 
