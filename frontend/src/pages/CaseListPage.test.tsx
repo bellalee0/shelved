@@ -1,12 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../app/routes';
 import { seedMockRoom } from '../mocks/roomDb';
 import { server } from '../mocks/node';
 import { setScenario } from '../mocks/scenarios';
 import { loginMockUser, resetLoginState } from '../mocks/testing/loginMockUser';
+
+// 수사 시작 후 이동하는 게임 화면의 Phaser는 jsdom에서 그릴 수 없으므로 빈 화면으로 바꾼다
+vi.mock('../game/PhaserGame', () => ({ PhaserGame: () => null }));
 
 /** 서버로 나간 API 요청("METHOD /path")을 기록한다 */
 function recordRequests() {
