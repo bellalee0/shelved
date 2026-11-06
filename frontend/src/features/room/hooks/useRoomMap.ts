@@ -1,15 +1,25 @@
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { getMap } from '../api';
 
 /**
+ * 맵 정보 쿼리 설정. 맵 정보는 세션 중 바뀌지 않으므로 다시 가져오지 않는다.
+ * 게임 화면의 입장 흐름(useGameSession)이 queryClient.fetchQuery로 같은 캐시를 쓴다.
+ */
+export function roomMapQueryOptions(roomId: number, userId: number) {
+  return queryOptions({
+    queryKey: ['room-map', userId, roomId],
+    queryFn: () => getMap(roomId),
+    staleTime: Infinity,
+  });
+}
+
+/**
  * 게임 맵 정보(GET /api/rooms/{roomId}/map). 인증이 필요한 API라 userId가 null(비로그인)이거나
- * roomId가 올바르지 않으면 요청하지 않는다. 맵 정보는 세션 중 바뀌지 않으므로 다시 가져오지 않는다.
+ * roomId가 올바르지 않으면 요청하지 않는다.
  */
 export function useRoomMap(roomId: number | null, userId: number | null) {
   return useQuery({
-    queryKey: ['room-map', userId, roomId],
-    queryFn: () => getMap(roomId!),
+    ...roomMapQueryOptions(roomId ?? 0, userId ?? 0),
     enabled: userId !== null && roomId !== null,
-    staleTime: Infinity,
   });
 }
