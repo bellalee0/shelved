@@ -136,20 +136,21 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
               <NoteWindow note={note} onClose={windows.closeNote} />
             </div>
           )}
+          {/* 오른쪽 패널도 맵 위에 떠서, 열고 닫아도 맵 영역 크기가 변하지 않는다(맵이 움직이지 않는다) */}
+          {windows.panel && (
+            <aside className="absolute top-0 right-0 z-10 h-full w-96">
+              <RightPanelContent
+                key={windows.panelOpenCount}
+                panel={windows.panel}
+                roomId={roomId}
+                briefing={session.briefing}
+                mapData={session.mapData}
+                onSessionRejected={session.handleSessionRejected}
+                onClose={windows.closePanel}
+              />
+            </aside>
+          )}
         </div>
-        {windows.panel && (
-          <aside className="w-96 shrink-0">
-            <RightPanelContent
-              key={windows.panelOpenCount}
-              panel={windows.panel}
-              roomId={roomId}
-              briefing={session.briefing}
-              mapData={session.mapData}
-              onSessionRejected={session.handleSessionRejected}
-              onClose={windows.closePanel}
-            />
-          </aside>
-        )}
       </div>
       <SessionOverlay
         phase={session.phase}
