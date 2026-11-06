@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { EvidencePanel } from '../features/evidence/components/EvidencePanel';
+import { NoteWindow, useNote } from '../features/note';
 import { NpcPanel } from '../features/npc/components/NpcPanel';
 import { BriefingPanel } from '../features/room/components/BriefingPanel';
 import { ExitDialog } from '../features/room/components/ExitDialog';
@@ -13,8 +14,8 @@ import { useGameWindows } from '../features/room/hooks/useGameWindows';
 import { useInteractRequests } from '../features/room/hooks/useInteractRequests';
 import { useMapInputSync } from '../features/room/hooks/useMapInputSync';
 import { useMapLoadStatus } from '../features/room/hooks/useMapLoadStatus';
-import { type NoteFlushOutcome, useSaveAndExit } from '../features/room/hooks/useSaveAndExit';
-import { canMoveOnMap } from '../features/room/inputPermission';
+import { useSaveAndExit } from '../features/room/hooks/useSaveAndExit';
+import { canMoveOnMap, canOperateSession } from '../features/room/inputPermission';
 import type { RoomBriefingResponse, RoomMapResponse } from '../features/room/types';
 
 // Phaser는 용량이 커서 게임 화면에 들어올 때만 따로 내려받는다
@@ -26,10 +27,6 @@ function parseRoomId(value: string | undefined) {
   const roomId = Number(value);
   return Number.isInteger(roomId) && roomId > 0 ? roomId : null;
 }
-
-// 개인 노트(FE-6) 연결 전 자리. 연결하면 useNote의 flush·hasUnsavedDraft로 바꾼다
-const flushNotePlaceholder = async (): Promise<NoteFlushOutcome> => 'NO_CHANGES';
-const HAS_UNSAVED_DRAFT_PLACEHOLDER = false;
 
 /** 게임 화면(/rooms/:roomId). 주소의 roomId를 확인한 뒤 실제 화면을 조립한다 */
 export function GamePage() {
@@ -73,23 +70,34 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
     disconnect();
     navigate('/');
   }, [disconnect, navigate]);
-  const exit = useSaveAndExit({ roomId, flushNote: flushNotePlaceholder, onLeave: handleLeave });
 
-  const conditions = {
+  const baseConditions = {
     mapReady: map.status === 'ready',
     hasConnection: session.hasConnection,
     connectionReplaced: session.phase === 'replaced',
-    // 나가기 진행 창도 열린 창으로 본다 (그동안 이동하지 않게)
-    hasOpenWindow: windows.hasOpenWindow || exit.step !== 'idle',
+    hasOpenWindow: windows.hasOpenWindow,
     hasOverlay,
     status: session.roomState?.timer.status ?? null,
     displayRemainingMs: session.displayRemainingMs,
     awaitingGrading: session.roomState?.timer.awaitingGrading ?? false,
   };
-  const mapInputEnabled = canMoveOnMap(conditions);
-  // 노트 연결 시 canOperateSession(conditions)을 useNote의 operable로 넘긴다
+  // 노트는 창이 열려 있어도 저장할 수 있어야 하므로 맵 준비·열린 창과 무관한 canOperateSession을 쓴다.
+  // 노트 창이 닫혀 있어도 flush가 동작하도록 항상 호출한다
+  const note = useNote({
+    roomId,
+    userId,
+    operable: canOperateSession(baseConditions),
+    // 연결 교체면 교체 안내, 그 외(진행 중 아님·시간 만료)는 상태를 다시 조회해 분기한다
+    onSessionRejected: session.handleSessionRejected,
+  });
+  const exit = useSaveAndExit({ roomId, flushNote: note.flush, onLeave: handleLeave });
+  const mapInputEnabled = canMoveOnMap({
+    ...baseConditions,
+    // 나가기 진행 창도 열린 창으로 본다 (그동안 이동하지 않게)
+    hasOpenWindow: baseConditions.hasOpenWindow || exit.step !== 'idle',
+  });
 
-  useMapInputSync(conditions.mapReady, mapInputEnabled);
+  useMapInputSync(baseConditions.mapReady, mapInputEnabled);
   useInteractRequests(mapInputEnabled, ({ type, targetId }) => {
     windows.openPanel(
       type === 'EVIDENCE'
@@ -109,6 +117,7 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
           roomState={session.roomState}
           displayRemainingMs={session.displayRemainingMs}
           isConnectionUnstable={session.isConnectionUnstable}
+          onOpenNote={windows.openNote}
           onOpenBriefing={() => windows.openPanel({ kind: 'BRIEFING' })}
           onExit={() => void exit.start()}
           actionsEnabled={session.phase === 'playing' && exit.step === 'idle'}
@@ -120,6 +129,12 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
             <Suspense fallback={null}>
               <PhaserGame key={map.gameKey} mapData={session.mapData} />
             </Suspense>
+          )}
+          {/* 노트 창은 맵 위에 떠서 오른쪽 패널과 동시에 열 수 있다 */}
+          {windows.noteOpen && (
+            <div className="absolute top-4 left-4 z-10 max-h-[calc(100%-2rem)] overflow-y-auto">
+              <NoteWindow note={note} onClose={windows.closeNote} />
+            </div>
           )}
         </div>
         {windows.panel && (
@@ -144,7 +159,7 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
         mapStatus={map.status}
         actionError={session.actionError}
         isSubmitting={session.isSubmitting}
-        hasUnsavedDraft={HAS_UNSAVED_DRAFT_PLACEHOLDER}
+        hasUnsavedDraft={note.hasUnsavedDraft}
         onStart={() => void session.start()}
         onResume={() => void session.resume()}
         onReenter={session.reenter}
