@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useEffect } from 'react';
 import { http, HttpResponse } from 'msw';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -365,5 +365,101 @@ describe('저장 후 나가기', () => {
 
     // then
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+});
+
+describe('게임 화면 개인 노트', () => {
+  it('노트 창은 오른쪽 패널과 동시에 열리고, Esc는 최근 창부터 하나씩 닫는다', async () => {
+    // given
+    await startPlaying();
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '노트' }));
+    fireEvent.click(screen.getByRole('button', { name: '사전 정보' }));
+
+    // then
+    expect(screen.getByRole('region', { name: '개인 노트' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '사전 정보' })).toBeInTheDocument();
+
+    // when
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    // then
+    expect(screen.queryByRole('heading', { name: '사전 정보' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '개인 노트' })).toBeInTheDocument();
+
+    // when
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    // then
+    expect(screen.queryByRole('region', { name: '개인 노트' })).not.toBeInTheDocument();
+    expect(inputEvents.at(-1)).toBe(true);
+  });
+
+  it('노트 창이 열려 있으면 이동은 막히고 노트 자동 저장은 된다', async () => {
+    // given
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { room, user } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '노트' }));
+    const textarea = await screen.findByLabelText('노트 내용');
+
+    // when
+    fireEvent.change(textarea, { target: { value: '9시 15분 메모가 수상하다' } });
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+
+    // then
+    expect(inputEvents.at(-1)).toBe(false);
+    await waitFor(() =>
+      expect(findMockRoom(room.roomId, user.userId)?.note.content).toBe('9시 15분 메모가 수상하다'),
+    );
+    expect(screen.getByRole('region', { name: '개인 노트' })).toBeInTheDocument();
+  });
+
+  it('저장 후 나가기에서 노트 저장이 실패하면 다시 시도 / 그래도 나가기를 보여 준다', async () => {
+    // given
+    const { router, room, user } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '노트' }));
+    const textarea = await screen.findByLabelText('노트 내용');
+    server.use(
+      http.put(`${import.meta.env.VITE_API_BASE_URL}/api/rooms/:roomId/notes/me`, () =>
+        HttpResponse.error(),
+      ),
+    );
+    fireEvent.change(textarea, { target: { value: '저장 안 될 메모' } });
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '저장 후 나가기' }));
+
+    // then
+    const exitDialog = await screen.findByRole('dialog', { name: '저장 후 나가기' });
+    expect(await within(exitDialog).findByText('노트를 저장하지 못했습니다.')).toBeInTheDocument();
+    expect(within(exitDialog).getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+    expect(router.state.location.pathname).not.toBe('/');
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '그래도 나가기 (이 기기에 초안 보관)' }));
+
+    // then
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(findMockRoom(room.roomId, user.userId)?.status).toBe('PAUSED');
+  });
+
+  it('복원 화면은 이 기기에 저장되지 않은 노트 초안이 있으면 알려 준다', async () => {
+    // given 이전 접속에서 저장하지 못한 초안 (키 형식: features/note/draft.ts)
+    const user = await loginMockUser();
+    const room = seedMockRoom(user.userId, { caseId: 1, status: 'PAUSED', remainingMs: 600_000 });
+    localStorage.setItem(
+      `shelved:note-draft:${user.userId}:${room.roomId}`,
+      JSON.stringify({ content: '저장 못 한 초안', baseRevision: 0, savedAt: Date.now() }),
+    );
+
+    // when
+    renderAt(`/rooms/${room.roomId}`);
+
+    // then
+    expect(await screen.findByText('수사를 이어서 진행합니다')).toBeInTheDocument();
+    expect(
+      await screen.findByText('이 기기에 저장되지 않은 노트 초안이 있습니다.'),
+    ).toBeInTheDocument();
   });
 });
