@@ -458,6 +458,8 @@ Tiled(맵 편집기)로 사건 맵을 만들 때 따르는 규칙이다. 용어�
 | 4 | `above` | 캐릭터보다 **위에** 그려질 부분 (키 큰 가구의 윗줄, 문틀 윗부분 등) |
 | 5 | `collision` | 충돌 표시. 게임에서 보이지 않음 |
 
+가로 벽은 `above`에 넣지 않는다. 캐릭터가 벽 앞(남쪽)에 서면 몸이 가려진다. `above`는 캐릭터가 그 밑을 지나가는 것(문틀 윗부분, 나무 윗부분 등)에만 쓴다.
+
 - `collision` 레이어는 `RoomMapResponse.collisionLayer`(시드 JSON `map.collisionLayer`)와 **같은 이름**이어야 한다. 이름을 바꾸려면 시드의 값도 함께 바꾼다.
 - 충돌 표시: 지나갈 수 없는 칸에 `collision-marker` 타일셋의 빨간 타일을 찍는다. **빈 칸이 아닌 칸 = 막힘**이다. 벽과 가구가 놓인 칸은 모두 찍어야 한다. 레이어는 Tiled에서 `보이기`를 끈 채로 저장한다(Phaser에서도 그리지 않는다).
 - `above`는 쓰지 않아도 되지만 레이어는 비워서라도 둔다. 필수 레이어(`ground`, `walls`, `decor`, `above`, `collision`)는 `assetManifest.test.ts`가 검사한다.
