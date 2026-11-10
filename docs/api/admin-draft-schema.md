@@ -37,7 +37,7 @@
 | `card` | 카드 정보 | `CASES.display_title`, `difficulty`, `keyword_tags` |
 | `source` | 원작 정보 | `CASES.source_novel_title`, `source_novel_author`, `source_novel_intro` |
 | `briefing` | 사전 정보 | `CASES.introduction`, `investigation_goal`, `background_knowledge` |
-| `suspects` | 등장인물 / NPC 설정 | `SUSPECTS` (`persona`는 `persona_prompt`로 변환), `CASES.culprit_suspect_id` |
+| `suspects` | 등장인물 / NPC 설정 | `SUSPECTS` (`publicIntro`는 `public_intro`, `persona`는 `persona_prompt`로 변환), `CASES.culprit_suspect_id` |
 | `evidences` | 물증 | `EVIDENCES` |
 | `trick` | 트릭 · 판정 기준 | `CASES.trick_summary`, `CASE_TRICK_ELEMENTS` |
 | `revealExplanation` | 리빌 해설 | `CASES.reveal_explanation` |
@@ -56,6 +56,7 @@
 | 카드 제목·원작 제목·작가·인물 및 물증 이름 | 각 1~100자 |
 | `keywordTags` | 1~5개, 각 1~20자, 중복 불가 |
 | 인물·물증·트릭 요소 목록 | 각각 최대 50명·100개·5개. 최소 개수는 확정 검사 참조 |
+| 인물 `publicIntro` | `null` 또는 1~200자 |
 | 소개·목표·배경지식·역할·말투·추궁 반응·물증 설명·트릭 설명·리빌 해설·판정 기준 및 기타 설명 문자열 | 각 1~10000자. nullable 필드는 `null` 허용 |
 | `SourceRef.location` / `quote` | 1~200자 / 1~10000자 |
 | 지식·진술·거짓말·침묵·진술 변경·원문 근거·지원 단서·인정/불인정 예시 배열 | 각 최대 100개. 빈 배열 허용 여부는 확정 검사 참조 |
@@ -115,6 +116,7 @@
 | `entityId` | number \| null | 확정 후 연결된 `SUSPECTS.id`. 확정 전 `null` |
 | `name` | string | 한국어 표기 (용어집을 따름) |
 | `role` | string | 인물 개요 (관리자 검수용, 플레이어 비공개) |
+| `publicIntro` | string \| null | 플레이어에게 공개하는 한 줄 소개(사전 정보에 표시, 1~200자). 범인·트릭을 암시하지 않음 |
 | `canConverse` | boolean | 대화 가능 여부. `false`여도 지목 대상에는 포함 |
 | `isCulprit` | boolean | 범인 여부. 초안 전체에서 정확히 1명 |
 | `spriteKey` | string \| null | 정적 에셋 목록의 스프라이트 식별자 |
@@ -199,6 +201,7 @@
       "entityId": null,
       "name": "해리스",
       "role": "저택의 집사. 20년째 근무",
+      "publicIntro": "저택의 집사",
       "canConverse": true,
       "isCulprit": true,
       "spriteKey": "npc-butler-01",
@@ -261,7 +264,7 @@
 | `set_card_info` | `displayTitle?`, `difficulty?`, `keywordTags?` | 준 필드만 교체 |
 | `set_source_info` | `novelTitle?`, `novelAuthor?`, `novelIntro?` | 준 필드만 교체 |
 | `set_briefing` | `introduction?`, `investigationGoal?`, `backgroundKnowledge?` | 준 필드만 교체 |
-| `add_suspect` | `name`, `role`, `canConverse`, `isCulprit`, `spriteKey?`, `persona?` | 추가 후 발급된 `key` 반환 |
+| `add_suspect` | `name`, `role`, `publicIntro?`, `canConverse`, `isCulprit`, `spriteKey?`, `persona?` | 추가 후 발급된 `key` 반환 |
 | `update_suspect` | `key` + 바꿀 필드 | 준 필드만 교체 (`persona`는 그 안의 준 필드만 교체) |
 | `remove_suspect` | `key` | 삭제 |
 | `add_evidence` | `name`, `description`, `sourceRefs?` | 추가 후 `key` 반환 |
@@ -321,11 +324,13 @@
 | 트릭 요소에 `supportingClues`가 없음 (자백 없이 추론 가능한지 확인 필요) | WARNING |
 | 설정 항목에 `sourceRefs`가 없음 | WARNING |
 | 대화 가능 인물의 `spriteKey`가 없음 | WARNING (필수 배치 후 출시 검사에서 ERROR). 미배치·대화 불가능 인물은 `null` 허용 |
+| 대화 가능 인물의 `publicIntro`가 비어 있음 | WARNING |
 | 지정한 `spriteKey`가 에셋 목록에 없음 | ERROR |
 | 문자열·배열·숫자 제약 위반 또는 중복 순서 | ERROR |
 
 **반영 방식**
 
+- `publicIntro`는 `SUSPECTS.public_intro`에 그대로 저장합니다. `role`은 초안에만 남깁니다(플레이어 비공개).
 - `persona`는 서버가 `src/main/resources/prompts/`의 템플릿으로 텍스트로 변환해 `SUSPECTS.persona_prompt`에 저장합니다. 원작 근거(`sourceRefs`)와 `supportingClues`는 초안에만 남깁니다(관리자 검수용).
 - `rubric`은 `CASE_TRICK_ELEMENTS.grading_rubric`(jsonb)에 그대로 저장하되 `evidenceKeys`/`suspectKeys`는 엔티티 ID로 바꿔 저장합니다.
 - 삭제된 인물·물증을 가리키던 맵 배치(`MAP_HOTSPOTS`)는 제거하고 응답의 `removedHotspots`로 알립니다.

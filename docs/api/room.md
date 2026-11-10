@@ -245,6 +245,18 @@ AI 내부 입력 컨텍스트(`input_json`의 프롬프트 등)는 포함하지 
 | `timeLimitSec` | number | |
 | `hintLimit` | number | |
 | `accusationLimit` | number | `3` |
+| `suspects` | BriefingSuspect[] | 등장인물. 지목 대상 전체(맵 미배치·대화 불가 인물 포함), `suspectId` 오름차순 |
+
+#### BriefingSuspect
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `suspectId` | number | |
+| `name` | string | |
+| `spriteKey` | string \| null | 얼굴 표시용. 미배치 인물은 `null`일 수 있음 |
+| `publicIntro` | string \| null | 플레이어에게 공개하는 한 줄 소개. 없으면 `null` |
+
+범인 여부·`role`·NPC 내부 설정은 포함하지 않습니다.
 
 ---
 
