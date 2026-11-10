@@ -140,3 +140,70 @@ describe('useGameSession 늦게 도착한 시작·이어하기 응답', () => {
     expect(placeAtSpawn).not.toHaveBeenCalled();
   });
 });
+
+describe('useGameSession 입장 시 맵 조회 실패', () => {
+  it('종료 상태면 맵 조회가 실패해도 ended로 간다', async () => {
+    // given
+    vi.mocked(getRoomState).mockResolvedValue(stateOf(timerOf({ status: 'CLEARED' })));
+    vi.mocked(getMap).mockRejectedValue(new Error('맵 실패'));
+
+    // when
+    const { result } = renderSession();
+
+    // then
+    await waitFor(() => expect(result.current.phase).toBe('ended'));
+  });
+
+  it('채점 대기면 맵·사전 정보 조회가 실패해도 awaitingGrading으로 간다', async () => {
+    // given
+    vi.mocked(getRoomState).mockResolvedValue(
+      stateOf(timerOf({ status: 'PAUSED', remainingMs: 0, awaitingGrading: true })),
+    );
+    vi.mocked(getMap).mockRejectedValue(new Error('맵 실패'));
+    vi.mocked(getBriefing).mockRejectedValue(new Error('사전 정보 실패'));
+
+    // when
+    const { result } = renderSession();
+
+    // then
+    await waitFor(() => expect(result.current.phase).toBe('awaitingGrading'));
+    expect(result.current.mapData).toBeNull();
+    expect(result.current.briefing).toBeNull();
+  });
+
+  it('진행할 수 있는 상태면 맵 조회가 실패했을 때 enterFailed로 간다', async () => {
+    // given
+    vi.mocked(getMap).mockRejectedValue(new Error('맵 실패'));
+
+    // when
+    const { result } = renderSession();
+
+    // then
+    await waitFor(() => expect(result.current.phase).toBe('enterFailed'));
+    expect(result.current.enterError).toBe('맵 실패');
+  });
+
+  it('state 조회가 실패하면 enterFailed로 간다', async () => {
+    // given
+    vi.mocked(getRoomState).mockRejectedValue(new Error('상태 실패'));
+
+    // when
+    const { result } = renderSession();
+
+    // then
+    await waitFor(() => expect(result.current.phase).toBe('enterFailed'));
+    expect(result.current.enterError).toBe('상태 실패');
+  });
+
+  it('세 요청은 응답을 기다리지 않고 함께 보낸다', async () => {
+    // given
+    vi.mocked(getRoomState).mockReturnValue(new Promise(() => undefined));
+
+    // when
+    renderSession();
+
+    // then
+    await waitFor(() => expect(getMap).toHaveBeenCalled());
+    expect(getBriefing).toHaveBeenCalled();
+  });
+});

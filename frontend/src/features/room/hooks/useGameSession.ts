@@ -111,20 +111,7 @@ export function useGameSession(roomId: number, userId: number) {
 
   const runEntry = useCallback(
     async (run: number) => {
-      try {
-        await pauseRoom(roomId);
-        const [roomState, briefing, mapData] = await Promise.all([
-          getRoomState(roomId),
-          getBriefing(roomId),
-          queryClient.fetchQuery(roomMapQueryOptions(roomId, userId)),
-        ]);
-        // 힌트(GET hints)·지목(GET accusations) 복원은 3~4주차 API가 생기면 여기에 함께 불러온다
-        if (run !== runRef.current) {
-          return;
-        }
-        setSession((prev) => ({ ...prev, briefing, mapData }));
-        applyTimer(roomState.timer, { connection: null, roomState });
-      } catch (error) {
+      const fail = (error: unknown) => {
         if (run !== runRef.current) {
           return;
         }
@@ -133,7 +120,50 @@ export function useGameSession(roomId: number, userId: number) {
           phase: 'enterFailed',
           enterError: error instanceof Error ? error.message : String(error),
         }));
+      };
+      try {
+        await pauseRoom(roomId);
+      } catch (error) {
+        fail(error);
+        return;
       }
+      // 세 요청은 함께 보내되, 하나가 실패해도 나머지 결과를 보고 분기한다
+      const [stateResult, briefingResult, mapResult] = await Promise.allSettled([
+        getRoomState(roomId),
+        getBriefing(roomId),
+        queryClient.fetchQuery(roomMapQueryOptions(roomId, userId)),
+      ]);
+      // 힌트(GET hints)·지목(GET accusations) 복원은 3~4주차 API가 생기면 여기에 함께 불러온다
+      if (run !== runRef.current) {
+        return;
+      }
+      if (stateResult.status === 'rejected') {
+        fail(stateResult.reason);
+        return;
+      }
+      const roomState = stateResult.value;
+      const briefing = briefingResult.status === 'fulfilled' ? briefingResult.value : null;
+      const mapData = mapResult.status === 'fulfilled' ? mapResult.value : null;
+      // 종료(결과 화면 이동)·채점 대기 화면은 사전 정보·맵을 쓰지 않으므로 그 조회 결과와 관계없이 들어간다
+      const phase = decideSessionPhase(roomState.timer, false);
+      const needsMap = phase !== 'ended' && phase !== 'awaitingGrading';
+      if (needsMap && (briefing === null || mapData === null)) {
+        fail(
+          briefingResult.status === 'rejected'
+            ? briefingResult.reason
+            : mapResult.status === 'rejected'
+              ? mapResult.reason
+              : null,
+        );
+        return;
+      }
+      // 실패한 쪽은 이전에 받은 값을 그대로 둔다 (재입장 중 이미 그린 맵을 지우지 않게)
+      setSession((prev) => ({
+        ...prev,
+        briefing: briefing ?? prev.briefing,
+        mapData: mapData ?? prev.mapData,
+      }));
+      applyTimer(roomState.timer, { connection: null, roomState });
     },
     [roomId, userId, queryClient, applyTimer],
   );
