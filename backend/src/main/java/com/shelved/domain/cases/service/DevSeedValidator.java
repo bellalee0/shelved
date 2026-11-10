@@ -17,6 +17,8 @@ import java.util.Set;
  */
 final class DevSeedValidator {
 
+    private static final int PUBLIC_INTRO_MAX_LENGTH = 200;
+
     private DevSeedValidator() {
     }
 
@@ -62,6 +64,10 @@ final class DevSeedValidator {
             }
             if (isBlank(suspect.name())) {
                 reasons.add("인물 이름 누락: " + suspect.key());
+            }
+            if (suspect.publicIntro() != null
+                    && (suspect.publicIntro().isBlank() || suspect.publicIntro().length() > PUBLIC_INTRO_MAX_LENGTH)) {
+                reasons.add("publicIntro는 1~" + PUBLIC_INTRO_MAX_LENGTH + "자: " + suspect.key());
             }
         }
         long culpritCount = suspects.stream().filter(Draft.SuspectItem::isCulprit).count();

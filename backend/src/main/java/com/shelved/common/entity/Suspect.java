@@ -38,6 +38,10 @@ public class Suspect {
     @Column(name = "sprite_key")
     private String spriteKey;
 
+    // 플레이어에게 공개하는 한 줄 소개(사전 정보 표시). 없으면 null
+    @Column(name = "public_intro", length = 200)
+    private String publicIntro;
+
     // 정답 보호: 리빌 전 플레이어 응답에 포함하지 않음
     @Column(name = "is_culprit", nullable = false)
     private boolean culprit;
@@ -51,6 +55,7 @@ public class Suspect {
             String name,
             String personaPrompt,
             String spriteKey,
+            String publicIntro,
             boolean culprit,
             boolean canConverse
     ) {
@@ -58,6 +63,7 @@ public class Suspect {
         this.name = name;
         this.personaPrompt = personaPrompt;
         this.spriteKey = spriteKey;
+        this.publicIntro = publicIntro;
         this.culprit = culprit;
         this.canConverse = canConverse;
     }
