@@ -53,6 +53,7 @@ const INITIAL_SESSION: SessionData = {
  * - start·resume은 사용자 버튼으로만 보낸다 (StrictMode에서 effect가 두 번 돌아도 한 번만 나가게)
  * - 페이지를 떠날 때 pause를 보내지 않는다. 하트비트를 멈추고 connectionId만 지운다 (탭 닫기는 서버 이탈 감지가 처리)
  * - connectionId는 메모리(setConnectionId)에만 둔다
+ * - 연결을 잃었다가 다시 연결하면(재입장, 하트비트 PAUSED 뒤 이어하기) reconnectKey를 올려 노트를 다시 받게 한다
  */
 export function useGameSession(roomId: number, userId: number) {
   const navigate = useNavigate();
@@ -64,11 +65,18 @@ export function useGameSession(roomId: number, userId: number) {
   const runRef = useRef(0);
   // start·resume·재조회 중복 실행 방지. 같은 틱의 두 번 클릭도 막도록 ref로 본다
   const submittingRef = useRef(false);
+  // 이 화면이 연결을 잃었다가 다시 연결할 때마다 1씩 올린다. 노트가 이 값으로 서버 내용을 다시 받는다
+  const [reconnectKey, setReconnectKey] = useState(0);
+  // 연결이 있다가 사라졌는지 (하트비트 PAUSED·연결 교체 등). 다음 start·resume 성공이 재연결이다
+  const lostConnectionRef = useRef(false);
 
   // 현재 연결. 응답 처리 중 최신 값을 동기적으로 보려고 상태와 함께 ref에도 둔다
   const connectionRef = useRef<Connection | null>(null);
 
   const updateConnection = useCallback((connection: Connection | null) => {
+    if (connectionRef.current !== null && connection === null) {
+      lostConnectionRef.current = true;
+    }
     connectionRef.current = connection;
     setConnectionId(connection?.connectionId ?? null);
   }, []);
@@ -142,6 +150,9 @@ export function useGameSession(roomId: number, userId: number) {
   const reenter = useCallback(() => {
     updateConnection(null);
     setActionError(null);
+    // 다시 들어오는 동안 다른 화면이 저장했을 수 있는 노트를 함께 다시 받는다 (room.md 재접속 흐름의 GET notes/me)
+    lostConnectionRef.current = false;
+    setReconnectKey((key) => key + 1);
     setSession((prev) => ({ ...prev, phase: 'entering', enterError: null, connection: null }));
     void runEntry(++runRef.current);
   }, [runEntry, updateConnection]);
@@ -172,12 +183,18 @@ export function useGameSession(roomId: number, userId: number) {
       setActionError(null);
       try {
         const response = await request(roomId);
+        const reconnected = lostConnectionRef.current;
         applyTimer(response.timer, {
           connection: {
             connectionId: response.connectionId,
             heartbeatIntervalMs: response.heartbeatIntervalMs,
           },
         });
+        if (reconnected && connectionRef.current !== null) {
+          // 연결이 끊긴 사이 다른 화면이 노트를 저장했을 수 있다
+          lostConnectionRef.current = false;
+          setReconnectKey((key) => key + 1);
+        }
         // 재접속은 항상 시작점에서 한다. 버튼은 MAP_READY 뒤에만 눌리므로 Scene이 구독 중이다
         EventBus.emit(GameEvents.PLACE_AT_SPAWN);
       } catch (error) {
@@ -261,6 +278,8 @@ export function useGameSession(roomId: number, userId: number) {
     briefing: session.briefing,
     mapData: session.mapData,
     hasConnection: session.connection !== null,
+    /** 연결을 잃었다가 다시 연결할 때마다 바뀐다. useNote의 resyncKey로 넘긴다 */
+    reconnectKey,
     displayRemainingMs,
     isConnectionUnstable: heartbeatState.isUnstable,
     /** start·resume 실패 문구 (409는 재조회로 처리하므로 여기에 오지 않는다) */

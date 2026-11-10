@@ -39,6 +39,8 @@ const SESSION_REJECT_CODES = new Set([
   'CONNECTION_ID_REQUIRED',
 ]);
 
+type ServerNote = Pick<NoteResponse, 'content' | 'revision' | 'maxLength'>;
+
 export type AutosaveDeps = {
   save: (content: string, revision: number) => Promise<NoteResponse>;
   delayMs: number;
@@ -50,7 +52,17 @@ export type Autosave = {
   getState: () => NoteState;
   subscribe: (listener: () => void) => () => void;
   /** 서버에서 불러온 노트로 시작한다. 한 번만 적용된다 */
-  init: (note: Pick<NoteResponse, 'content' | 'revision' | 'maxLength'>) => void;
+  init: (note: ServerNote) => void;
+  /**
+   * 재접속으로 서버 노트를 다시 받기 시작한다. 예약된 저장을 취소하고, 다시 맞출 때까지
+   * 불러오는 중으로 보이며 입력·저장을 막는다. 진행 중인 저장이 끝나면 resolve된다(그 뒤에 조회해야 최신이다)
+   */
+  beginResync: () => Promise<void>;
+  /**
+   * 다시 받은 서버 노트로 맞춘다. 진행 중인 저장이 있으면 끝난 뒤 맞춘다.
+   * 서버와 다른 미저장 내용이 있으면 초안으로 남기고 초안 선택(pendingDraft)을 띄운다
+   */
+  resync: (note: ServerNote) => void;
   setContent: (content: string) => void;
   setOperable: (operable: boolean) => void;
   /** 세션 거부 알림을 받을 함수를 바꾼다 (화면이 다시 그려져도 같은 컨트롤러를 쓰기 위해) */
@@ -96,6 +108,10 @@ export function createAutosave(deps: AutosaveDeps): Autosave {
   let blockedCode: string | null = null;
   let pendingDraft: NoteDraft | null = null;
   let operable = false;
+  /** 재접속으로 서버 노트를 다시 받는 중 (beginResync ~ resync 적용) */
+  let resyncing = false;
+  /** 진행 중인 저장이 끝나면 적용할 서버 노트. 여러 번 오면 마지막 것만 쓴다 */
+  let resyncNote: ServerNote | null = null;
   let onSessionRejected = deps.onSessionRejected;
 
   function isDirty() {
@@ -103,7 +119,7 @@ export function createAutosave(deps: AutosaveDeps): Autosave {
   }
 
   function computeStatus(): NoteSaveStatus {
-    if (!loaded) return 'LOADING';
+    if (!loaded || resyncing) return 'LOADING';
     if (conflict) return 'CONFLICT';
     if (saving) return 'SAVING';
     if (content.length > maxLength || invalidInput) return 'TOO_LONG';
@@ -114,7 +130,7 @@ export function createAutosave(deps: AutosaveDeps): Autosave {
 
   function buildState(): NoteState {
     return {
-      loaded,
+      loaded: loaded && !resyncing,
       content,
       serverContent,
       revision,
@@ -145,6 +161,7 @@ export function createAutosave(deps: AutosaveDeps): Autosave {
   function canSend() {
     return (
       loaded &&
+      !resyncing &&
       operable &&
       !conflict &&
       !blockedCode &&
@@ -246,6 +263,40 @@ export function createAutosave(deps: AutosaveDeps): Autosave {
     return current;
   }
 
+  /** resync의 실제 적용. 진행 중인 저장이 없을 때만 부른다 */
+  function applyResync() {
+    const note = resyncNote;
+    if (!note || !resyncing) {
+      return;
+    }
+    resyncNote = null;
+    // 이 화면의 미저장 내용: 고르지 않은 초안 > 입력 중 내용 > 이 기기에 보관된 초안
+    const storedDraft = deps.draftStore.read();
+    const unsaved: NoteDraft | null =
+      pendingDraft ??
+      (isDirty() ? { content, baseRevision: revision, savedAt: Date.now() } : null) ??
+      storedDraft;
+
+    resyncing = false;
+    loaded = true;
+    content = note.content;
+    serverContent = note.content;
+    revision = note.revision;
+    maxLength = note.maxLength;
+    conflict = null;
+    failed = false;
+    invalidInput = false;
+    if (unsaved && unsaved.content !== note.content) {
+      // 서버 내용을 기준으로 삼고, 미저장 내용은 초안으로 남겨 이어 쓸지 버릴지 고르게 한다
+      pendingDraft = unsaved;
+      deps.draftStore.write(unsaved.content, unsaved.baseRevision);
+    } else {
+      pendingDraft = null;
+      deps.draftStore.clear();
+    }
+    emit();
+  }
+
   return {
     getState: () => state,
     subscribe(listener) {
@@ -269,9 +320,28 @@ export function createAutosave(deps: AutosaveDeps): Autosave {
       }
       emit();
     },
+    beginResync() {
+      clearTimer();
+      resyncing = true;
+      emit();
+      const pending = inflight;
+      return pending ? pending.then(() => undefined) : Promise.resolve();
+    },
+    resync(note) {
+      clearTimer();
+      resyncing = true;
+      resyncNote = note;
+      const pending = inflight;
+      if (pending) {
+        void pending.then(applyResync);
+      } else {
+        applyResync();
+      }
+    },
     setContent(next) {
-      // 이 기기의 미저장 초안을 이어 쓸지 버릴지 고르기 전에는 입력을 받지 않는다(초안을 덮어쓰지 않기 위해)
-      if (!loaded || pendingDraft) {
+      // 이 기기의 미저장 초안을 이어 쓸지 버릴지 고르기 전에는 입력을 받지 않는다(초안을 덮어쓰지 않기 위해).
+      // 서버 노트를 다시 받는 중에도 받지 않는다
+      if (!loaded || resyncing || pendingDraft) {
         return;
       }
       content = next;

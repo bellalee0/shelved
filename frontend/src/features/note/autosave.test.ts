@@ -505,3 +505,121 @@ describe('로컬 초안', () => {
     vi.restoreAllMocks();
   });
 });
+
+describe('서버 노트로 다시 맞추기 (재접속)', () => {
+  it('다시 받는 동안에는 불러오는 중으로 보이고 입력을 받지 않는다', async () => {
+    // given
+    const { autosave, save } = setup();
+
+    // when
+    void autosave.beginResync();
+    autosave.setContent('다시 받는 중 입력');
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    // then
+    expect(autosave.getState().loaded).toBe(false);
+    expect(autosave.getState().status).toBe('LOADING');
+    expect(autosave.getState().content).toBe('처음');
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('미저장 내용이 없으면 서버 내용과 revision으로 바꾼다', async () => {
+    // given
+    const { autosave, save, draftStore } = setup();
+    void autosave.beginResync();
+
+    // when 다른 탭이 저장한 내용
+    autosave.resync({ content: '다른 탭 내용', revision: 7, maxLength: 20 });
+    await settle();
+
+    // then
+    const state = autosave.getState();
+    expect(state.loaded).toBe(true);
+    expect(state.content).toBe('다른 탭 내용');
+    expect(state.revision).toBe(7);
+    expect(state.pendingDraft).toBeNull();
+    expect(state.status).toBe('SAVED');
+    expect(draftStore.read()).toBeNull();
+
+    // when 이후 입력은 새 revision으로 저장한다
+    autosave.setContent('이어서 입력');
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    // then
+    expect(save).toHaveBeenLastCalledWith('이어서 입력', 7);
+  });
+
+  it('미저장 입력이 있으면 초안으로 남기고 서버 내용을 기준으로 초안 선택을 띄운다', async () => {
+    // given 입력 후 자동 저장이 예약된 상태
+    const { autosave, save, draftStore } = setup();
+    autosave.setContent('내 입력');
+    void autosave.beginResync();
+
+    // when
+    autosave.resync({ content: '다른 탭 내용', revision: 7, maxLength: 20 });
+    await settle();
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    // then 예약된 저장은 취소되고, 선택 전에는 입력을 받지 않는다
+    const state = autosave.getState();
+    expect(save).not.toHaveBeenCalled();
+    expect(state.content).toBe('다른 탭 내용');
+    expect(state.revision).toBe(7);
+    expect(state.pendingDraft?.content).toBe('내 입력');
+    expect(draftStore.read()?.content).toBe('내 입력');
+    autosave.setContent('선택 전 입력');
+    expect(autosave.getState().content).toBe('다른 탭 내용');
+
+    // when 이어 쓰기를 고르면 새 revision으로 저장한다
+    autosave.continueWithDraft();
+    await vi.advanceTimersByTimeAsync(DELAY);
+
+    // then
+    expect(save).toHaveBeenCalledWith('내 입력', 7);
+  });
+
+  it('남아 있던 초안 선택이 서버 내용과 같아지면 선택을 닫는다', async () => {
+    // given
+    createDraftStore(USER_ID, ROOM_ID).write('같은 내용', 4);
+    const { autosave, draftStore } = setup();
+    void autosave.beginResync();
+
+    // when
+    autosave.resync({ content: '같은 내용', revision: 6, maxLength: 20 });
+    await settle();
+
+    // then
+    expect(autosave.getState().pendingDraft).toBeNull();
+    expect(autosave.getState().content).toBe('같은 내용');
+    expect(draftStore.read()).toBeNull();
+  });
+
+  it('진행 중인 저장이 있으면 끝난 뒤 서버 내용으로 맞춘다', async () => {
+    // given
+    const { autosave, save, calls } = setup();
+    autosave.setContent('저장 중 내용');
+    await vi.advanceTimersByTimeAsync(DELAY);
+    expect(calls).toHaveLength(1);
+    const waitForSave = autosave.beginResync();
+
+    // when
+    autosave.resync({ content: '다른 탭 내용', revision: 9, maxLength: 20 });
+    await settle();
+
+    // then 저장이 끝나기 전에는 반영하지 않는다
+    expect(autosave.getState().content).toBe('저장 중 내용');
+    expect(autosave.getState().loaded).toBe(false);
+
+    // when
+    calls[0].resolve();
+    await waitForSave;
+    await settle();
+
+    // then 저장된 내용은 미저장이 아니므로 서버 내용으로 바뀐다
+    const state = autosave.getState();
+    expect(state.content).toBe('다른 탭 내용');
+    expect(state.revision).toBe(9);
+    expect(state.pendingDraft).toBeNull();
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+});

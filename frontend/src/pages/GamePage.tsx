@@ -89,6 +89,8 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
     operable: canOperateSession(baseConditions),
     // 연결 교체면 교체 안내, 그 외(진행 중 아님·시간 만료)는 상태를 다시 조회해 분기한다
     onSessionRejected: session.handleSessionRejected,
+    // 재접속하면 다른 화면이 저장했을 수 있는 최신 노트를 다시 받는다
+    resyncKey: session.reconnectKey,
   });
   const exit = useSaveAndExit({ roomId, flushNote: note.flush, onLeave: handleLeave });
   const mapInputEnabled = canMoveOnMap({
