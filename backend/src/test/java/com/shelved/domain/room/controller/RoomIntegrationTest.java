@@ -29,6 +29,7 @@ import com.shelved.fixture.ClocktowerCaseFixture;
 import com.shelved.fixture.ClocktowerCaseFixture.SampleCase;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import com.jayway.jsonpath.JsonPath;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -334,8 +335,18 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.backgroundKnowledge").value(ClocktowerCaseFixture.BACKGROUND_KNOWLEDGE))
                 .andExpect(jsonPath("$.data.timeLimitSec").value(1200))
                 .andExpect(jsonPath("$.data.hintLimit").value(5))
-                .andExpect(jsonPath("$.data.accusationLimit").value(3));
-        assertThat(result.andReturn().getResponse().getContentAsString()).doesNotContain(
+                .andExpect(jsonPath("$.data.accusationLimit").value(3))
+                .andExpect(jsonPath("$.data.suspects.length()").value(4))
+                .andExpect(jsonPath("$.data.suspects[0].name").value("해리스"))
+                .andExpect(jsonPath("$.data.suspects[0].spriteKey").value("npc-butler-01"))
+                .andExpect(jsonPath("$.data.suspects[0].publicIntro").value("저택의 집사"))
+                .andExpect(jsonPath("$.data.suspects[3].name").value("엘리스"))
+                .andExpect(jsonPath("$.data.suspects[3].spriteKey").doesNotExist());
+        String body = result.andReturn().getResponse().getContentAsString();
+        assertThat(body).doesNotContain("role", "culprit", "Culprit", "persona", "canConverse");
+        List<Number> ids = JsonPath.read(body, "$.data.suspects[*].suspectId");
+        assertThat(ids).isSorted();
+        assertThat(body).doesNotContain(
                 ClocktowerCaseFixture.SOURCE_NOVEL_TITLE,
                 ClocktowerCaseFixture.TRICK_SUMMARY,
                 ClocktowerCaseFixture.REVEAL_EXPLANATION,

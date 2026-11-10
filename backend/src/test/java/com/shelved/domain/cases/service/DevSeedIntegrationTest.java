@@ -88,6 +88,8 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
                             tuple("톰", false, true, "npc-workman-01"),
                             tuple("엘리스", false, false, null));
             assertThat(suspects).allSatisfy(suspect -> assertThat(suspect.getPersonaPrompt()).isNull());
+            assertThat(suspects).extracting(Suspect::getPublicIntro)
+                    .containsExactly("저택의 집사", "저택의 가정부", "저택의 정원사", "저택 주인의 주치의");
 
             List<Evidence> evidences = listByCase(Evidence.class, caseId);
             assertThat(evidences).extracting(Evidence::getName).containsExactly("서재의 작은 상자", "찢긴 메모");
@@ -121,6 +123,28 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
             assertThat(draft.trick().elements()).extracting(Draft.TrickElementItem::entityId)
                     .containsExactly(elements.getFirst().getId());
             assertThat(draft.suspects().getFirst().persona().speechStyle()).isNotBlank();
+            assertThat(draft.suspects().getFirst().publicIntro()).isEqualTo("저택의 집사");
+        });
+    }
+
+    @Test
+    void loadAll_publicIntro없는기존형식시드_null로저장() throws IOException {
+
+        // given: 모든 인물에서 publicIntro 필드를 제거한 기존 형식
+        String title = writeSeed("legacy.json",
+                seed -> array(seed, "suspects").forEach(node -> ((ObjectNode) node).remove("publicIntro")));
+
+        // when
+        DevSeedLoadResult result = devSeedService.loadAll(seedPath());
+
+        // then
+        assertThat(result).isEqualTo(new DevSeedLoadResult(1, 0, 0));
+        transactionTemplate.executeWithoutResult(status -> {
+            Long caseId = findPublishedCases(title).getFirst().getId();
+            assertThat(listByCase(Suspect.class, caseId)).extracting(Suspect::getPublicIntro)
+                    .containsOnlyNulls();
+            Draft draft = listByCase(CaseDraft.class, caseId).getFirst().getDraftJson();
+            assertThat(draft.suspects()).extracting(Draft.SuspectItem::publicIntro).containsOnlyNulls();
         });
     }
 
@@ -154,6 +178,10 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
                 });
         String unplacedEvidence = writeSeed("4-unplaced-evidence.json",
                 seed -> array(object(seed, "map"), "hotspots").remove(4));
+        String longIntro = writeSeed("7-long-intro.json",
+                seed -> ((ObjectNode) array(seed, "suspects").get(0)).put("publicIntro", "가".repeat(201)));
+        String blankIntro = writeSeed("8-blank-intro.json",
+                seed -> ((ObjectNode) array(seed, "suspects").get(0)).put("publicIntro", " "));
         Files.writeString(seedDir.resolve("5-broken.json"), "{ \"schemaVersion\": 1, ");
         String valid = writeSeed("6-valid.json", seed -> { });
 
@@ -161,12 +189,14 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
         DevSeedLoadResult result = devSeedService.loadAll(seedPath());
 
         // then
-        assertThat(result).isEqualTo(new DevSeedLoadResult(1, 0, 5));
+        assertThat(result).isEqualTo(new DevSeedLoadResult(1, 0, 7));
         transactionTemplate.executeWithoutResult(status -> {
             assertThat(findPublishedCases(twoCulprits)).isEmpty();
             assertThat(findPublishedCases(unknownHotspotKey)).isEmpty();
             assertThat(findPublishedCases(unknownFeedbackKey)).isEmpty();
             assertThat(findPublishedCases(unplacedEvidence)).isEmpty();
+            assertThat(findPublishedCases(longIntro)).isEmpty();
+            assertThat(findPublishedCases(blankIntro)).isEmpty();
             assertThat(findPublishedCases(valid)).hasSize(1);
         });
     }

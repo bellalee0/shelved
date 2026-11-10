@@ -105,14 +105,14 @@ public final class ClocktowerCaseFixture {
         Suspect butler = new Suspect(mysteryCase, "해리스",
                 "[가상 사건] 저택의 집사 해리스. 정중하고 짧게 말한다. 9시에는 주방에서 은식기를 닦고 있었다고 진술한다. "
                         + "모순을 추궁받아도 자백하지 않고 답변을 거부한다.",
-                "npc-butler-01", true, true);
+                "npc-butler-01", "저택의 집사", true, true);
         Suspect housekeeper = new Suspect(mysteryCase, "마거릿",
                 "[가상 사건] 저택의 가정부 마거릿. 9시 15분쯤 서재에서 주인의 목소리를 들었다고 진술한다.",
-                "npc-housekeeper-01", false, true);
+                "npc-housekeeper-01", "저택의 가정부", false, true);
         Suspect gardener = new Suspect(mysteryCase, "톰",
                 "[가상 사건] 저택의 정원사 톰. 저녁 내내 정원에서 일했다고 진술한다.",
-                "npc-gardener-01", false, true);
-        Suspect doctor = new Suspect(mysteryCase, "엘리스", null, null, false, false);
+                "npc-gardener-01", "저택의 정원사", false, true);
+        Suspect doctor = new Suspect(mysteryCase, "엘리스", null, null, "주치의", false, false);
         List.of(butler, housekeeper, gardener, doctor).forEach(entityManager::persist);
 
         Evidence smallBox = new Evidence(mysteryCase, "서재의 작은 상자",
@@ -190,13 +190,13 @@ public final class ClocktowerCaseFixture {
         );
 
         List<Draft.SuspectItem> suspects = List.of(
-                new Draft.SuspectItem("sus-1", null, "해리스", "저택의 집사. 20년째 근무", true, true,
+                new Draft.SuspectItem("sus-1", null, "해리스", "저택의 집사. 20년째 근무", "저택의 집사", true, true,
                         "npc-butler-01", butlerPersona),
-                new Draft.SuspectItem("sus-2", null, "마거릿", "저택의 가정부", true, false,
+                new Draft.SuspectItem("sus-2", null, "마거릿", "저택의 가정부", "저택의 가정부", true, false,
                         "npc-housekeeper-01", housekeeperPersona),
-                new Draft.SuspectItem("sus-3", null, "톰", "저택의 정원사", true, false,
+                new Draft.SuspectItem("sus-3", null, "톰", "저택의 정원사", "저택의 정원사", true, false,
                         "npc-gardener-01", gardenerPersona),
-                new Draft.SuspectItem("sus-4", null, "엘리스", "주치의. 사건 당일 저택에 없었다", false, false,
+                new Draft.SuspectItem("sus-4", null, "엘리스", "주치의. 사건 당일 저택에 없었다", "주치의", false, false,
                         null, null)
         );
 
