@@ -72,7 +72,7 @@ public class DevSeedImporter {
 
         Map<String, Suspect> suspectByKey = new LinkedHashMap<>();
         for (Draft.SuspectItem item : seed.suspectList()) {
-            Suspect suspect = new Suspect(mysteryCase, item.name(), null, item.spriteKey(), item.isCulprit(), item.canConverse());
+            Suspect suspect = new Suspect(mysteryCase, item.name(), null, item.spriteKey(), item.publicIntro(), item.isCulprit(), item.canConverse());
             suspectByKey.put(item.key(), suspectRepository.save(suspect));
         }
         Map<String, Evidence> evidenceByKey = new LinkedHashMap<>();
@@ -143,7 +143,7 @@ public class DevSeedImporter {
     ) {
         List<Draft.SuspectItem> suspects = seed.suspectList().stream()
                 .map(item -> new Draft.SuspectItem(item.key(), suspectByKey.get(item.key()).getId(), item.name(),
-                        item.role(), item.canConverse(), item.isCulprit(), item.spriteKey(), item.persona()))
+                        item.role(), item.publicIntro(), item.canConverse(), item.isCulprit(), item.spriteKey(), item.persona()))
                 .toList();
         List<Draft.EvidenceItem> evidences = seed.evidenceList().stream()
                 .map(item -> new Draft.EvidenceItem(item.key(), evidenceByKey.get(item.key()).getId(), item.name(),

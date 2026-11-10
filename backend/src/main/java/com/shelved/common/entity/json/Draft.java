@@ -69,6 +69,7 @@ public record Draft(
             Long entityId,
             String name,
             String role,
+            String publicIntro,
             boolean canConverse,
             boolean isCulprit,
             String spriteKey,
