@@ -27,8 +27,17 @@ export const DEPTH_GROUND = -30;
 export const DEPTH_WALLS = -20;
 export const DEPTH_DECOR = -10;
 export const DEPTH_ABOVE = 100_000;
+/** NPC 이름: 캐릭터(y 좌표)보다 위, "E: 대화" 안내(DEPTH_PROMPT)보다 아래 */
+export const DEPTH_NAME_LABEL = 100_050;
 export const DEPTH_PROMPT = 100_100;
 
-/** 상호작용 안내가 대상 기준점에서 얼마나 위에 뜨는지(px) */
-export const PROMPT_OFFSET_SUSPECT_PX = 52;
+/** NPC 이름 글자 아랫단이 NPC 기준점(발밑)에서 얼마나 위에 뜨는지(px). 머리 바로 위 */
+export const NAME_LABEL_OFFSET_PX = 44;
+/** 이름 글자 상자의 대략적인 높이(px). 글자 14px 이하 + 위아래 여백. 안내가 이름과 겹치지 않게 올리는 데 쓴다 */
+export const NAME_LABEL_HEIGHT_PX = 18;
+const NAME_LABEL_GAP_PX = 4;
+
+/** 상호작용 안내가 대상 기준점에서 얼마나 위에 뜨는지(px). NPC는 이름 상자 위로 띄운다 */
+export const PROMPT_OFFSET_SUSPECT_PX =
+  NAME_LABEL_OFFSET_PX + NAME_LABEL_HEIGHT_PX + NAME_LABEL_GAP_PX;
 export const PROMPT_OFFSET_EVIDENCE_PX = 18;

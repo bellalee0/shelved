@@ -15,7 +15,7 @@ import { findNearestTarget, listInteractionTargets, type InteractionTarget } fro
 import { shouldIgnoreGameKeys } from '../keyboardFocus';
 import { createEvidenceMarker } from '../objects/EvidenceMarker';
 import { NO_MOVE_INPUT, type MoveInput } from '../objects/movement';
-import { createNpc, isPlaced } from '../objects/Npc';
+import { createNpc, createNpcNameLabel, isPlaced } from '../objects/Npc';
 import { Player } from '../objects/Player';
 import { reportLoadFailure } from './loadFailure';
 import { getManifest, getMapData, SceneKeys } from './sceneKeys';
@@ -86,9 +86,11 @@ export class InvestigationScene extends Phaser.Scene {
     for (const evidence of mapData.evidences) {
       createEvidenceMarker(this, evidence);
     }
-    const npcSprites = mapData.suspects
-      .filter(isPlaced)
-      .map((suspect) => createNpc(this, suspect, manifest));
+    const placedSuspects = mapData.suspects.filter(isPlaced);
+    const npcSprites = placedSuspects.map((suspect) => createNpc(this, suspect, manifest));
+    for (const suspect of placedSuspects) {
+      createNpcNameLabel(this, suspect);
+    }
     this.targets = listInteractionTargets(mapData.suspects, mapData.evidences);
 
     // 최초 배치는 Scene이 직접 한다 (React가 MAP_READY 전에 보낸 PLACE_AT_SPAWN은 받을 수 없으므로)
