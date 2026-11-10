@@ -66,6 +66,28 @@ const CLOCKTOWER_CASE: MockCase = {
     timeLimitSec: MOCK_GAME_CONFIG.timeLimitSec.EASY,
     hintLimit: MOCK_GAME_CONFIG.hintLimit.EASY,
     accusationLimit: MOCK_GAME_CONFIG.accusationLimit,
+    suspects: [
+      {
+        suspectId: 1,
+        name: '해리스',
+        spriteKey: 'npc-gentleman-01',
+        publicIntro: '저택에서 오랫동안 일해 온 집사.',
+      },
+      {
+        suspectId: 2,
+        name: '마거릿',
+        spriteKey: 'npc-maid-01',
+        publicIntro: '저택의 살림을 맡은 가정부.',
+      },
+      {
+        suspectId: 3,
+        name: '톰',
+        spriteKey: 'npc-workman-01',
+        publicIntro: '정원과 시계탑을 관리하는 정원사.',
+      },
+      // 대화 불가·미배치 인물. 소개도 없어 이름과 대체 얼굴만 보인다
+      { suspectId: 4, name: '엘리스', spriteKey: null, publicIntro: null },
+    ],
   },
   map: {
     mapUrl: '/assets/maps/clocktower-mansion.json',
@@ -135,6 +157,14 @@ const LIGHTHOUSE_CASE: MockCase = {
     timeLimitSec: MOCK_GAME_CONFIG.timeLimitSec.NORMAL,
     hintLimit: MOCK_GAME_CONFIG.hintLimit.NORMAL,
     accusationLimit: MOCK_GAME_CONFIG.accusationLimit,
+    suspects: [
+      {
+        suspectId: 11,
+        name: '보급선 선원',
+        spriteKey: 'npc-old-man-01',
+        publicIntro: '그날 밤 등대에 물자를 싣고 온 선원.',
+      },
+    ],
   },
   map: {
     mapUrl: '/assets/maps/clocktower-mansion.json',

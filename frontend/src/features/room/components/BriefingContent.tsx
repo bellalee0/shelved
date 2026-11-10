@@ -1,6 +1,7 @@
 import { DIFFICULTY_LABELS } from '../../../shared/constants/labels';
 import { formatTimeLimit } from '../../../shared/utils/formatTime';
 import type { RoomBriefingResponse } from '../types';
+import { BriefingSuspects } from './BriefingSuspects';
 
 /** 사전 정보 본문. 수사 준비 화면과 사전 정보 패널이 함께 쓴다 */
 export function BriefingContent({ briefing }: { briefing: RoomBriefingResponse }) {
@@ -27,6 +28,7 @@ export function BriefingContent({ briefing }: { briefing: RoomBriefingResponse }
       <BriefingSection title="사건 소개" body={briefing.introduction} />
       <BriefingSection title="수사 목표" body={briefing.investigationGoal} />
       <BriefingSection title="배경지식" body={briefing.backgroundKnowledge} />
+      <BriefingSuspects suspects={briefing.suspects} />
     </div>
   );
 }

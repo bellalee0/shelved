@@ -128,6 +128,16 @@ export type RoomStateResponse = {
   conversations: ConversationSummary[];
 };
 
+/** 사전 정보의 등장인물 한 명 (지목 대상 전체, suspectId 오름차순) */
+export type BriefingSuspect = {
+  suspectId: number;
+  name: string;
+  /** 얼굴 표시용. 미배치 인물은 null일 수 있다 */
+  spriteKey: string | null;
+  /** 플레이어에게 공개하는 한 줄 소개. 없으면 null */
+  publicIntro: string | null;
+};
+
 export type RoomBriefingResponse = {
   displayTitle: string;
   difficulty: Difficulty;
@@ -137,6 +147,7 @@ export type RoomBriefingResponse = {
   timeLimitSec: number;
   hintLimit: number;
   accusationLimit: number;
+  suspects: BriefingSuspect[];
 };
 
 export type RoomMapSuspect = {
