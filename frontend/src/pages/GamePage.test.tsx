@@ -470,7 +470,8 @@ describe('게임 화면 개인 노트', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     // then
-    expect(await screen.findByLabelText('노트 내용')).toHaveValue('다른 탭 메모');
+    // 이어하기 직후 한 번은 이전 내용이 그려진 뒤 다시 받기가 시작되므로 값이 바뀔 때까지 기다린다
+    await waitFor(() => expect(screen.getByLabelText('노트 내용')).toHaveValue('다른 탭 메모'));
     expect(noteFetches()).toBe(2);
   });
 
@@ -495,7 +496,8 @@ describe('게임 화면 개인 노트', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     // then
-    expect(await screen.findByLabelText('노트 내용')).toHaveValue('다른 탭 메모');
+    // 이어하기 직후 한 번은 이전 내용이 그려진 뒤 다시 받기가 시작되므로 값이 바뀔 때까지 기다린다
+    await waitFor(() => expect(screen.getByLabelText('노트 내용')).toHaveValue('다른 탭 메모'));
   });
 
   it('복원 화면은 이 기기에 저장되지 않은 노트 초안이 있으면 알려 준다', async () => {
