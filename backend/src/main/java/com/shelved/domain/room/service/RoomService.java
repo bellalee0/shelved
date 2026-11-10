@@ -11,6 +11,7 @@ import com.shelved.common.entity.PlayResult;
 import com.shelved.common.entity.PlayerNote;
 import com.shelved.common.entity.Room;
 import com.shelved.common.entity.RoomParticipant;
+import com.shelved.common.entity.Suspect;
 import com.shelved.common.entity.User;
 import com.shelved.common.enums.GradingStatus;
 import com.shelved.common.enums.HotspotType;
@@ -129,7 +130,9 @@ public class RoomService {
 
         Room room = roomAccessService.getAccessibleRoom(roomId, authUser);
 
-        return RoomBriefingResponse.from(room, gameProperties);
+        List<Suspect> suspectList = suspectRepository.findAllByMysteryCaseIdOrderByIdAsc(room.getMysteryCase().getId());
+
+        return RoomBriefingResponse.from(room, gameProperties, suspectList);
     }
 
     /**
