@@ -53,6 +53,7 @@ const INITIAL_SESSION: SessionData = {
  * - start·resume은 사용자 버튼으로만 보낸다 (StrictMode에서 effect가 두 번 돌아도 한 번만 나가게)
  * - 페이지를 떠날 때 pause를 보내지 않는다. 하트비트를 멈추고 connectionId만 지운다 (탭 닫기는 서버 이탈 감지가 처리)
  * - connectionId는 메모리(setConnectionId)에만 둔다
+ * - 연결을 잃었다가 다시 연결하면(재입장, 하트비트 PAUSED 뒤 이어하기) reconnectKey를 올려 노트를 다시 받게 한다
  */
 export function useGameSession(roomId: number, userId: number) {
   const navigate = useNavigate();
@@ -62,13 +63,21 @@ export function useGameSession(roomId: number, userId: number) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   // 입장·상태 재조회의 회차. 늦게 도착한 이전 회차 응답(StrictMode의 첫 effect 포함)은 버린다
   const runRef = useRef(0);
-  // start·resume·재조회 중복 실행 방지. 같은 틱의 두 번 클릭도 막도록 ref로 본다
-  const submittingRef = useRef(false);
+  // start·resume 중복 실행 방지. 같은 틱의 두 번 클릭도 막도록 ref로 본다.
+  // 요청마다 다른 객체를 넣어, 버려진 요청이 끝날 때 새 요청의 표시를 지우지 않게 한다
+  const submittingRef = useRef<object | null>(null);
+  // 이 화면이 연결을 잃었다가 다시 연결할 때마다 1씩 올린다. 노트가 이 값으로 서버 내용을 다시 받는다
+  const [reconnectKey, setReconnectKey] = useState(0);
+  // 연결이 있다가 사라졌는지 (하트비트 PAUSED·연결 교체 등). 다음 start·resume 성공이 재연결이다
+  const lostConnectionRef = useRef(false);
 
   // 현재 연결. 응답 처리 중 최신 값을 동기적으로 보려고 상태와 함께 ref에도 둔다
   const connectionRef = useRef<Connection | null>(null);
 
   const updateConnection = useCallback((connection: Connection | null) => {
+    if (connectionRef.current !== null && connection === null) {
+      lostConnectionRef.current = true;
+    }
     connectionRef.current = connection;
     setConnectionId(connection?.connectionId ?? null);
   }, []);
@@ -102,20 +111,7 @@ export function useGameSession(roomId: number, userId: number) {
 
   const runEntry = useCallback(
     async (run: number) => {
-      try {
-        await pauseRoom(roomId);
-        const [roomState, briefing, mapData] = await Promise.all([
-          getRoomState(roomId),
-          getBriefing(roomId),
-          queryClient.fetchQuery(roomMapQueryOptions(roomId, userId)),
-        ]);
-        // 힌트(GET hints)·지목(GET accusations) 복원은 3~4주차 API가 생기면 여기에 함께 불러온다
-        if (run !== runRef.current) {
-          return;
-        }
-        setSession((prev) => ({ ...prev, briefing, mapData }));
-        applyTimer(roomState.timer, { connection: null, roomState });
-      } catch (error) {
+      const fail = (error: unknown) => {
         if (run !== runRef.current) {
           return;
         }
@@ -124,7 +120,50 @@ export function useGameSession(roomId: number, userId: number) {
           phase: 'enterFailed',
           enterError: error instanceof Error ? error.message : String(error),
         }));
+      };
+      try {
+        await pauseRoom(roomId);
+      } catch (error) {
+        fail(error);
+        return;
       }
+      // 세 요청은 함께 보내되, 하나가 실패해도 나머지 결과를 보고 분기한다
+      const [stateResult, briefingResult, mapResult] = await Promise.allSettled([
+        getRoomState(roomId),
+        getBriefing(roomId),
+        queryClient.fetchQuery(roomMapQueryOptions(roomId, userId)),
+      ]);
+      // 힌트(GET hints)·지목(GET accusations) 복원은 3~4주차 API가 생기면 여기에 함께 불러온다
+      if (run !== runRef.current) {
+        return;
+      }
+      if (stateResult.status === 'rejected') {
+        fail(stateResult.reason);
+        return;
+      }
+      const roomState = stateResult.value;
+      const briefing = briefingResult.status === 'fulfilled' ? briefingResult.value : null;
+      const mapData = mapResult.status === 'fulfilled' ? mapResult.value : null;
+      // 종료(결과 화면 이동)·채점 대기 화면은 사전 정보·맵을 쓰지 않으므로 그 조회 결과와 관계없이 들어간다
+      const phase = decideSessionPhase(roomState.timer, false);
+      const needsMap = phase !== 'ended' && phase !== 'awaitingGrading';
+      if (needsMap && (briefing === null || mapData === null)) {
+        fail(
+          briefingResult.status === 'rejected'
+            ? briefingResult.reason
+            : mapResult.status === 'rejected'
+              ? mapResult.reason
+              : null,
+        );
+        return;
+      }
+      // 실패한 쪽은 이전에 받은 값을 그대로 둔다 (재입장 중 이미 그린 맵을 지우지 않게)
+      setSession((prev) => ({
+        ...prev,
+        briefing: briefing ?? prev.briefing,
+        mapData: mapData ?? prev.mapData,
+      }));
+      applyTimer(roomState.timer, { connection: null, roomState });
     },
     [roomId, userId, queryClient, applyTimer],
   );
@@ -141,7 +180,13 @@ export function useGameSession(roomId: number, userId: number) {
   /** 재접속 흐름을 처음부터 다시 한다 ("이 화면에서 계속하기", 입장 실패 후 다시 시도) */
   const reenter = useCallback(() => {
     updateConnection(null);
+    // 진행 중이던 start·resume은 회차가 바뀌어 버려지므로 버튼을 다시 누를 수 있게 한다
+    submittingRef.current = null;
+    setIsSubmitting(false);
     setActionError(null);
+    // 다시 들어오는 동안 다른 화면이 저장했을 수 있는 노트를 함께 다시 받는다 (room.md 재접속 흐름의 GET notes/me)
+    lostConnectionRef.current = false;
+    setReconnectKey((key) => key + 1);
     setSession((prev) => ({ ...prev, phase: 'entering', enterError: null, connection: null }));
     void runEntry(++runRef.current);
   }, [runEntry, updateConnection]);
@@ -167,20 +212,37 @@ export function useGameSession(roomId: number, userId: number) {
       if (submittingRef.current) {
         return;
       }
-      submittingRef.current = true;
+      const submission = {};
+      submittingRef.current = submission;
       setIsSubmitting(true);
       setActionError(null);
+      // 응답을 기다리는 사이 화면을 떠났거나(언마운트) 다시 입장 흐름이 시작됐으면 응답을 반영하지 않는다.
+      // 그때 서버에 생긴 연결은 정리하지 않는다: pause는 연결 헤더 없이 방 단위로 멈추므로
+      // 떠난 화면이 보내면 다른 화면의 진행을 멈출 수 있다. 하트비트가 끊기면 서버가 PAUSED로 바꾼다
+      const run = runRef.current;
       try {
         const response = await request(roomId);
+        if (run !== runRef.current) {
+          return;
+        }
+        const reconnected = lostConnectionRef.current;
         applyTimer(response.timer, {
           connection: {
             connectionId: response.connectionId,
             heartbeatIntervalMs: response.heartbeatIntervalMs,
           },
         });
+        if (reconnected && connectionRef.current !== null) {
+          // 연결이 끊긴 사이 다른 화면이 노트를 저장했을 수 있다
+          lostConnectionRef.current = false;
+          setReconnectKey((key) => key + 1);
+        }
         // 재접속은 항상 시작점에서 한다. 버튼은 MAP_READY 뒤에만 눌리므로 Scene이 구독 중이다
         EventBus.emit(GameEvents.PLACE_AT_SPAWN);
       } catch (error) {
+        if (run !== runRef.current) {
+          return;
+        }
         if (isApiError(error) && error.status === 409) {
           // 로딩 중 상태가 바뀌었을 수 있다 (다른 탭에서 시작·이어하기, 시간 만료 등)
           await checkState();
@@ -188,8 +250,10 @@ export function useGameSession(roomId: number, userId: number) {
           setActionError(error instanceof Error ? error.message : String(error));
         }
       } finally {
-        submittingRef.current = false;
-        setIsSubmitting(false);
+        if (submittingRef.current === submission) {
+          submittingRef.current = null;
+          setIsSubmitting(false);
+        }
       }
     },
     [roomId, applyTimer, checkState],
@@ -261,6 +325,8 @@ export function useGameSession(roomId: number, userId: number) {
     briefing: session.briefing,
     mapData: session.mapData,
     hasConnection: session.connection !== null,
+    /** 연결을 잃었다가 다시 연결할 때마다 바뀐다. useNote의 resyncKey로 넘긴다 */
+    reconnectKey,
     displayRemainingMs,
     isConnectionUnstable: heartbeatState.isUnstable,
     /** start·resume 실패 문구 (409는 재조회로 처리하므로 여기에 오지 않는다) */

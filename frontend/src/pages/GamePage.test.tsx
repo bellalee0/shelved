@@ -444,6 +444,62 @@ describe('게임 화면 개인 노트', () => {
     expect(findMockRoom(room.roomId, user.userId)?.status).toBe('PAUSED');
   });
 
+  it('다른 화면이 노트를 저장한 뒤 이 화면에서 계속하면 서버의 최신 노트를 다시 불러온다', async () => {
+    // given 노트를 한 번 불러온 뒤 다른 화면이 연결을 가져가 노트를 저장했다
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { room, user } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '노트' }));
+    expect(await screen.findByLabelText('노트 내용')).toHaveValue('');
+    const mockRoom = findMockRoom(room.roomId, user.userId)!;
+    mockRoom.connectionId = 'other-tab';
+    mockRoom.note = {
+      ...mockRoom.note,
+      content: '다른 탭 메모',
+      revision: mockRoom.note.revision + 1,
+    };
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    await screen.findByText('다른 화면에서 수사를 이어하고 있습니다');
+    const noteFetches = () => requestedPaths.filter((path) => path.endsWith('/notes/me')).length;
+    expect(noteFetches()).toBe(1);
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '이 화면에서 계속하기' }));
+    const resumeButton = await screen.findByRole('button', { name: '수사 이어하기' });
+    await waitFor(() => expect(resumeButton).toBeEnabled());
+    fireEvent.click(resumeButton);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // then
+    // 이어하기 직후 한 번은 이전 내용이 그려진 뒤 다시 받기가 시작되므로 값이 바뀔 때까지 기다린다
+    await waitFor(() => expect(screen.getByLabelText('노트 내용')).toHaveValue('다른 탭 메모'));
+    expect(noteFetches()).toBe(2);
+  });
+
+  it('하트비트로 일시정지된 뒤 이어하면 서버의 최신 노트를 다시 불러온다', async () => {
+    // given
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { room, user } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '노트' }));
+    expect(await screen.findByLabelText('노트 내용')).toHaveValue('');
+    const mockRoom = findMockRoom(room.roomId, user.userId)!;
+    pauseMockRoom(mockRoom);
+    mockRoom.note = {
+      ...mockRoom.note,
+      content: '다른 탭 메모',
+      revision: mockRoom.note.revision + 1,
+    };
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    const resumeButton = await screen.findByRole('button', { name: '수사 이어하기' });
+
+    // when
+    fireEvent.click(resumeButton);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // then
+    // 이어하기 직후 한 번은 이전 내용이 그려진 뒤 다시 받기가 시작되므로 값이 바뀔 때까지 기다린다
+    await waitFor(() => expect(screen.getByLabelText('노트 내용')).toHaveValue('다른 탭 메모'));
+  });
+
   it('복원 화면은 이 기기에 저장되지 않은 노트 초안이 있으면 알려 준다', async () => {
     // given 이전 접속에서 저장하지 못한 초안 (키 형식: features/note/draft.ts)
     const user = await loginMockUser();
