@@ -3,6 +3,7 @@ package com.shelved.common.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shelved.IntegrationTestSupport;
+import com.shelved.common.enums.LlmProvider;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -66,6 +67,8 @@ class ConfigurationIntegrationTest extends IntegrationTestSupport {
         assertThat(llmProperties.gameTimeout()).isEqualTo(Duration.ofSeconds(60));
         assertThat(llmProperties.casebuilderChatTimeout()).isEqualTo(Duration.ofSeconds(300));
         assertThat(llmProperties.processingRecoveryMargin()).isEqualTo(Duration.ofSeconds(60));
+        assertThat(llmProperties.processingRecoveryInterval()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(llmProperties.provider()).isEqualTo(LlmProvider.FAKE);
         assertThat(casebuilderProperties.coverImageMaxSize()).isEqualTo(DataSize.ofMegabytes(5));
         assertThat(casebuilderProperties.sourceTextMaxSize()).isNotNull();
         assertThat(casebuilderProperties.coverImageDir()).isNotBlank();
@@ -77,8 +80,8 @@ class ConfigurationIntegrationTest extends IntegrationTestSupport {
 
         // given
         LlmProperties properties = new LlmProperties(
-                "sk-ant-example-secret", "model", "filter-model",
-                Duration.ofSeconds(60), Duration.ofSeconds(300), Duration.ofSeconds(60), 1000, 100);
+                LlmProvider.CLAUDE, "sk-ant-example-secret", "model", "filter-model",
+                Duration.ofSeconds(60), Duration.ofSeconds(300), Duration.ofSeconds(60), Duration.ofSeconds(30), 1000, 100);
 
         // when
         String text = properties.toString();

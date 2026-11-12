@@ -80,11 +80,15 @@ AI 요청의 처리 상태입니다. AI POST의 `202` 응답, 상태 조회 API,
 | `input` | object | 플레이어가 보낸 입력. 재시도 시 그대로 다시 보낸다. `NPC_ASK`·`HINT`·`HINT_FOLLOWUP`: `{ "question" }`, `ACCUSATION`: `{ "suspectId", "trickExplanation" }` |
 | `result` | object \| null | `SUCCEEDED`일 때 최초 성공 당시 원래 POST의 성공 응답 스냅샷 (현재 횟수·상태는 `GET state`로 재조회)과 같은 객체 (`NPC_ASK`: [NpcAskResponse](investigation.md#npcaskresponse), `HINT`: [HintCreateResponse](hint-accusation.md#post-apiroomsroomidhints), `HINT_FOLLOWUP`: [HintFollowupResponse](hint-accusation.md#hintfollowupresponse), `ACCUSATION`: [AccusationCreateResponse](hint-accusation.md#post-apiroomsroomidaccusations)) |
 | `error` | object \| null | `FAILED`일 때 `{ "code", "message" }` |
-| `retryAvailableAt` | string \| null | `ACCUSATION`이 `FAILED`일 때 같은 답안 재채점이 가능한 시각. 그 외 `null` |
+| `retryAvailableAt` | string \| null | `ACCUSATION`이 `FAILED`일 때 같은 답안 재채점이 가능한 시각(실패 시각 + 채점 재시도 최소 간격). 그 외 `null` |
 | `acceptedAt` | string | 서버 최초 접수 시각 |
 | `updatedAt` | string | |
 
-AI 내부 입력 컨텍스트(`input_json`의 프롬프트 등)는 포함하지 않습니다. `input`에는 플레이어가 직접 입력한 값만 담습니다.
+AI 내부 입력 컨텍스트(프롬프트·인물 설정·대화 이력 등)는 포함하지 않습니다. `input`에는 플레이어가 직접 입력한 값만 담습니다.
+
+- `error.code`는 유형별 실패 코드(`NPC_ANSWER_FAILED`·`HINT_GENERATION_FAILED`·`HINT_FOLLOWUP_FAILED`·`GRADING_FAILED`)입니다. 처리 중 세션이 최종 종료되어 반영되지 않은 요청은 `ROOM_ENDED_DURING_REQUEST`입니다.
+- 서버가 정해진 시간(AI 호출 시간 제한 + 여유) 안에 끝내지 못했거나 서버 재시작으로 중단된 `PROCESSING` 요청은 유형별 실패 코드의 `FAILED`로 정리됩니다. 같은 `requestId`·입력으로 다시 보내면 됩니다.
+- AI POST가 `202`일 때 `message`는 `"요청을 처리하고 있습니다"`이고 `data`가 이 객체입니다.
 
 ---
 
@@ -168,7 +172,7 @@ AI 내부 입력 컨텍스트(`input_json`의 프롬프트 등)는 포함하지 
 | `hintCount` | [UsageCount](#usagecount) | 새 힌트 횟수 |
 | `accusationCount` | [UsageCount](#usagecount) | 지목 횟수 (정상 채점 완료 기준) |
 | `pendingAccusation` | object \| null | 채점 중(`PENDING`)이거나 채점 실패(`ERROR`)한 지목. 형식은 [AccusationResponse](hint-accusation.md#accusationresponse) |
-| `aiRequests` | [AiRequestStatusResponse](#airequeststatusresponse)[] | `PROCESSING`이거나 재시도 대기 중인 `FAILED` 요청 (대체된 지목 제외) |
+| `aiRequests` | [AiRequestStatusResponse](#airequeststatusresponse)[] | `PROCESSING`이거나 재시도 대기 중인 `FAILED` 요청. 재시도 대기는 같은 대상(유형 + `targetId`)의 가장 최근 요청이 `FAILED`인 경우이며, 대체된 지목과 세션 종료로 실패한 요청(`ROOM_ENDED_DURING_REQUEST`)은 제외합니다. 같은 대상에 이후 다른 요청을 보냈다면 이전 실패는 나오지 않습니다. 접수 순서 |
 | `conversations` | object[] | 대화한 NPC 목록 `{ suspectId: number, messageCount: number, lastMessageAt: string }`. `messageCount`는 양의 정수 |
 
 ### UsageCount
@@ -413,7 +417,7 @@ Phaser의 `INTERACT_REQUESTED { type, targetId }`에서 `targetId`는 `suspectId
 
 ## GET /api/rooms/{roomId}/ai-requests/{requestId}
 
-AI POST가 `202`를 받았거나, 응답을 받지 못한 채 연결이 끊긴 경우 결과를 확인합니다. 일시정지·종료 후에도 조회할 수 있습니다. 프론트엔드는 `PROCESSING`인 동안 2초 간격으로 조회합니다.
+AI POST가 `202`를 받았거나, 응답을 받지 못한 채 연결이 끊긴 경우 결과를 확인합니다. 일시정지·종료 후에도 조회할 수 있고 `X-Connection-Id`는 필요 없습니다. 프론트엔드는 `PROCESSING`인 동안 2초 간격으로 조회합니다.
 
 **성공 응답** `200` [AiRequestStatusResponse](#airequeststatusresponse)
 
@@ -421,4 +425,5 @@ AI POST가 `202`를 받았거나, 응답을 받지 못한 채 연결이 끊긴 �
 
 | 상태 | 코드 | 상황 |
 |---|---|---|
+| 404 | `ROOM_NOT_FOUND` | 세션이 없거나 본인 세션이 아님 |
 | 404 | `AI_REQUEST_NOT_FOUND` | 이 세션에 해당 `requestId`가 없음 |

@@ -17,6 +17,7 @@ import com.shelved.common.exception.CustomException;
 import com.shelved.common.jwt.AuthUser;
 import com.shelved.common.utils.SafeExceptionLog;
 import com.shelved.domain.accusation.repository.AccusationRepository;
+import com.shelved.domain.airequest.service.AiRequestQueryService;
 import com.shelved.domain.hint.repository.HintRepository;
 import com.shelved.domain.room.dto.RoomConnectionResponse;
 import com.shelved.domain.room.dto.RoomStateResponse;
@@ -46,6 +47,7 @@ public class RoomLifecycleService {
     private final AccusationRepository accusationRepository;
     private final HintRepository hintRepository;
     private final AiRequestRepository aiRequestRepository;
+    private final AiRequestQueryService aiRequestQueryService;
     private final RoomAccessService roomAccessService;
     private final RoomTimeSettler roomTimeSettler;
     private final RoomSettlementService roomSettlementService;
@@ -84,7 +86,7 @@ public class RoomLifecycleService {
                 hintCount,
                 accusationCount,
                 null,
-                List.of(),
+                aiRequestQueryService.getActiveAiRequestList(roomId),
                 List.of()
         );
     }

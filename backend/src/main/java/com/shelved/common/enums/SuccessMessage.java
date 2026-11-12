@@ -34,6 +34,11 @@ public enum SuccessMessage {
     ROOM_PAUSE_SUCCESS("일시정지 성공"),
     ROOM_RESUME_SUCCESS("수사 이어하기 성공"),
 
+    // AI 요청
+    AI_REQUEST_GET_SUCCESS("AI 요청 상태 조회 성공"),
+    // 같은 requestId가 아직 처리 중일 때의 202 응답
+    AI_REQUEST_PROCESSING_SUCCESS("요청을 처리하고 있습니다"),
+
     // 물증
     EVIDENCE_INSPECT_SUCCESS("물증 조사 성공"),
 
