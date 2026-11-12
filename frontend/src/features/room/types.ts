@@ -1,7 +1,6 @@
 // 백엔드 room 도메인 DTO와 같은 이름·필드의 타입 (docs/api/room.md)
 import type {
-  AiRequestStatus,
-  AiRequestType,
+  AiRequestStatusResponse,
   Difficulty,
   GradingStatus,
   RoomStatus,
@@ -74,29 +73,8 @@ export type UsageCount = {
   remaining: number;
 };
 
-/** AI 요청에 플레이어가 보낸 입력. NPC_ASK·HINT·HINT_FOLLOWUP은 question, ACCUSATION은 suspectId·trickExplanation */
-export type AiRequestInput = { question: string } | { suspectId: number; trickExplanation: string };
-
-/**
- * AI 요청의 처리 상태. AI POST의 202 응답, 상태 조회 API, 세션 복원 응답에서 쓴다.
- * 2주차에는 타입만 만든다. result는 요청 유형별 응답(NpcAskResponse 등)이라 해당 도메인 작업에서 좁힌다.
- */
-export type AiRequestStatusResponse = {
-  requestId: string;
-  type: AiRequestType;
-  /** NPC_ASK: suspectId, HINT_FOLLOWUP: hintId, 그 외 null */
-  targetId: number | null;
-  status: AiRequestStatus;
-  input: AiRequestInput;
-  /** SUCCEEDED일 때 최초 성공 당시 응답의 스냅샷 */
-  result: unknown;
-  /** FAILED일 때 */
-  error: { code: string; message: string } | null;
-  /** ACCUSATION이 FAILED일 때 같은 답안 재채점이 가능한 시각 */
-  retryAvailableAt: string | null;
-  acceptedAt: string;
-  updatedAt: string;
-};
+// AI 요청 상태는 NPC·힌트·지목이 함께 쓰므로 shared에 두고, 기존 import 경로를 위해 다시 내보낸다
+export type { AiRequestInput, AiRequestStatusResponse } from '../../shared/api/types';
 
 export type ConversationSummary = {
   suspectId: number;
