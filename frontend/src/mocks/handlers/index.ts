@@ -1,8 +1,10 @@
 import type { RequestHandler } from 'msw';
+import { aiRequestHandlers } from './aiRequests';
 import { authHandlers } from './auth';
 import { casesHandlers } from './cases';
 import { evidenceHandlers } from './evidence';
 import { noteHandlers } from './note';
+import { npcHandlers } from './npc';
 import { roomHandlers } from './room';
 
 /**
@@ -15,4 +17,6 @@ export const handlers: RequestHandler[] = [
   ...roomHandlers,
   ...evidenceHandlers,
   ...noteHandlers,
+  ...npcHandlers,
+  ...aiRequestHandlers,
 ];
