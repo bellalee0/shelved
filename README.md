@@ -251,12 +251,17 @@ npm run format          # Prettier로 코드 정렬
 |---|---|
 | `shelvedMock.setScenario('casesError')` | 사건 목록 조회가 `500`으로 실패 (`false`를 두 번째 인자로 주면 끔) |
 | `shelvedMock.setScenario('roomsError')` | 내 세션 목록 조회가 `500`으로 실패 |
-| `shelvedMock.setScenario('networkError')` | 사건·세션·물증·노트 요청이 네트워크 오류로 실패 |
+| `shelvedMock.setScenario('networkError')` | 사건·세션·물증·노트·NPC 요청이 네트워크 오류로 실패 |
+| `shelvedMock.setScenario('npcSlow')` | NPC 질문이 `202`(처리 중)로 응답하고, 상태 조회 두 번째(약 4초 뒤)에 답변 완료 |
+| `shelvedMock.setScenario('npcFail')` | NPC 질문의 첫 실행이 `502 NPC_ANSWER_FAILED`, "다시 보내기"(같은 `requestId`)는 성공. `npcSlow`와 함께 켜면 상태 조회 결과가 실패 |
+| `shelvedMock.setScenario('npcNoResponse')` | 서버는 질문을 접수했지만 응답 없이 연결이 끊긴 상황. 상태 조회 첫 번째에 답변 완료 |
 | `shelvedMock.clearScenarios()` | 켜 둔 스위치를 모두 끔 (스위치는 `shelved.mock.scenario`에 저장되어 새로고침 후에도 유지) |
 | `shelvedMock.seedRooms('active')` | 시계탑 사건의 일시정지 세션 추가 → 카드에 "진행 중" 배지. 종류: `active`, `gradingError`(다시 채점하기), `gradingPending`(채점 대기), `ended`(지난 수사) |
 | `shelvedMock.replaceConnection()` | 다른 탭에서 이어하기를 한 상황: 진행 중 세션의 다음 하트비트·조작이 `409 CONNECTION_REPLACED` |
 | `shelvedMock.conflictNote(roomId)` | 다른 탭에서 노트를 먼저 저장한 상황: 다음 저장이 `409 NOTE_REVISION_CONFLICT` |
-| `shelvedMock.resetRooms()` | 목 세션·노트를 모두 지움 (목 사용자·토큰은 유지) |
+| `shelvedMock.resetRooms()` | 목 세션·노트·NPC 대화를 모두 지움 (목 사용자·토큰은 유지) |
+
+NPC 질문 목은 약 1초 뒤 중립적인 문장으로 답합니다. 질문에 `범인`이 들어 있으면 `400 QUESTION_BLOCKED`(기록되지 않음)로 차단합니다.
 
 #### 정적 에셋
 
