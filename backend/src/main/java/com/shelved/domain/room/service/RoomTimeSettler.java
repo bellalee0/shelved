@@ -101,7 +101,7 @@ public class RoomTimeSettler {
         }
 
         room.expire();
-        // TODO(W3): 이 세션의 처리 중(PROCESSING) AI 요청을 무효화해 늦은 응답이 게임 데이터·횟수에 반영되지 않게 한다
+        // 처리 중(PROCESSING) AI 요청의 늦은 응답은 결과 확정 시 세션 종료를 확인해 반영하지 않는다 (AiRequestTransactionService.complete)
         if (!playResultRepository.existsByRoomId(room.getId())) {
             int hintUsedCount = Math.toIntExact(hintRepository.countByRoomId(room.getId()));
             playResultRepository.save(new PlayResult(

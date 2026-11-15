@@ -92,11 +92,12 @@
 | `GOOGLE_CLIENT_ID` | Google 로그인 ID 토큰의 대상(client ID) 검증 |
 | `JWT_SECRET_KEY` | 액세스 토큰 서명 키 (UTF-8 32바이트 이상). 없거나 짧으면 서버가 기동하지 않는다 |
 | `SHELVED_CORS_ALLOWED_ORIGINS` | (선택) 브라우저에서 API를 호출할 수 있는 출처. 기본값 `http://localhost:5173` |
+| `SHELVED_LLM_PROVIDER` | (선택) LLM 호출 제공자. 기본값 `fake`(실제 API를 호출하지 않고 고정 문장 응답) / `claude`(실제 Claude API 호출, 비용 발생) |
 | `CLAUDE_API_KEY` | Claude API 키 |
 | `CLAUDE_MODEL` | 본 응답용 Claude 모델 (NPC 대화·힌트·채점·사건 제작) |
 | `CLAUDE_FILTER_MODEL` | 질문 분류용 작은 Claude 모델 (직접적인 정답 요구 차단) |
 
-Claude 관련 변수는 비어 있어도 서버가 기동됩니다. AI 기능을 쓸 때 필요합니다.
+`SHELVED_LLM_PROVIDER`가 `fake`(기본값)이면 Claude 관련 변수가 비어 있어도 서버가 기동되고 AI 기능은 고정 문장으로 응답합니다. `claude`로 지정하면 `CLAUDE_API_KEY`·`CLAUDE_MODEL`·`CLAUDE_FILTER_MODEL`이 모두 있어야 기동됩니다.
 `GOOGLE_CLIENT_ID`가 비어 있어도 서버는 기동되지만 Google 로그인 요청은 모두 `GOOGLE_TOKEN_INVALID`로 실패합니다.
 
 `JWT_SECRET_KEY`는 아래 명령으로 만든 임의 값을 `.env`에 넣습니다. 이 값이 바뀌면 이미 발급된 액세스 토큰은 모두 `INVALID_TOKEN`이 됩니다.

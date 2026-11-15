@@ -17,6 +17,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -116,6 +117,32 @@ public class AiRequest {
         this.executionNo = 1;
         this.acceptedAt = acceptedAt;
         this.updatedAt = acceptedAt;
+    }
+
+    /**
+     * 같은 requestId로 다시 받은 요청이 처음 요청과 같은지 (유형·대상·플레이어 입력)
+     */
+    public boolean isSameRequest(AiRequestType requestType, Long targetId, AiRequestInput inputJson) {
+        return this.requestType == requestType
+                && Objects.equals(this.targetId, targetId)
+                && Objects.equals(this.inputJson, inputJson);
+    }
+
+    /**
+     * 이 실행 번호의 결과를 아직 반영할 수 있는지 (최신 실행이고 처리 중). 아니면 늦은 응답이다
+     */
+    public boolean isCurrentExecution(int executionNo) {
+        return this.status == AiRequestStatus.PROCESSING && this.executionNo == executionNo;
+    }
+
+    /**
+     * 실패한 요청을 같은 행에서 다시 실행한다. 실행 번호를 1 올려 이전 실행의 늦은 응답을 구분한다
+     */
+    public void restart(LocalDateTime updatedAt) {
+        this.status = AiRequestStatus.PROCESSING;
+        this.executionNo++;
+        this.errorCode = null;
+        this.updatedAt = updatedAt;
     }
 
     public void succeed(Long resultRefId, JsonNode resultJson, LocalDateTime updatedAt) {

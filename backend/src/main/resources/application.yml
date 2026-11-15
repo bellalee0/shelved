@@ -97,7 +97,10 @@ shelved:
     max-length: 5000
 
   llm:
-    # 비밀 값과 모델명은 환경 변수로만 주입한다. 1주차에는 비어 있어도 기동되며, 호출 시점 검증은 W3에서 추가한다.
+    # LLM 호출 제공자: fake(기본값, 실제 API를 호출하지 않고 고정 문장을 돌려줌) / claude(실제 Claude API 호출).
+    # 기본은 fake이며, 실제 호출(비용 발생)은 저장소 소유자가 환경 변수 SHELVED_LLM_PROVIDER=claude로 지정할 때만 한다.
+    provider: ${SHELVED_LLM_PROVIDER:fake}
+    # 비밀 값과 모델명은 환경 변수로만 주입한다. provider=fake면 비어 있어도 기동되고, provider=claude면 비어 있을 때 기동에 실패한다.
     api-key: ${CLAUDE_API_KEY:}
     # 본 응답용 모델 (NPC 대화·힌트·채점·사건 제작)
     model: ${CLAUDE_MODEL:}
@@ -109,6 +112,8 @@ shelved:
     casebuilder-chat-timeout: 300s
     # PROCESSING 요청 복구 기준 = 각 시간 제한 + 이 값 — 잠정
     processing-recovery-margin: 60s
+    # 오래된 PROCESSING 요청을 실패로 정리하는 점검 주기 — 잠정
+    processing-recovery-interval: 30s
     # 호출 1회의 입력 토큰 상한. 넘으면 잘라 보내지 않고 LLM_INPUT_TOO_LARGE — 잠정, W5 실측 후 확정
     max-input-tokens: 150000
     # 호출 1회의 출력 토큰 상한 — 잠정, W5 실측 후 확정

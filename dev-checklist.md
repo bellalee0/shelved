@@ -197,22 +197,22 @@
 
 ## 5. AI 요청 공통 인프라 (3.6절, 6.4~6.5절, backend.md AI 연동 규칙)
 
-- [ ] [W3] `infra/llm` Claude API 클라이언트 — 모델명·키 설정값, 호출 시간 제한, 응답 사용량 추출
-- [ ] [W3] 테스트용 Fake LLM 클라이언트 — 지연·오류·형식 불일치 재현
-- [ ] [W3] `LLM_USAGE_LOGS` 기록 — 성공·실패 무관 호출마다, 재시도 포함, `request_type`·`call_status`·`error_code`, 게임 호출은 `room_id`·`case_id`, 사용량 미확인 시 `usage_known=false`·null
-- [ ] [W3] 프롬프트 파일 관리 — `src/main/resources/prompts/` (Java 문자열에 긴 프롬프트 금지)
-- [ ] [W3] `AI_REQUESTS` 접수 서비스 — 같은 `requestId` + 같은 입력이면 기존 결과·처리 중 상태 반환, 입력 다르면 `409 AI_REQUEST_ID_REUSED`, 대상별 동시 1건(`409 AI_REQUEST_IN_PROGRESS`), 한도 = 완료 + 처리 중 임시 확보
-- [ ] [W3] 짧은 트랜잭션 분리 — 접수(임시 확보) → 트랜잭션 밖 AI 호출 → 결과 확정 (backend.md 13)
-- [ ] [W3] 결과 확정 — 정상 결과·게임 데이터 저장과 `SUCCEEDED`·횟수 사용을 한 트랜잭션에서 확정, 실패 시 `FAILED`·임시 확보 해제·`502` 유형별 코드
-- [ ] [W3] 완료 결과 스냅샷 — 최초 성공 응답을 `AI_REQUESTS.result_json`에 저장하고, 같은 `requestId` 재전송·상태 조회 시 당시 값 그대로 반환(남은 횟수·세션 상태를 현재 값으로 재계산하지 않음, 서버 재시작 후에도 복원)
-- [ ] [W3] 재시도 — 같은 `requestId`·입력으로 재실행 시 `execution_no` 증가, 이전 실행의 늦은 응답은 게임 데이터·횟수에 미반영
-- [ ] [W3] 최종 종료 후 도착한 응답은 기록·횟수에 미반영, `409 ROOM_ENDED_DURING_REQUEST`, 사용량 로그만 기록 (일시정지는 정상 저장)
-- [ ] [W3] 처리 중 `202 Accepted` + `AiRequestStatusResponse` 반환
-- [ ] [W3] `GET /api/rooms/{roomId}/ai-requests/{requestId}` — 참가자 권한 검사, 일시정지·종료 후에도 조회, 내부 입력 컨텍스트 미노출
-- [ ] [W3] 작업 시간 제한·서버 재시작 복구 — 오래된 `PROCESSING`을 `FAILED`로 정리하는 스케줄러·시작 시 복구
+- [x] [W3] `infra/llm` Claude API 클라이언트 — 모델명·키 설정값, 호출 시간 제한, 응답 사용량 추출 (담당: BE-8)
+- [x] [W3] 테스트용 Fake LLM 클라이언트 — 지연·오류·형식 불일치 재현 (담당: BE-8, 로컬 실행도 `shelved.llm.provider=fake` 기본값)
+- [x] [W3] `LLM_USAGE_LOGS` 기록 — 성공·실패 무관 호출마다, 재시도 포함, `request_type`·`call_status`·`error_code`, 게임 호출은 `room_id`·`case_id`, 사용량 미확인 시 `usage_known=false`·null (담당: BE-8)
+- [x] [W3] 프롬프트 파일 관리 — `src/main/resources/prompts/` (Java 문자열에 긴 프롬프트 금지) (담당: BE-8)
+- [x] [W3] `AI_REQUESTS` 접수 서비스 — 같은 `requestId` + 같은 입력이면 기존 결과·처리 중 상태 반환, 입력 다르면 `409 AI_REQUEST_ID_REUSED`, 대상별 동시 1건(`409 AI_REQUEST_IN_PROGRESS`), 한도 = 완료 + 처리 중 임시 확보 (담당: BE-8, 한도 검사는 도메인 콜백 `AiRequestHandler.prepare`)
+- [x] [W3] 짧은 트랜잭션 분리 — 접수(임시 확보) → 트랜잭션 밖 AI 호출 → 결과 확정 (backend.md 13) (담당: BE-8)
+- [x] [W3] 결과 확정 — 정상 결과·게임 데이터 저장과 `SUCCEEDED`·횟수 사용을 한 트랜잭션에서 확정, 실패 시 `FAILED`·임시 확보 해제·`502` 유형별 코드 (담당: BE-8)
+- [x] [W3] 완료 결과 스냅샷 — 최초 성공 응답을 `AI_REQUESTS.result_json`에 저장하고, 같은 `requestId` 재전송·상태 조회 시 당시 값 그대로 반환(남은 횟수·세션 상태를 현재 값으로 재계산하지 않음, 서버 재시작 후에도 복원) (담당: BE-8)
+- [x] [W3] 재시도 — 같은 `requestId`·입력으로 재실행 시 `execution_no` 증가, 이전 실행의 늦은 응답은 게임 데이터·횟수에 미반영 (담당: BE-8)
+- [x] [W3] 최종 종료 후 도착한 응답은 기록·횟수에 미반영, `409 ROOM_ENDED_DURING_REQUEST`, 사용량 로그만 기록 (일시정지는 정상 저장) (담당: BE-8)
+- [x] [W3] 처리 중 `202 Accepted` + `AiRequestStatusResponse` 반환 (담당: BE-8, 공통 헬퍼 `AiRequestResult.toResponseEntity`. 도메인 API 연결은 BE-9·BE-10)
+- [x] [W3] `GET /api/rooms/{roomId}/ai-requests/{requestId}` — 참가자 권한 검사, 일시정지·종료 후에도 조회, 내부 입력 컨텍스트 미노출 (담당: BE-8)
+- [x] [W3] 작업 시간 제한·서버 재시작 복구 — 오래된 `PROCESSING`을 `FAILED`로 정리하는 스케줄러·시작 시 복구 (담당: BE-8)
 - [ ] [W3] 직접 정답 요구 차단 모듈 — NPC 질문·새 힌트·보충 질문마다 작은 모델(`shelved.llm.filter-model`)로 의도 분류 호출(단순 금칙어 금지), AI 요청 접수·기회 확보 전에 수행, 차단 질문은 기록하지 않음(`400 QUESTION_BLOCKED`), 분류 호출은 `QUESTION_FILTER`로 사용량 기록, 분류 실패·형식 오류 시 접수하지 않고 해당 API의 `502` 반환(기회 미차감)
 - [ ] [W3] 분류 프롬프트·판정 예시 — 차단: 범인 정체·범행 여부를 직접 또는 우회적으로 묻는 질문 / 허용: 행적·목격 사실·물증 질문, 증거 기반 추궁 (가상 사건 예시로 단위 테스트)
-- [ ] [W3] 테스트 — 같은 `requestId` 재전송 시 같은 결과(이후 횟수가 바뀌어도 당시 스냅샷), 동시 요청 한도 초과·중복 저장 없음(Testcontainers 통합 테스트), AI 실패 시 미차감, 늦은 응답 미반영, 재시작 복구
+- [x] [W3] 테스트 — 같은 `requestId` 재전송 시 같은 결과(이후 횟수가 바뀌어도 당시 스냅샷), 동시 요청 한도 초과·중복 저장 없음(Testcontainers 통합 테스트), AI 실패 시 미차감, 늦은 응답 미반영, 재시작 복구 (담당: BE-8)
 
 ## 6. NPC 대화 (2.4절, 3.7절, `docs/api/investigation.md`)
 
