@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { EvidencePanel } from '../features/evidence/components/EvidencePanel';
 import { NoteWindow, useNote } from '../features/note';
-import { NpcPanel } from '../features/npc/components/NpcPanel';
+import { ConversationLogPanel, joinConversations, NpcPanel } from '../features/npc';
 import { BriefingPanel } from '../features/room/components/BriefingPanel';
 import { ExitDialog } from '../features/room/components/ExitDialog';
 import { GameHud } from '../features/room/components/GameHud';
@@ -16,7 +16,11 @@ import { useMapInputSync } from '../features/room/hooks/useMapInputSync';
 import { useMapLoadStatus } from '../features/room/hooks/useMapLoadStatus';
 import { useSaveAndExit } from '../features/room/hooks/useSaveAndExit';
 import { canMoveOnMap, canOperateSession } from '../features/room/inputPermission';
-import type { RoomBriefingResponse, RoomMapResponse } from '../features/room/types';
+import type {
+  RoomBriefingResponse,
+  RoomMapResponse,
+  RoomStateResponse,
+} from '../features/room/types';
 
 // Phaser는 용량이 커서 게임 화면에 들어올 때만 따로 내려받는다
 const PhaserGame = lazy(() =>
@@ -65,11 +69,20 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
   const hasOverlay = session.phase !== 'playing';
   const windows = useGameWindows(hasOverlay);
 
-  const { disconnect } = session;
+  const { disconnect, checkState } = session;
   const handleLeave = useCallback(() => {
     disconnect();
     navigate('/');
   }, [disconnect, navigate]);
+
+  // NPC 답변 결과(최초 성공 당시 스냅샷)로 현재 상태를 덮지 않고, GET state를 다시 조회해 대화 목록·시간을 맞춘다.
+  // 진행 중이 아니면 입장·재접속 흐름이 곧 state를 다시 받으므로 따로 조회하지 않는다
+  const sessionPhase = session.phase;
+  const handleNpcAnswered = useCallback(() => {
+    if (sessionPhase === 'playing') {
+      void checkState();
+    }
+  }, [sessionPhase, checkState]);
 
   const baseConditions = {
     mapReady: map.status === 'ready',
@@ -83,10 +96,11 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
   };
   // 노트는 창이 열려 있어도 저장할 수 있어야 하므로 맵 준비·열린 창과 무관한 canOperateSession을 쓴다.
   // 노트 창이 닫혀 있어도 flush가 동작하도록 항상 호출한다
+  const operable = canOperateSession(baseConditions);
   const note = useNote({
     roomId,
     userId,
-    operable: canOperateSession(baseConditions),
+    operable,
     // 연결 교체면 교체 안내, 그 외(진행 중 아님·시간 만료)는 상태를 다시 조회해 분기한다
     onSessionRejected: session.handleSessionRejected,
     // 재접속하면 다른 화면이 저장했을 수 있는 최신 노트를 다시 받는다
@@ -121,6 +135,7 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
           isConnectionUnstable={session.isConnectionUnstable}
           onOpenNote={windows.openNote}
           onOpenBriefing={() => windows.openPanel({ kind: 'BRIEFING' })}
+          onOpenConversations={() => windows.openPanel({ kind: 'CONVERSATIONS' })}
           onExit={() => void exit.start()}
           actionsEnabled={session.phase === 'playing' && exit.step === 'idle'}
         />
@@ -147,6 +162,10 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
                 roomId={roomId}
                 briefing={session.briefing}
                 mapData={session.mapData}
+                roomState={session.roomState}
+                operable={operable}
+                reconnectKey={session.reconnectKey}
+                onNpcAnswered={handleNpcAnswered}
                 onSessionRejected={session.handleSessionRejected}
                 onClose={windows.closePanel}
               />
@@ -186,6 +205,11 @@ type RightPanelContentProps = {
   roomId: number;
   briefing: RoomBriefingResponse | null;
   mapData: RoomMapResponse | null;
+  roomState: RoomStateResponse | null;
+  /** 세션 조작(질문 전송)을 보낼 수 있는지. 맵 준비·열린 창과 무관하다 */
+  operable: boolean;
+  reconnectKey: number;
+  onNpcAnswered: () => void;
   onSessionRejected: (code: string) => void;
   onClose: () => void;
 };
@@ -196,6 +220,10 @@ function RightPanelContent({
   roomId,
   briefing,
   mapData,
+  roomState,
+  operable,
+  reconnectKey,
+  onNpcAnswered,
   onSessionRejected,
   onClose,
 }: RightPanelContentProps) {
@@ -211,8 +239,31 @@ function RightPanelContent({
       );
     case 'NPC': {
       const suspect = mapData?.suspects.find((item) => item.suspectId === panel.suspectId);
-      return <NpcPanel suspectName={suspect?.name ?? '인물'} onClose={onClose} />;
+      return (
+        <NpcPanel
+          roomId={roomId}
+          suspect={{
+            suspectId: panel.suspectId,
+            name: suspect?.name ?? '인물',
+            // 맵 정보에 없는 인물이면 서버도 거부하므로 미리 막는다
+            canConverse: suspect?.canConverse ?? false,
+          }}
+          operable={operable}
+          resyncKey={reconnectKey}
+          onAnswered={onNpcAnswered}
+          onSessionRejected={onSessionRejected}
+          onClose={onClose}
+        />
+      );
     }
+    case 'CONVERSATIONS':
+      return (
+        <ConversationLogPanel
+          roomId={roomId}
+          conversations={joinConversations(roomState?.conversations ?? [], mapData?.suspects ?? [])}
+          onClose={onClose}
+        />
+      );
     case 'BRIEFING':
       return briefing ? <BriefingPanel briefing={briefing} onClose={onClose} /> : null;
     case 'HINT':

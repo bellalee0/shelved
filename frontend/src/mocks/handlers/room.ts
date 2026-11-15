@@ -9,6 +9,7 @@ import type {
   RoomSummaryResponse,
 } from '../../features/room/types';
 import type { PageResponse } from '../../shared/api/types';
+import { conversationsOf, pendingAiRequestsOf } from '../aiRequestDb';
 import { findMockCase, MOCK_GAME_CONFIG } from '../data/clocktowerCase';
 import { authenticatePlayer, connectionReplacedResponse, loadOwnedRoom } from '../roomAccess';
 import {
@@ -32,7 +33,7 @@ import { checkScenario } from '../scenarios';
 import { mockErrorResponse, ok } from './auth';
 
 // docs/api/room.md 의 세션 API 중 2주차 범위(목록·생성·state·briefing·map·start·heartbeat·pause·resume).
-// result·ai-requests 는 이후 작업에서 추가한다.
+// result는 이후 작업에서 추가한다. ai-requests는 handlers/aiRequests.ts에 있다.
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const DEFAULT_PAGE_SIZE = 20;
@@ -154,8 +155,8 @@ export const roomHandlers = [
       hintCount: usageOf(card.hintLimit),
       accusationCount: usageOf(card.accusationLimit),
       pendingAccusation: null,
-      aiRequests: [],
-      conversations: [],
+      aiRequests: pendingAiRequestsOf(room),
+      conversations: conversationsOf(room),
     };
     return ok(data, '세션 상태 조회 성공');
   }),

@@ -8,7 +8,14 @@ import { mockErrorResponse } from './handlers/auth';
 
 const SCENARIO_STORAGE_KEY = 'shelved.mock.scenario';
 
-export const SCENARIO_NAMES = ['casesError', 'roomsError', 'networkError'] as const;
+export const SCENARIO_NAMES = [
+  'casesError',
+  'roomsError',
+  'networkError',
+  'npcSlow',
+  'npcFail',
+  'npcNoResponse',
+] as const;
 export type ScenarioName = (typeof SCENARIO_NAMES)[number];
 
 /** 켜진 스위치 목록. 저장소를 못 읽거나 형식이 다르면 모두 꺼진 것으로 본다 */
@@ -42,6 +49,7 @@ export function clearScenarios() {
  * - networkError: 모든 사건·세션·물증·노트 요청이 네트워크 오류로 실패
  * - casesError: GET /api/cases 가 500
  * - roomsError: GET /api/rooms 가 500
+ * NPC 질문 스위치(npcSlow·npcFail·npcNoResponse)는 handlers/npc.ts가 직접 읽는다.
  */
 export function checkScenario(target: 'cases' | 'rooms' | 'other'): Response | null {
   const enabled = getEnabledScenarios();

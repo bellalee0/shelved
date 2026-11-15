@@ -16,6 +16,36 @@ type MockNote = {
   updatedAtMs: number;
 };
 
+/** NPC 대화 한 줄 (handlers/npc). messageId는 세션 안에서 유일하다 */
+export type MockNpcMessage = {
+  messageId: number;
+  suspectId: number;
+  senderType: 'USER' | 'NPC';
+  content: string;
+  sequenceNo: number;
+  createdAtMs: number;
+};
+
+/** AI 요청 한 건 (mocks/aiRequestDb.ts). 지금은 NPC 질문만 쓴다 */
+export type MockAiRequest = {
+  requestId: string;
+  type: 'NPC_ASK';
+  targetId: number;
+  status: 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
+  input: { question: string };
+  /** SUCCEEDED일 때 최초 성공 당시 응답 (NpcAskResponse) */
+  result: unknown;
+  error: { code: string; message: string } | null;
+  /** 실행 번호. 실패 후 같은 requestId로 다시 보내면 올라간다 */
+  attemptNo: number;
+  /** 처리 중일 때 상태 조회가 몇 번 더 와야 끝나는지. null이면 POST 응답 안에서 끝난다 */
+  pollsUntilDone: number | null;
+  /** 끝날 때 실패로 끝낼지 (npcFail 스위치의 첫 실행) */
+  failOnFinish: boolean;
+  acceptedAtMs: number;
+  updatedAtMs: number;
+};
+
 export type MockRoom = {
   roomId: number;
   userId: number;
@@ -34,6 +64,10 @@ export type MockRoom = {
   endedAtMs: number | null;
   pendingGradingStatus: 'PENDING' | 'ERROR' | null;
   note: MockNote;
+  /** NPC 대화 기록. 이 필드가 생기기 전에 저장된 목 세션에는 없으므로 aiRequestDb.ts가 비어 있으면 만든다 */
+  npcMessages?: MockNpcMessage[];
+  /** AI 요청 기록. npcMessages와 같은 이유로 선택 필드다 */
+  aiRequests?: MockAiRequest[];
 };
 
 type MockRoomDb = {

@@ -11,6 +11,7 @@ type GameHudProps = {
   /** 없으면 "노트" 버튼을 비활성으로 둔다 */
   onOpenNote?: () => void;
   onOpenBriefing: () => void;
+  onOpenConversations: () => void;
   onExit: () => void;
   /** 진행 중일 때만 버튼을 누를 수 있다 */
   actionsEnabled: boolean;
@@ -23,6 +24,7 @@ export function GameHud({
   isConnectionUnstable,
   onOpenNote,
   onOpenBriefing,
+  onOpenConversations,
   onExit,
   actionsEnabled,
 }: GameHudProps) {
@@ -51,6 +53,9 @@ export function GameHud({
         </Button>
         <Button variant="secondary" onClick={onOpenBriefing} disabled={!actionsEnabled}>
           사전 정보
+        </Button>
+        <Button variant="secondary" onClick={onOpenConversations} disabled={!actionsEnabled}>
+          대화 기록
         </Button>
         {/* 힌트·지목은 이후 작업에서 연결한다 */}
         <Button variant="secondary" disabled>

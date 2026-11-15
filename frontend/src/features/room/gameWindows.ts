@@ -5,6 +5,7 @@ export type RightPanel =
   | { kind: 'EVIDENCE'; evidenceId: number }
   | { kind: 'NPC'; suspectId: number }
   | { kind: 'BRIEFING' }
+  | { kind: 'CONVERSATIONS' }
   | { kind: 'HINT' };
 
 export type GameWindowId = 'PANEL' | 'NOTE';

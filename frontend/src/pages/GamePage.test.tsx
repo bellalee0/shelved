@@ -9,6 +9,7 @@ import type { RoomMapResponse } from '../features/room/types';
 import { EventBus } from '../game/EventBus';
 import { GameEvents } from '../game/events';
 import { server } from '../mocks/node';
+import { acceptNpcAsk, finishMockAiRequest } from '../mocks/aiRequestDb';
 import { findMockRoom, pauseMockRoom, seedMockRoom, startMockRoom } from '../mocks/roomDb';
 import { loginMockUser, resetLoginState } from '../mocks/testing/loginMockUser';
 
@@ -242,18 +243,38 @@ describe('게임 화면 입장 흐름', () => {
 });
 
 describe('게임 화면 패널·창', () => {
-  it('NPC를 고르면 이름과 준비 중 안내만 보여 주고 API를 호출하지 않는다', async () => {
+  it('NPC에게 질문하면 답변을 보여 주고 상태를 다시 조회해 대화 기록 패널에 그 NPC가 나타난다', async () => {
     // given
-    await startPlaying();
-    const before = requestedPaths.length;
+    const { room } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '대화 기록' }));
+    expect(await screen.findByText('아직 대화한 인물이 없습니다.')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
 
-    // when
+    // when NPC 대화창을 열어 질문한다
     act(() => EventBus.emit(GameEvents.INTERACT_REQUESTED, { type: 'SUSPECT', targetId: 3 }));
-
-    // then
     expect(screen.getByRole('heading', { name: '톰' })).toBeInTheDocument();
-    expect(screen.getByText('대화 기능은 준비 중입니다.')).toBeInTheDocument();
-    expect(requestedPaths.slice(before).filter((path) => !path.endsWith('/heartbeat'))).toEqual([]);
+    expect(inputEvents.at(-1)).toBe(false);
+    const before = requestedPaths.length;
+    fireEvent.change(await screen.findByLabelText('질문'), {
+      target: { value: '어젯밤 9시에 어디에 있었나요?' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }));
+
+    // then 답변 뒤 GET state를 다시 조회한다
+    const conversation = await screen.findByRole('list', { name: '톰와의 대화' });
+    await waitFor(() => expect(within(conversation).getAllByRole('listitem')).toHaveLength(2));
+    await waitFor(() =>
+      expect(requestedPaths.slice(before)).toContain(`GET /api/rooms/${room.roomId}/state`),
+    );
+
+    // when 대화 기록 패널에서 톰을 고른다
+    fireEvent.click(screen.getByRole('button', { name: '대화 기록' }));
+    fireEvent.click(await screen.findByRole('button', { name: /톰\s*메시지 2개/ }));
+
+    // then 원문을 읽기 전용으로 보여 준다
+    const log = await screen.findByRole('list', { name: '톰와의 대화' });
+    expect(within(log).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByLabelText('질문')).not.toBeInTheDocument();
   });
 
   it('사전 정보 패널을 열고 Esc로 닫으면 다시 이동을 허용한다', async () => {
@@ -284,7 +305,7 @@ describe('게임 화면 패널·창', () => {
     act(() => EventBus.emit(GameEvents.INTERACT_REQUESTED, { type: 'SUSPECT', targetId: 3 }));
 
     // then
-    expect(screen.queryByText('대화 기능은 준비 중입니다.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '톰' })).not.toBeInTheDocument();
   });
 });
 
@@ -498,6 +519,36 @@ describe('게임 화면 개인 노트', () => {
     // then
     // 이어하기 직후 한 번은 이전 내용이 그려진 뒤 다시 받기가 시작되므로 값이 바뀔 때까지 기다린다
     await waitFor(() => expect(screen.getByLabelText('노트 내용')).toHaveValue('다른 탭 메모'));
+  });
+
+  it('다른 화면에서 질문한 뒤 이 화면에서 계속하면 열린 NPC 대화창의 기록을 다시 불러온다', async () => {
+    // given 대화창을 연 뒤 다른 화면이 연결을 가져가 같은 NPC에게 질문했다
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { room, user } = await startPlaying();
+    act(() => EventBus.emit(GameEvents.INTERACT_REQUESTED, { type: 'SUSPECT', targetId: 3 }));
+    expect(await screen.findByText('아직 나눈 대화가 없습니다.')).toBeInTheDocument();
+    const mockRoom = findMockRoom(room.roomId, user.userId)!;
+    mockRoom.connectionId = 'other-tab';
+    const otherTabAsk = acceptNpcAsk(mockRoom, {
+      requestId: '7a1d2c3b-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+      suspectId: 3,
+      question: '다른 탭의 질문',
+      pollsUntilDone: null,
+      failFirstAttempt: false,
+    });
+    finishMockAiRequest(mockRoom, otherTabAsk);
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    await screen.findByText('다른 화면에서 수사를 이어하고 있습니다');
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '이 화면에서 계속하기' }));
+    const resumeButton = await screen.findByRole('button', { name: '수사 이어하기' });
+    await waitFor(() => expect(resumeButton).toBeEnabled());
+    fireEvent.click(resumeButton);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // then
+    expect(await screen.findByText('다른 탭의 질문')).toBeInTheDocument();
   });
 
   it('복원 화면은 이 기기에 저장되지 않은 노트 초안이 있으면 알려 준다', async () => {
