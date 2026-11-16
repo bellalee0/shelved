@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { EvidencePanel } from '../features/evidence/components/EvidencePanel';
 import { NoteWindow, useNote } from '../features/note';
+import { HintPanel } from '../features/hint';
 import { ConversationLogPanel, joinConversations, NpcPanel } from '../features/npc';
 import { BriefingPanel } from '../features/room/components/BriefingPanel';
 import { ExitDialog } from '../features/room/components/ExitDialog';
@@ -75,7 +76,7 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
     navigate('/');
   }, [disconnect, navigate]);
 
-  // NPC 답변 결과(최초 성공 당시 스냅샷)로 현재 상태를 덮지 않고, GET state를 다시 조회해 대화 목록·시간을 맞춘다.
+  // NPC 답변·힌트 결과(최초 성공 당시 스냅샷)로 현재 상태를 덮지 않고, GET state를 다시 조회해 대화 목록·횟수·시간을 맞춘다.
   // 진행 중이 아니면 입장·재접속 흐름이 곧 state를 다시 받으므로 따로 조회하지 않는다
   const sessionPhase = session.phase;
   const handleNpcAnswered = useCallback(() => {
@@ -136,6 +137,7 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
           onOpenNote={windows.openNote}
           onOpenBriefing={() => windows.openPanel({ kind: 'BRIEFING' })}
           onOpenConversations={() => windows.openPanel({ kind: 'CONVERSATIONS' })}
+          onOpenHint={() => windows.openPanel({ kind: 'HINT' })}
           onExit={() => void exit.start()}
           actionsEnabled={session.phase === 'playing' && exit.step === 'idle'}
         />
@@ -164,8 +166,11 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
                 mapData={session.mapData}
                 roomState={session.roomState}
                 operable={operable}
+                hasConnection={session.hasConnection && session.phase !== 'replaced'}
+                remainingMs={session.displayRemainingMs}
                 reconnectKey={session.reconnectKey}
                 onNpcAnswered={handleNpcAnswered}
+                onHintCountChanged={handleNpcAnswered}
                 onSessionRejected={session.handleSessionRejected}
                 onClose={windows.closePanel}
               />
@@ -208,8 +213,13 @@ type RightPanelContentProps = {
   roomState: RoomStateResponse | null;
   /** 세션 조작(질문 전송)을 보낼 수 있는지. 맵 준비·열린 창과 무관하다 */
   operable: boolean;
+  /** 현재 조작 연결이 있는지 (연결 교체면 false) */
+  hasConnection: boolean;
+  /** 화면 타이머의 남은 시간 */
+  remainingMs: number | null;
   reconnectKey: number;
   onNpcAnswered: () => void;
+  onHintCountChanged: () => void;
   onSessionRejected: (code: string) => void;
   onClose: () => void;
 };
@@ -222,8 +232,11 @@ function RightPanelContent({
   mapData,
   roomState,
   operable,
+  hasConnection,
+  remainingMs,
   reconnectKey,
   onNpcAnswered,
+  onHintCountChanged,
   onSessionRejected,
   onClose,
 }: RightPanelContentProps) {
@@ -267,7 +280,18 @@ function RightPanelContent({
     case 'BRIEFING':
       return briefing ? <BriefingPanel briefing={briefing} onClose={onClose} /> : null;
     case 'HINT':
-      // 힌트 대화창은 3주차 작업에서 연결한다
-      return null;
+      return (
+        <HintPanel
+          roomId={roomId}
+          operable={operable}
+          timerStatus={roomState?.timer.status ?? null}
+          remainingMs={remainingMs}
+          hasConnection={hasConnection}
+          resyncKey={reconnectKey}
+          onCountChanged={onHintCountChanged}
+          onSessionRejected={onSessionRejected}
+          onClose={onClose}
+        />
+      );
   }
 }
