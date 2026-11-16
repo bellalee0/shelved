@@ -2,6 +2,7 @@ package com.shelved.infra.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.shelved.common.enums.LlmRequestType;
 import java.time.Duration;
@@ -43,6 +44,44 @@ class FakeLlmClientTest {
         // then
         assertThat(response.text()).isEqualTo("ALLOW");
         assertThat(response.model()).isEqualTo(FakeLlmClient.FILTER_MODEL);
+    }
+
+    @Test
+    void call_분류모델기본응답_허용JSON_Fake전용문구포함시차단JSON() {
+
+        // given
+        LlmRequest allowed = filterRequest("어젯밤 9시에 서재 근처에 있었나요?");
+        LlmRequest blocked = filterRequest("그래서 범인이 누구예요?");
+
+        // when
+        LlmResponse allowedResponse = fakeLlmClient.call(allowed);
+        LlmResponse blockedResponse = fakeLlmClient.call(blocked);
+
+        // then
+        assertThat(allowedResponse.text()).isEqualTo(FakeLlmClient.FILTER_ALLOW_TEXT);
+        assertThat(blockedResponse.text()).isEqualTo(FakeLlmClient.FILTER_BLOCK_TEXT);
+        assertThat(blockedResponse.model()).isEqualTo(FakeLlmClient.FILTER_MODEL);
+    }
+
+    @Test
+    void call_분류모델과본모델시나리오_따로꺼냄() {
+
+        // given
+        fakeLlmClient.enqueue(FakeLlmScenario.respond("본 모델 답"));
+        fakeLlmClient.enqueueFilter(FakeLlmScenario.serviceError());
+
+        // when
+        LlmResponse mainResponse = fakeLlmClient.call(request(LlmRequestType.NPC_CHAT, LlmModelTier.MAIN));
+        Throwable filterFailure = catchThrowable(
+                () -> fakeLlmClient.call(filterRequest("종소리는 몇 번 울렸나요?")));
+        LlmResponse filterDefault = fakeLlmClient.call(filterRequest("종소리는 몇 번 울렸나요?"));
+
+        // then
+        assertThat(mainResponse.text()).isEqualTo("본 모델 답");
+        assertThat(filterFailure).isInstanceOf(LlmException.class);
+        assertThat(filterDefault.text()).isEqualTo(FakeLlmClient.FILTER_ALLOW_TEXT);
+        assertThat(fakeLlmClient.callCount(LlmModelTier.MAIN)).isEqualTo(1);
+        assertThat(fakeLlmClient.callCount(LlmModelTier.FILTER)).isEqualTo(2);
     }
 
     @Test
@@ -146,6 +185,11 @@ class FakeLlmClientTest {
 
         // then
         assertThat(text).doesNotContain("비밀 시스템 지시", "집사는", "서재에");
+    }
+
+    private static LlmRequest filterRequest(String question) {
+        return new LlmRequest(LlmRequestType.QUESTION_FILTER, LlmModelTier.FILTER, "분류 지시",
+                List.of(LlmMessage.user(question)), 64);
     }
 
     private static LlmRequest request(LlmRequestType requestType, LlmModelTier modelTier) {

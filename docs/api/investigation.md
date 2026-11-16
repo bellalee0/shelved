@@ -34,6 +34,7 @@ NPC에게 자유 질문을 보내고 답변을 받습니다. 질문과 답변은
 - `suspectId`가 이 세션 사건의 인물이 아니면 `404 SUSPECT_NOT_FOUND`, 대화할 수 없는 인물(`canConverse=false`)이면 `400 NPC_NOT_CONVERSABLE`입니다.
 - 범인 정체·범행 여부를 직접 또는 우회적으로 묻는 질문은 AI 요청 접수 전에 차단하고 `400 QUESTION_BLOCKED`를 반환합니다. 대화 기록에 저장하지 않습니다. `message`에 "행적·목격 사실·물증에 관해 질문해 보세요" 같은 안내가 담깁니다.
 - 같은 세션·같은 NPC에는 한 번에 한 질문만 처리합니다. requestId 규칙은 [README](README.md#ai-요청-처리-requestid)를 따릅니다.
+- 검사 순서: 입력 검증 → (같은 `requestId`가 이미 완료·처리 중이면 아래 검사 없이 저장된 결과·`202`) → 세션 상태 공통 검사 → 인물 검사(`SUSPECT_NOT_FOUND`·`NPC_NOT_CONVERSABLE`) → 정답 요구 차단 판정 → 접수. 따라서 일시정지·종료 상태나 대화할 수 없는 인물에는 차단 판정을 하지 않고 해당 오류를 먼저 반환합니다.
 
 **요청 헤더**: `X-Connection-Id` 필수
 

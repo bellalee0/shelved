@@ -69,6 +69,10 @@ final class DevSeedValidator {
                     && (suspect.publicIntro().isBlank() || suspect.publicIntro().length() > PUBLIC_INTRO_MAX_LENGTH)) {
                 reasons.add("publicIntro는 1~" + PUBLIC_INTRO_MAX_LENGTH + "자: " + suspect.key());
             }
+            // admin-draft-schema.md 확정 검사: 대화 가능 인물의 persona에 statements·pressureResponse가 비어 있음 → ERROR
+            if (suspect.canConverse() && !hasConversablePersona(suspect.persona())) {
+                reasons.add("대화 가능 인물의 persona.statements·pressureResponse 필수: " + suspect.key());
+            }
         }
         long culpritCount = suspects.stream().filter(Draft.SuspectItem::isCulprit).count();
         if (culpritCount != 1) {
@@ -206,6 +210,13 @@ final class DevSeedValidator {
                 reasons.add(field + "가 없는 키를 참조: " + elementKey + " -> " + ref);
             }
         }
+    }
+
+    private static boolean hasConversablePersona(Draft.Persona persona) {
+        return persona != null
+                && persona.statements() != null
+                && persona.statements().stream().anyMatch(fact -> fact != null && !isBlank(fact.text()))
+                && !isBlank(persona.pressureResponse());
     }
 
     private static boolean isNegativeOrNull(Integer value) {

@@ -87,7 +87,12 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
                             tuple("마거릿", false, true, "npc-maid-01"),
                             tuple("톰", false, true, "npc-workman-01"),
                             tuple("엘리스", false, false, null));
-            assertThat(suspects).allSatisfy(suspect -> assertThat(suspect.getPersonaPrompt()).isNull());
+            // persona가 있는 대화 가능 인물은 변환된 persona_prompt, persona가 없는 대화 불가 인물은 null
+            assertThat(suspects.subList(0, 3)).allSatisfy(suspect -> assertThat(suspect.getPersonaPrompt()).isNotBlank());
+            assertThat(suspects.get(0).getPersonaPrompt())
+                    .contains("정중하고 짧게 말한다", "9시에는 주방에서 은식기를 닦고 있었다", "서재에서 녹음기를 설치했다")
+                    .doesNotContain("2장 4문단", "20년째 근무");
+            assertThat(suspects.get(3).getPersonaPrompt()).isNull();
             assertThat(suspects).extracting(Suspect::getPublicIntro)
                     .containsExactly("저택의 집사", "저택의 가정부", "저택의 정원사", "저택 주인의 주치의");
 
@@ -182,6 +187,12 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
                 seed -> ((ObjectNode) array(seed, "suspects").get(0)).put("publicIntro", "가".repeat(201)));
         String blankIntro = writeSeed("8-blank-intro.json",
                 seed -> ((ObjectNode) array(seed, "suspects").get(0)).put("publicIntro", " "));
+        String emptyStatements = writeSeed("9-empty-statements.json",
+                seed -> array(object((ObjectNode) array(seed, "suspects").get(1), "persona"), "statements").removeAll());
+        String blankPressure = writeSeed("10-blank-pressure.json",
+                seed -> object((ObjectNode) array(seed, "suspects").get(2), "persona").put("pressureResponse", " "));
+        String conversableWithoutPersona = writeSeed("11-no-persona.json",
+                seed -> ((ObjectNode) array(seed, "suspects").get(0)).putNull("persona"));
         Files.writeString(seedDir.resolve("5-broken.json"), "{ \"schemaVersion\": 1, ");
         String valid = writeSeed("6-valid.json", seed -> { });
 
@@ -189,7 +200,7 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
         DevSeedLoadResult result = devSeedService.loadAll(seedPath());
 
         // then
-        assertThat(result).isEqualTo(new DevSeedLoadResult(1, 0, 7));
+        assertThat(result).isEqualTo(new DevSeedLoadResult(1, 0, 10));
         transactionTemplate.executeWithoutResult(status -> {
             assertThat(findPublishedCases(twoCulprits)).isEmpty();
             assertThat(findPublishedCases(unknownHotspotKey)).isEmpty();
@@ -197,6 +208,9 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
             assertThat(findPublishedCases(unplacedEvidence)).isEmpty();
             assertThat(findPublishedCases(longIntro)).isEmpty();
             assertThat(findPublishedCases(blankIntro)).isEmpty();
+            assertThat(findPublishedCases(emptyStatements)).isEmpty();
+            assertThat(findPublishedCases(blankPressure)).isEmpty();
+            assertThat(findPublishedCases(conversableWithoutPersona)).isEmpty();
             assertThat(findPublishedCases(valid)).hasSize(1);
         });
     }

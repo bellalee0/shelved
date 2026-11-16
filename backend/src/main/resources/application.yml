@@ -96,6 +96,10 @@ shelved:
     # 개인 노트 최대 글자 수 (UTF-16 코드 단위) — 잠정, 사건 A 플레이테스트(W4) 후 조정
     max-length: 5000
 
+  npc:
+    # NPC 프롬프트에 넣는 대화 이력의 최대 메시지 수(질문·답변 각각 1개, 최근 것부터) — 잠정, 사건 A 플레이테스트(W4) 후 조정
+    history-message-limit: 30
+
   llm:
     # LLM 호출 제공자: fake(기본값, 실제 API를 호출하지 않고 고정 문장을 돌려줌) / claude(실제 Claude API 호출).
     # 기본은 fake이며, 실제 호출(비용 발생)은 저장소 소유자가 환경 변수 SHELVED_LLM_PROVIDER=claude로 지정할 때만 한다.
