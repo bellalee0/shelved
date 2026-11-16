@@ -2,19 +2,23 @@ package com.shelved.domain.hint.controller;
 
 import static com.shelved.common.enums.SuccessMessage.HINT_CREATE_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.HINT_FOLLOWUP_CREATE_SUCCESS;
+import static com.shelved.common.enums.SuccessMessage.HINT_LIST_GET_SUCCESS;
 
 import com.shelved.common.dto.CommonResponse;
 import com.shelved.common.jwt.AuthUser;
 import com.shelved.domain.airequest.service.AiRequestResult;
 import com.shelved.domain.hint.dto.HintCreateRequest;
 import com.shelved.domain.hint.dto.HintFollowupRequest;
+import com.shelved.domain.hint.dto.HintListResponse;
 import com.shelved.domain.hint.service.HintService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,6 +35,18 @@ public class HintController {
     private static final String CONNECTION_ID_HEADER = "X-Connection-Id";
 
     private final HintService hintService;
+
+    @Operation(summary = "힌트 기록", description = "힌트·보충 질문(오래된 순), hintCount, 처리 중·재시도 대기 중인 요청(pendingRequests). 모든 세션 상태에서 조회")
+    @GetMapping("/{roomId}/hints")
+    public ResponseEntity<CommonResponse<HintListResponse>> getHintList(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId
+    ) {
+        HintListResponse response = hintService.getHintList(authUser, roomId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(HINT_LIST_GET_SUCCESS, response));
+    }
 
     @Operation(summary = "새 힌트 요청", description = "X-Connection-Id 필수. 정상 답변이 저장되면 1회 사용. 200 HintCreateResponse, "
             + "같은 requestId가 처리 중이면 202 AiRequestStatusResponse. 남은 횟수 없음 409 HINT_LIMIT_EXCEEDED, "

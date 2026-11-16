@@ -44,6 +44,7 @@ public enum SuccessMessage {
     NPC_MESSAGE_LIST_GET_SUCCESS("NPC 대화 기록 조회 성공"),
 
     // 힌트
+    HINT_LIST_GET_SUCCESS("힌트 기록 조회 성공"),
     HINT_CREATE_SUCCESS("힌트 요청 성공"),
     HINT_FOLLOWUP_CREATE_SUCCESS("보충 질문 성공"),
 
