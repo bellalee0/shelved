@@ -39,6 +39,10 @@ public enum SuccessMessage {
     // 같은 requestId가 아직 처리 중일 때의 202 응답
     AI_REQUEST_PROCESSING_SUCCESS("요청을 처리하고 있습니다"),
 
+    // NPC
+    NPC_ASK_SUCCESS("NPC 질문 성공"),
+    NPC_MESSAGE_LIST_GET_SUCCESS("NPC 대화 기록 조회 성공"),
+
     // 물증
     EVIDENCE_INSPECT_SUCCESS("물증 조사 성공"),
 

@@ -25,6 +25,16 @@ public final class ValidationMessage {
     // --- 세션 ---
     public static final String CASE_ID_NOT_NULL = "사건을 선택해 주세요.";
 
+    // --- AI 요청 ---
+    // requestId 형식 (UUID, 대소문자 무관)
+    public static final String UUID_REGEX = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+    public static final String REQUEST_ID_NOT_BLANK = "요청 식별자는 필수입니다.";
+    public static final String REQUEST_ID_PATTERN = "요청 식별자 형식이 올바르지 않습니다.";
+
+    // --- NPC ---
+    public static final String QUESTION_NOT_BLANK = "질문 내용은 필수입니다.";
+    public static final String QUESTION_SIZE = "질문은 500자 이하로 입력해 주세요.";
+
     // --- 노트 ---
     public static final String NOTE_CONTENT_NOT_NULL = "노트 내용은 필수입니다.";
     public static final String NOTE_REVISION_NOT_NULL = "노트 버전은 필수입니다.";
