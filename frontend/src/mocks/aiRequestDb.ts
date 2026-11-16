@@ -8,6 +8,7 @@ import {
   type MockNpcMessage,
   type MockRoom,
 } from './roomDb';
+import { finishMockHintRequest } from './hintDb';
 
 // NPC 대화 기록과 AI 요청 상태를 담는 목 "DB". handlers/npc·aiRequests·room(state)이 함께 쓴다.
 // 실제 AI 대신 정해진 중립 문장으로 답한다. 가상 사건용이며 인물의 내부 설정·정답과 관련이 없다.
@@ -39,7 +40,10 @@ export function findMockAiRequest(room: MockRoom, requestId: string): MockAiRequ
 /** 이 NPC에게 처리 중인 질문 (NPC별 한 개) */
 export function findProcessingNpcAsk(room: MockRoom, suspectId: number): MockAiRequest | undefined {
   return aiRequestsOf(room).find(
-    (request) => request.targetId === suspectId && request.status === 'PROCESSING',
+    (request) =>
+      request.type === 'NPC_ASK' &&
+      request.targetId === suspectId &&
+      request.status === 'PROCESSING',
   );
 }
 
@@ -58,14 +62,39 @@ export function toAiRequestStatus(request: MockAiRequest): AiRequestStatusRespon
   };
 }
 
-/** 처리 중이거나 재시도 대기 중인 실패 요청 (GET state의 aiRequests, GET messages의 pendingRequests) */
-export function pendingAiRequestsOf(room: MockRoom, suspectId?: number): AiRequestStatusResponse[] {
-  return aiRequestsOf(room)
-    .filter(
-      (request) =>
-        (request.status === 'PROCESSING' || request.status === 'FAILED') &&
-        (suspectId === undefined || request.targetId === suspectId),
-    )
+/**
+ * 처리 중이거나 재시도 대기 중인 실패 요청 (GET state의 aiRequests, GET messages·hints의 pendingRequests).
+ * 재시도 대기는 같은 대상(유형 + targetId)의 가장 최근 요청이 FAILED인 경우다. 이후 다른 요청을 보냈다면 이전 실패는 나오지 않는다.
+ * suspectId를 주면 그 NPC의 질문만, types를 주면 그 유형만 돌려준다.
+ */
+export function pendingAiRequestsOf(
+  room: MockRoom,
+  filter: { suspectId?: number; types?: MockAiRequest['type'][] } = {},
+): AiRequestStatusResponse[] {
+  const requests = aiRequestsOf(room);
+  return requests
+    .filter((request, index) => {
+      if (filter.suspectId !== undefined) {
+        if (request.type !== 'NPC_ASK' || request.targetId !== filter.suspectId) {
+          return false;
+        }
+      }
+      if (filter.types !== undefined && !filter.types.includes(request.type)) {
+        return false;
+      }
+      if (request.status === 'PROCESSING') {
+        return true;
+      }
+      return (
+        request.status === 'FAILED' &&
+        !requests.some(
+          (other, otherIndex) =>
+            otherIndex > index &&
+            other.type === request.type &&
+            other.targetId === request.targetId,
+        )
+      );
+    })
     .map(toAiRequestStatus);
 }
 
@@ -150,6 +179,10 @@ export function acceptNpcAsk(
 
 /** 처리 중인 요청을 끝낸다. 성공이면 질문·답변을 대화 기록에 한 번만 저장한다 */
 export function finishMockAiRequest(room: MockRoom, request: MockAiRequest) {
+  if (request.type !== 'NPC_ASK' || request.targetId === null) {
+    finishMockHintRequest(room, request);
+    return;
+  }
   const nowMs = currentTimeMs();
   request.pollsUntilDone = null;
   request.updatedAtMs = nowMs;

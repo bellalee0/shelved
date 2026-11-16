@@ -2,6 +2,7 @@ import { Button } from '../../../shared/components/Button';
 import { DIFFICULTY_LABELS, ROOM_STATUS_LABELS } from '../../../shared/constants/labels';
 import { formatRemainingTime } from '../../../shared/utils/formatTime';
 import { formatUsage } from '../formatUsage';
+import { toAiRequestBadges } from '../aiRequestBadges';
 import type { RoomStateResponse } from '../types';
 
 type GameHudProps = {
@@ -12,10 +13,22 @@ type GameHudProps = {
   onOpenNote?: () => void;
   onOpenBriefing: () => void;
   onOpenConversations: () => void;
+  onOpenHint: () => void;
   onExit: () => void;
   /** 진행 중일 때만 버튼을 누를 수 있다 */
   actionsEnabled: boolean;
 };
+
+/** 처리 중·다시 보내기 대기 요청이 있다는 작은 점 */
+function PendingBadge() {
+  return (
+    <span
+      role="img"
+      aria-label="처리 중인 요청 있음"
+      className="ml-1.5 inline-block size-2 rounded-full bg-accent align-middle"
+    />
+  );
+}
 
 /** 게임 화면 위쪽 HUD. 사건 정보·타이머·남은 횟수는 항상 보인다 */
 export function GameHud({
@@ -25,9 +38,12 @@ export function GameHud({
   onOpenNote,
   onOpenBriefing,
   onOpenConversations,
+  onOpenHint,
   onExit,
   actionsEnabled,
 }: GameHudProps) {
+  // 재접속 직후 처리 중·재시도 대기 요청이 있으면 해당 버튼에 점을 보여 창을 열어 보게 한다
+  const badges = toAiRequestBadges(roomState.aiRequests);
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line bg-surface px-5 py-3">
       <div className="flex min-w-0 items-center gap-2">
@@ -56,11 +72,13 @@ export function GameHud({
         </Button>
         <Button variant="secondary" onClick={onOpenConversations} disabled={!actionsEnabled}>
           대화 기록
+          {badges.npc && <PendingBadge />}
         </Button>
-        {/* 힌트·지목은 이후 작업에서 연결한다 */}
-        <Button variant="secondary" disabled>
+        <Button variant="secondary" onClick={onOpenHint} disabled={!actionsEnabled}>
           힌트
+          {badges.hint && <PendingBadge />}
         </Button>
+        {/* 지목은 이후 작업에서 연결한다 */}
         <Button variant="secondary" disabled>
           지목
         </Button>

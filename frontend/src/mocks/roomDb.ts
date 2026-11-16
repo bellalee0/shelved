@@ -26,11 +26,27 @@ export type MockNpcMessage = {
   createdAtMs: number;
 };
 
-/** AI 요청 한 건 (mocks/aiRequestDb.ts). 지금은 NPC 질문만 쓴다 */
+/** 힌트 한 건 (mocks/hintDb.ts). 보충 질문·답변은 같은 힌트 안에 둔다 */
+export type MockHint = {
+  hintId: number;
+  requestId: string;
+  question: string;
+  content: string;
+  createdAtMs: number;
+  followup: {
+    requestId: string;
+    question: string;
+    content: string;
+    createdAtMs: number;
+  } | null;
+};
+
+/** AI 요청 한 건 (mocks/aiRequestDb.ts). NPC 질문·새 힌트·보충 질문을 쓴다 */
 export type MockAiRequest = {
   requestId: string;
-  type: 'NPC_ASK';
-  targetId: number;
+  type: 'NPC_ASK' | 'HINT' | 'HINT_FOLLOWUP';
+  /** NPC_ASK: suspectId, HINT_FOLLOWUP: hintId, HINT: null */
+  targetId: number | null;
   status: 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
   input: { question: string };
   /** SUCCEEDED일 때 최초 성공 당시 응답 (NpcAskResponse) */
@@ -68,6 +84,8 @@ export type MockRoom = {
   npcMessages?: MockNpcMessage[];
   /** AI 요청 기록. npcMessages와 같은 이유로 선택 필드다 */
   aiRequests?: MockAiRequest[];
+  /** 힌트 기록. 위 선택 필드와 같은 이유로 선택 필드다 */
+  hints?: MockHint[];
 };
 
 type MockRoomDb = {

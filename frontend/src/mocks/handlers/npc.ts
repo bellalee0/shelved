@@ -92,7 +92,11 @@ export const npcHandlers = [
     // 같은 requestId: 입력이 다르면 거부, 완료면 저장된 결과(연결 검사 없음), 처리 중이면 202, 실패면 다시 실행
     const existing = findMockAiRequest(room, requestId);
     if (existing) {
-      if (existing.targetId !== suspectId || existing.input.question !== question) {
+      if (
+        existing.type !== 'NPC_ASK' ||
+        existing.targetId !== suspectId ||
+        existing.input.question !== question
+      ) {
         return mockErrorResponse(
           409,
           'AI_REQUEST_ID_REUSED',
@@ -187,7 +191,7 @@ export const npcHandlers = [
       suspectId: suspect.suspectId,
       suspectName: suspect.name,
       messages: npcMessagesFor(room, suspect.suspectId),
-      pendingRequests: pendingAiRequestsOf(room, suspect.suspectId),
+      pendingRequests: pendingAiRequestsOf(room, { suspectId: suspect.suspectId }),
     };
     return ok(data, 'NPC 대화 기록 조회 성공');
   }),
