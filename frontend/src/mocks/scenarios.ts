@@ -15,6 +15,9 @@ export const SCENARIO_NAMES = [
   'npcSlow',
   'npcFail',
   'npcNoResponse',
+  'hintSlow',
+  'hintFail',
+  'hintNoResponse',
 ] as const;
 export type ScenarioName = (typeof SCENARIO_NAMES)[number];
 
@@ -49,7 +52,7 @@ export function clearScenarios() {
  * - networkError: 모든 사건·세션·물증·노트 요청이 네트워크 오류로 실패
  * - casesError: GET /api/cases 가 500
  * - roomsError: GET /api/rooms 가 500
- * NPC 질문 스위치(npcSlow·npcFail·npcNoResponse)는 handlers/npc.ts가 직접 읽는다.
+ * NPC 질문 스위치(npcSlow·npcFail·npcNoResponse)는 handlers/npc.ts가, 힌트·보충 질문 스위치(hintSlow·hintFail·hintNoResponse)는 handlers/hint.ts가 직접 읽는다.
  */
 export function checkScenario(target: 'cases' | 'rooms' | 'other'): Response | null {
   const enabled = getEnabledScenarios();

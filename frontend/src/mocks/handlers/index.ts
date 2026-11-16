@@ -3,6 +3,7 @@ import { aiRequestHandlers } from './aiRequests';
 import { authHandlers } from './auth';
 import { casesHandlers } from './cases';
 import { evidenceHandlers } from './evidence';
+import { hintHandlers } from './hint';
 import { noteHandlers } from './note';
 import { npcHandlers } from './npc';
 import { roomHandlers } from './room';
@@ -18,5 +19,6 @@ export const handlers: RequestHandler[] = [
   ...evidenceHandlers,
   ...noteHandlers,
   ...npcHandlers,
+  ...hintHandlers,
   ...aiRequestHandlers,
 ];

@@ -11,6 +11,7 @@ import type {
 import type { PageResponse } from '../../shared/api/types';
 import { conversationsOf, pendingAiRequestsOf } from '../aiRequestDb';
 import { findMockCase, MOCK_GAME_CONFIG } from '../data/clocktowerCase';
+import { hintCountOf } from '../hintDb';
 import { authenticatePlayer, connectionReplacedResponse, loadOwnedRoom } from '../roomAccess';
 import {
   type MockRoom,
@@ -151,8 +152,8 @@ export const roomHandlers = [
       startedAt: room.startedAtMs === null ? null : toServerTime(room.startedAtMs),
       timer: timerOf(room),
       heartbeatIntervalMs: MOCK_GAME_CONFIG.heartbeatIntervalMs,
-      // 2주차에는 힌트·지목을 쓰지 않으므로 사용 0, 한도만 설정값
-      hintCount: usageOf(card.hintLimit),
+      hintCount: hintCountOf(room),
+      // 지목은 4주차 작업에서 사용 횟수를 반영한다
       accusationCount: usageOf(card.accusationLimit),
       pendingAccusation: null,
       aiRequests: pendingAiRequestsOf(room),
