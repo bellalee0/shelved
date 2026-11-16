@@ -1,10 +1,10 @@
 package com.shelved.domain.npc.service;
 
 import com.shelved.common.config.LlmProperties;
-import com.shelved.common.entity.json.GlossaryTerm;
 import com.shelved.common.enums.Difficulty;
 import com.shelved.common.enums.LlmRequestType;
 import com.shelved.common.enums.MessageSenderType;
+import com.shelved.infra.llm.GlossaryPromptFormatter;
 import com.shelved.infra.llm.LlmMessage;
 import com.shelved.infra.llm.LlmModelTier;
 import com.shelved.infra.llm.LlmRequest;
@@ -12,7 +12,6 @@ import com.shelved.infra.llm.PromptTemplateLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -31,7 +30,6 @@ import org.springframework.stereotype.Component;
 public class NpcPromptBuilder {
 
     static final String SYSTEM_TEMPLATE_NAME = "npc-system.txt";
-    private static final String NO_GLOSSARY = "(없음)";
 
     private final PromptTemplateLoader promptTemplateLoader;
     private final LlmProperties llmProperties;
@@ -41,7 +39,7 @@ public class NpcPromptBuilder {
         String systemPrompt = promptTemplateLoader.render(SYSTEM_TEMPLATE_NAME, Map.of(
                 "suspectName", context.suspectName(),
                 "difficultyGuide", promptTemplateLoader.load(difficultyTemplateName(context.difficulty())).strip(),
-                "glossary", glossaryText(context.glossary()),
+                "glossary", GlossaryPromptFormatter.format(context.glossary()),
                 "personaPrompt", context.personaPrompt()
         ));
 
@@ -75,15 +73,5 @@ public class NpcPromptBuilder {
         }
         messageList.add(LlmMessage.user(context.question()));
         return messageList;
-    }
-
-    private static String glossaryText(List<GlossaryTerm> glossary) {
-        if (glossary.isEmpty()) {
-            return NO_GLOSSARY;
-        }
-        return glossary.stream()
-                .map(term -> "- " + term.original() + " → " + term.korean()
-                        + (term.note() == null || term.note().isBlank() ? "" : " (" + term.note() + ")"))
-                .collect(Collectors.joining("\n"));
     }
 }
