@@ -21,6 +21,7 @@ import com.shelved.domain.cases.repository.EvidenceRepository;
 import com.shelved.domain.cases.repository.MapHotspotRepository;
 import com.shelved.domain.cases.repository.MysteryCaseRepository;
 import com.shelved.domain.cases.repository.SuspectRepository;
+import com.shelved.domain.npc.service.PersonaPromptComposer;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -33,7 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 검사(DevSeedValidator)를 통과한 시드 1건을 PUBLISHED 사건으로 반영한다 (한 파일 = 한 트랜잭션).
- * persona_prompt는 비워 두고(3주차 NPC 작업에서 변환), 원본을 다시 읽을 수 있도록 entityId를 채운 초안을 CASE_DRAFTS에 함께 저장한다.
+ * persona는 PersonaPromptComposer로 텍스트로 바꿔 persona_prompt에 넣고(persona가 없는 대화 불가 인물은 null),
+ * 원본을 다시 읽을 수 있도록 entityId를 채운 초안을 CASE_DRAFTS에 함께 저장한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -46,6 +48,7 @@ public class DevSeedImporter {
     private final CaseMapRepository caseMapRepository;
     private final MapHotspotRepository mapHotspotRepository;
     private final CaseDraftRepository caseDraftRepository;
+    private final PersonaPromptComposer personaPromptComposer;
     private final Clock clock;
 
     /**
@@ -72,7 +75,9 @@ public class DevSeedImporter {
 
         Map<String, Suspect> suspectByKey = new LinkedHashMap<>();
         for (Draft.SuspectItem item : seed.suspectList()) {
-            Suspect suspect = new Suspect(mysteryCase, item.name(), null, item.spriteKey(), item.publicIntro(), item.isCulprit(), item.canConverse());
+            String personaPrompt = item.persona() == null ? null : personaPromptComposer.compose(item.persona());
+            Suspect suspect = new Suspect(mysteryCase, item.name(), personaPrompt, item.spriteKey(), item.publicIntro(),
+                    item.isCulprit(), item.canConverse());
             suspectByKey.put(item.key(), suspectRepository.save(suspect));
         }
         Map<String, Evidence> evidenceByKey = new LinkedHashMap<>();
