@@ -9,6 +9,7 @@ import com.shelved.domain.airequest.service.AiRequestPrecheckService;
 import com.shelved.domain.airequest.service.AiRequestResult;
 import com.shelved.domain.airequest.service.QuestionFilterService;
 import com.shelved.domain.hint.dto.HintCreateRequest;
+import com.shelved.domain.hint.dto.HintFollowupRequest;
 import com.shelved.infra.llm.LlmCallContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class HintService {
     private final QuestionFilterService questionFilterService;
     private final AiRequestExecutor aiRequestExecutor;
     private final HintHandler hintHandler;
+    private final HintFollowupHandler hintFollowupHandler;
 
     /**
      * 새 힌트 요청. 트랜잭션 없이 실행한다 (분류·답변 AI 호출 중 트랜잭션·잠금을 잡지 않음, backend.md 13)
@@ -46,5 +48,28 @@ public class HintService {
         }
 
         return aiRequestExecutor.execute(authUser, command, hintHandler);
+    }
+
+    /**
+     * 무료 보충 질문. 새 힌트와 같은 순서로 처리하며, 힌트 횟수는 검사·차감하지 않는다.
+     * 이 세션의 힌트가 아니면 404 HINT_NOT_FOUND, 이미 썼으면 409 HINT_FOLLOWUP_ALREADY_USED (분류 전 사전 검사와 접수에서 모두 확인)
+     */
+    public AiRequestResult createHintFollowup(
+            AuthUser authUser,
+            Long roomId,
+            Long hintId,
+            HintFollowupRequest request,
+            String connectionId
+    ) {
+        AiRequestCommand command = new AiRequestCommand(
+                roomId, request.requestId(), hintId, AiRequestInput.question(request.question()), connectionId);
+
+        if (!aiRequestPrecheckService.isAlreadyAccepted(authUser, command, AiRequestType.HINT_FOLLOWUP)) {
+            Long caseId = hintPrecheckService.validateFollowupRequestable(authUser, roomId, hintId, connectionId);
+            questionFilterService.validateQuestion(request.question(), request.requestId(),
+                    LlmCallContext.game(roomId, caseId), AiRequestType.HINT_FOLLOWUP.getFailureCode());
+        }
+
+        return aiRequestExecutor.execute(authUser, command, hintFollowupHandler);
     }
 }

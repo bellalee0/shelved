@@ -45,6 +45,7 @@ public enum SuccessMessage {
 
     // 힌트
     HINT_CREATE_SUCCESS("힌트 요청 성공"),
+    HINT_FOLLOWUP_CREATE_SUCCESS("보충 질문 성공"),
 
     // 물증
     EVIDENCE_INSPECT_SUCCESS("물증 조사 성공"),
