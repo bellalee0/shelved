@@ -210,18 +210,18 @@
 - [x] [W3] 처리 중 `202 Accepted` + `AiRequestStatusResponse` 반환 (담당: BE-8, 공통 헬퍼 `AiRequestResult.toResponseEntity`. 도메인 API 연결은 BE-9·BE-10)
 - [x] [W3] `GET /api/rooms/{roomId}/ai-requests/{requestId}` — 참가자 권한 검사, 일시정지·종료 후에도 조회, 내부 입력 컨텍스트 미노출 (담당: BE-8)
 - [x] [W3] 작업 시간 제한·서버 재시작 복구 — 오래된 `PROCESSING`을 `FAILED`로 정리하는 스케줄러·시작 시 복구 (담당: BE-8)
-- [ ] [W3] 직접 정답 요구 차단 모듈 — NPC 질문·새 힌트·보충 질문마다 작은 모델(`shelved.llm.filter-model`)로 의도 분류 호출(단순 금칙어 금지), AI 요청 접수·기회 확보 전에 수행, 차단 질문은 기록하지 않음(`400 QUESTION_BLOCKED`), 분류 호출은 `QUESTION_FILTER`로 사용량 기록, 분류 실패·형식 오류 시 접수하지 않고 해당 API의 `502` 반환(기회 미차감)
-- [ ] [W3] 분류 프롬프트·판정 예시 — 차단: 범인 정체·범행 여부를 직접 또는 우회적으로 묻는 질문 / 허용: 행적·목격 사실·물증 질문, 증거 기반 추궁 (가상 사건 예시로 단위 테스트)
+- [x] [W3] 직접 정답 요구 차단 모듈 — NPC 질문·새 힌트·보충 질문마다 작은 모델(`shelved.llm.filter-model`)로 의도 분류 호출(단순 금칙어 금지), AI 요청 접수·기회 확보 전에 수행, 차단 질문은 기록하지 않음(`400 QUESTION_BLOCKED`), 분류 호출은 `QUESTION_FILTER`로 사용량 기록, 분류 실패·형식 오류 시 접수하지 않고 해당 API의 `502` 반환(기회 미차감) (담당: BE-9, `QuestionFilterService.validateQuestion`에 실패 코드를 넘겨 재사용. NPC 질문에 연결, 힌트·보충 질문은 BE-10)
+- [~] [W3] 분류 프롬프트·판정 예시 — 차단: 범인 정체·범행 여부를 직접 또는 우회적으로 묻는 질문 / 허용: 행적·목격 사실·물증 질문, 증거 기반 추궁 (가상 사건 예시로 단위 테스트) (담당: BE-9, `prompts/question-filter.txt`에 차단 7·허용 8 예시. 응답 형식 파싱은 단위 테스트 완료, 실제 분류 정확도는 Fake라 미검증 → INT-3에서 확인)
 - [x] [W3] 테스트 — 같은 `requestId` 재전송 시 같은 결과(이후 횟수가 바뀌어도 당시 스냅샷), 동시 요청 한도 초과·중복 저장 없음(Testcontainers 통합 테스트), AI 실패 시 미차감, 늦은 응답 미반영, 재시작 복구 (담당: BE-8)
 
 ## 6. NPC 대화 (2.4절, 3.7절, `docs/api/investigation.md`)
 
-- [ ] [W3] `POST /api/rooms/{roomId}/npc/{suspectId}/ask` — 세션 상태 공통 검사, 이 사건의 인물인지(`404 SUSPECT_NOT_FOUND`), `canConverse=false`면 `400 NPC_NOT_CONVERSABLE`, 질문 1~500자, 질문·답변을 `sequence_no` 순서로 저장, 실패 시 `502 NPC_ANSWER_FAILED`
-- [ ] [W3] 이미 완료된 같은 `requestId`는 세션 상태 검사 없이 저장된 결과 반환
-- [ ] [W3] NPC 시스템 프롬프트 구성 — `persona_prompt` + 난이도별 응답 방식(쉬움: 자진해서 살짝 덧붙임 / 보통: 친절하게, 묻지 않은 것은 말하지 않음 / 어려움: 물어본 것만) + 용어집 + 해당 NPC 대화 이력 (2.3절)
-- [ ] [W3] 원작 기반 응답 원칙 반영 — 인물이 알 수 없는 사실 답변 금지, 설정에 없는 사건 사실·거짓말 즉흥 생성 금지, 증거 기반 추궁 허용·자백 여부는 설정 따름 (2.4절)
-- [ ] [W3] `GET /api/rooms/{roomId}/npc/{suspectId}/messages` — `sequenceNo` 순, `pendingRequests` 포함, 모든 상태에서 조회
-- [ ] [W3] 테스트 — 대화 불가 인물 거부, 다른 사건 인물 거부, 차단 질문 미기록, NPC별 동시 1건
+- [x] [W3] `POST /api/rooms/{roomId}/npc/{suspectId}/ask` — 세션 상태 공통 검사, 이 사건의 인물인지(`404 SUSPECT_NOT_FOUND`), `canConverse=false`면 `400 NPC_NOT_CONVERSABLE`, 질문 1~500자, 질문·답변을 `sequence_no` 순서로 저장, 실패 시 `502 NPC_ANSWER_FAILED` (담당: BE-9)
+- [x] [W3] 이미 완료된 같은 `requestId`는 세션 상태 검사 없이 저장된 결과 반환 (담당: BE-9, 완료·처리 중 재전송은 분류 호출도 하지 않음)
+- [x] [W3] NPC 시스템 프롬프트 구성 — `persona_prompt` + 난이도별 응답 방식(쉬움: 자진해서 살짝 덧붙임 / 보통: 친절하게, 묻지 않은 것은 말하지 않음 / 어려움: 물어본 것만) + 용어집 + 해당 NPC 대화 이력 (2.3절) (담당: BE-9, 이력은 최근 `shelved.npc.history-message-limit`개(잠정 30). persona → `persona_prompt` 변환은 `PersonaPromptComposer`, 시드 반영 포함)
+- [~] [W3] 원작 기반 응답 원칙 반영 — 인물이 알 수 없는 사실 답변 금지, 설정에 없는 사건 사실·거짓말 즉흥 생성 금지, 증거 기반 추궁 허용·자백 여부는 설정 따름 (2.4절) (담당: BE-9, `prompts/npc-system.txt`에 반영. 실제 답변 품질은 Fake라 미검증 → INT-3에서 확인)
+- [x] [W3] `GET /api/rooms/{roomId}/npc/{suspectId}/messages` — `sequenceNo` 순, `pendingRequests` 포함, 모든 상태에서 조회 (담당: BE-9, `GET state`의 `conversations` 집계 포함)
+- [x] [W3] 테스트 — 대화 불가 인물 거부, 다른 사건 인물 거부, 차단 질문 미기록, NPC별 동시 1건 (담당: BE-9, `NpcAskIntegrationTest`·`NpcMessageIntegrationTest`)
 
 ## 7. 물증 (3.8절, `docs/api/investigation.md`)
 

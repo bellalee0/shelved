@@ -97,7 +97,7 @@
 | `CLAUDE_MODEL` | 본 응답용 Claude 모델 (NPC 대화·힌트·채점·사건 제작) |
 | `CLAUDE_FILTER_MODEL` | 질문 분류용 작은 Claude 모델 (직접적인 정답 요구 차단) |
 
-`SHELVED_LLM_PROVIDER`가 `fake`(기본값)이면 Claude 관련 변수가 비어 있어도 서버가 기동되고 AI 기능은 고정 문장으로 응답합니다. `claude`로 지정하면 `CLAUDE_API_KEY`·`CLAUDE_MODEL`·`CLAUDE_FILTER_MODEL`이 모두 있어야 기동됩니다.
+`SHELVED_LLM_PROVIDER`가 `fake`(기본값)이면 Claude 관련 변수가 비어 있어도 서버가 기동되고 AI 기능은 고정 문장으로 응답합니다. 직접 정답 요구 차단(질문 분류)은 fake에서 기본 "허용"이며, 화면 확인용으로 질문에 `범인이 누구`가 들어 있을 때만 차단합니다(fake 전용 규칙, 실제 분류는 작은 모델이 판정). `claude`로 지정하면 `CLAUDE_API_KEY`·`CLAUDE_MODEL`·`CLAUDE_FILTER_MODEL`이 모두 있어야 기동됩니다.
 `GOOGLE_CLIENT_ID`가 비어 있어도 서버는 기동되지만 Google 로그인 요청은 모두 `GOOGLE_TOKEN_INVALID`로 실패합니다.
 
 `JWT_SECRET_KEY`는 아래 명령으로 만든 임의 값을 `.env`에 넣습니다. 이 값이 바뀌면 이미 발급된 액세스 토큰은 모두 `INVALID_TOKEN`이 됩니다.
@@ -177,8 +177,10 @@ set -a; source .env; set +a
 - 위치: `backend/src/main/resources/dev-data/*.json` (파일 하나 = 사건 하나). 실제 사건 정보가 들어가므로 **Git에서 제외**되어 있으며 커밋하지 않습니다.
 - 형식: 관리자 제작 초안([docs/api/admin-draft-schema.md](docs/api/admin-draft-schema.md))과 같은 JSON에 최상위 `map` 블록(맵 경로·시작 위치·충돌 레이어·상호작용 반경·`hotspots`)을 더한 형태입니다. 가상 사건으로 쓴 예시: [`backend/src/test/resources/dev-seed/clocktower-sample.json`](backend/src/test/resources/dev-seed/clocktower-sample.json)
 - 같은 표시명(`card.displayTitle`)의 공개 사건이 이미 있으면 건너뜁니다. 그래서 다시 기동해도 중복으로 들어가지 않고, **시드 파일을 고쳐도 자동으로 반영되지 않습니다.**
-- 검사(범인 1명, 없는 키 참조, 대화 가능 인물·모든 물증 배치, 좌표 0 이상, 배치된 인물의 `spriteKey`)를 통과하지 못한 파일은 건너뛰고, 서버 로그에 파일 이름과 실패 사유만 남깁니다.
+- 검사(범인 1명, 없는 키 참조, 대화 가능 인물·모든 물증 배치, 좌표 0 이상, 배치된 인물의 `spriteKey`, 대화 가능 인물의 `persona.statements`·`pressureResponse`)를 통과하지 못한 파일은 건너뛰고, 서버 로그에 파일 이름과 실패 사유만 남깁니다.
 - 폴더를 바꾸려면 `shelved.dev-seed.path`(기본 `classpath:dev-data/`, 예: `file:/절대/경로/`)를 지정합니다.
+
+- 대화 가능 인물의 `persona`는 넣을 때 NPC 설정 텍스트(`suspects.persona_prompt`)로 변환됩니다(원문 근거 `sourceRefs`는 제외). persona를 고친 경우에도 아래처럼 다시 넣어야 반영됩니다.
 
 고친 시드를 다시 넣으려면, 기존 사건을 비공개로 돌린 뒤 서버를 다시 띄웁니다. 기존 사건과 그 세션 기록은 DB에 남지만 사건 목록에는 나오지 않습니다.
 
