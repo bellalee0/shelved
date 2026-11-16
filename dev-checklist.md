@@ -237,13 +237,13 @@
 
 ## 9. 힌트 & 무료 보충 질문 (3.4절, `docs/api/hint-accusation.md`)
 
-- [ ] [W3] `GET /api/rooms/{roomId}/hints` — 힌트·보충 질문 시간순, `hintCount`, `followupAvailable`, `pendingRequests`, 종료 후에도 조회
-- [ ] [W3] `POST /api/rooms/{roomId}/hints` — 난이도별 한도(쉬움 5/보통 3/어려움 1, 처리 중 확보분 포함), 세션당 동시 1건, 정상 답변 저장 시에만 1회 사용, 실패 시 `502 HINT_GENERATION_FAILED`
-- [ ] [W3] `POST /api/rooms/{roomId}/hints/{hintId}/followup` — 이 세션의 힌트인지(`404 HINT_NOT_FOUND`), 힌트당 1회(`409 HINT_FOLLOWUP_ALREADY_USED`), 힌트 횟수 0이어도 가능, 새 정보 요구 시 안내 답변도 1회 사용 처리
-- [ ] [W3] 힌트 프롬프트 — 플레이어 질문, NPC 대화, 물증 조사 이력, 이전 힌트, 사건 정보 참고. 범인·트릭 정답 직접 공개 금지, NPC 진술의 출처 유지(거짓일 수 있는 진술을 사실처럼 말하지 않음)
-- [ ] [W3] 보충 질문 프롬프트 — 원래 질문·힌트 답변 범위 안에서만 풀어 설명, 새 단서·정답 정보 추가 금지
-- [ ] [W3] `HINT_FOLLOWUP` 유형으로 사용량 기록
-- [ ] [W3] 테스트 — 한도 소진, 동시 요청 한도 초과 없음, 보충 질문 중복 거부, 차단 질문 미차감, 실패 미차감
+- [x] [W3] `GET /api/rooms/{roomId}/hints` — 힌트·보충 질문 시간순, `hintCount`, `followupAvailable`, `pendingRequests`, 종료 후에도 조회 (담당: BE-10)
+- [x] [W3] `POST /api/rooms/{roomId}/hints` — 난이도별 한도(쉬움 5/보통 3/어려움 1, 처리 중 확보분 포함), 세션당 동시 1건, 정상 답변 저장 시에만 1회 사용, 실패 시 `502 HINT_GENERATION_FAILED` (담당: BE-10)
+- [x] [W3] `POST /api/rooms/{roomId}/hints/{hintId}/followup` — 이 세션의 힌트인지(`404 HINT_NOT_FOUND`), 힌트당 1회(`409 HINT_FOLLOWUP_ALREADY_USED`), 힌트 횟수 0이어도 가능, 새 정보 요구 시 안내 답변도 1회 사용 처리 (담당: BE-10. 안내 답변 사용 처리는 Fake 답변으로 확인)
+- [~] [W3] 힌트 프롬프트 — 플레이어 질문, NPC 대화, 물증 조사 이력, 이전 힌트, 사건 정보 참고. 범인·트릭 정답 직접 공개 금지, NPC 진술의 출처 유지(거짓일 수 있는 진술을 사실처럼 말하지 않음) (담당: BE-10. 컨텍스트 구성·출처 표기·한도는 테스트로 확인, 품질(정답 비공개·출처 유지)은 INT-3 확인)
+- [~] [W3] 보충 질문 프롬프트 — 원래 질문·힌트 답변 범위 안에서만 풀어 설명, 새 단서·정답 정보 추가 금지 (담당: BE-10. 정답·트릭·NPC 설정·수사 기록을 입력에서 뺀 것은 테스트로 확인, 품질은 INT-3 확인)
+- [x] [W3] `HINT_FOLLOWUP` 유형으로 사용량 기록 (담당: BE-10. 새 힌트 `HINT`, 분류 `QUESTION_FILTER`도 확인)
+- [x] [W3] 테스트 — 한도 소진, 동시 요청 한도 초과 없음, 보충 질문 중복 거부, 차단 질문 미차감, 실패 미차감 (담당: BE-10)
 
 ## 10. 지목 & 채점 (3.2절, 3.5~3.6절, `docs/api/hint-accusation.md`)
 

@@ -9,8 +9,6 @@ import static com.shelved.common.exception.ErrorCode.ROOM_TIME_EXPIRED;
 import com.shelved.common.config.GameProperties;
 import com.shelved.common.entity.MysteryCase;
 import com.shelved.common.entity.Room;
-import com.shelved.common.enums.AiRequestStatus;
-import com.shelved.common.enums.AiRequestType;
 import com.shelved.common.enums.GradingStatus;
 import com.shelved.common.enums.RoomStatus;
 import com.shelved.common.exception.CustomException;
@@ -18,13 +16,12 @@ import com.shelved.common.jwt.AuthUser;
 import com.shelved.common.utils.SafeExceptionLog;
 import com.shelved.domain.accusation.repository.AccusationRepository;
 import com.shelved.domain.airequest.service.AiRequestQueryService;
-import com.shelved.domain.hint.repository.HintRepository;
+import com.shelved.domain.hint.service.HintUsageCounter;
 import com.shelved.domain.room.dto.RoomConnectionResponse;
 import com.shelved.domain.npc.repository.NpcMessageRepository;
 import com.shelved.domain.room.dto.RoomStateResponse;
 import com.shelved.domain.room.dto.RoomStateResponse.RoomUsageCount;
 import com.shelved.domain.room.dto.RoomTimerResponse;
-import com.shelved.domain.room.repository.AiRequestRepository;
 import com.shelved.domain.room.repository.RoomRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -46,8 +43,7 @@ public class RoomLifecycleService {
 
     private final RoomRepository roomRepository;
     private final AccusationRepository accusationRepository;
-    private final HintRepository hintRepository;
-    private final AiRequestRepository aiRequestRepository;
+    private final HintUsageCounter hintUsageCounter;
     private final AiRequestQueryService aiRequestQueryService;
     private final NpcMessageRepository npcMessageRepository;
     private final RoomAccessService roomAccessService;
@@ -67,10 +63,7 @@ public class RoomLifecycleService {
         roomTimeSettler.settle(room, now);
 
         MysteryCase mysteryCase = room.getMysteryCase();
-        RoomUsageCount hintCount = new RoomUsageCount(
-                gameProperties.hintLimitOf(mysteryCase.getDifficulty()),
-                hintRepository.countByRoomId(roomId),
-                aiRequestRepository.countByRoomIdAndRequestTypeAndStatus(roomId, AiRequestType.HINT, AiRequestStatus.PROCESSING));
+        RoomUsageCount hintCount = hintUsageCounter.countHintUsage(roomId, mysteryCase.getDifficulty());
         RoomUsageCount accusationCount = new RoomUsageCount(
                 gameProperties.accusationLimit(),
                 accusationRepository.countByRoomIdAndGradingStatus(roomId, GradingStatus.COMPLETED),

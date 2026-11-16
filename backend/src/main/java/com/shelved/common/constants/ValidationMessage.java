@@ -31,7 +31,7 @@ public final class ValidationMessage {
     public static final String REQUEST_ID_NOT_BLANK = "요청 식별자는 필수입니다.";
     public static final String REQUEST_ID_PATTERN = "요청 식별자 형식이 올바르지 않습니다.";
 
-    // --- NPC ---
+    // --- 질문 (NPC 질문·새 힌트·보충 질문 공통) ---
     public static final String QUESTION_NOT_BLANK = "질문 내용은 필수입니다.";
     public static final String QUESTION_SIZE = "질문은 500자 이하로 입력해 주세요.";
 
