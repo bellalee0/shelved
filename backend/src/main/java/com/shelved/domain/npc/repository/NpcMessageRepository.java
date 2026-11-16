@@ -32,4 +32,19 @@ public interface NpcMessageRepository extends JpaRepository<NpcMessage, Long> {
             order by c.suspect.id asc
             """)
     List<NpcConversationSummaryResponse> findConversationSummaryList(@Param("roomId") Long roomId);
+
+    /**
+     * 세션의 모든 NPC 대화에서 대화별 최근 limit개 메시지 (suspectId → sequenceNo 오름차순, 한 번에 조회. 힌트 프롬프트용).
+     * 같은 대화에서 자기보다 뒤인 메시지가 limit개 미만인 메시지만 고른다
+     */
+    @Query("""
+            select new com.shelved.domain.npc.repository.NpcRecentMessageRow(
+                s.id, s.name, m.senderType, m.content, m.sequenceNo)
+            from NpcMessage m join m.conversation c join c.suspect s
+            where c.room.id = :roomId
+              and (select count(later) from NpcMessage later
+                   where later.conversation = c and later.sequenceNo > m.sequenceNo) < :limit
+            order by s.id asc, m.sequenceNo asc
+            """)
+    List<NpcRecentMessageRow> findRecentMessageRowList(@Param("roomId") Long roomId, @Param("limit") long limit);
 }
