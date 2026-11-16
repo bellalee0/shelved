@@ -20,6 +20,7 @@ import com.shelved.domain.accusation.repository.AccusationRepository;
 import com.shelved.domain.airequest.service.AiRequestQueryService;
 import com.shelved.domain.hint.repository.HintRepository;
 import com.shelved.domain.room.dto.RoomConnectionResponse;
+import com.shelved.domain.npc.repository.NpcMessageRepository;
 import com.shelved.domain.room.dto.RoomStateResponse;
 import com.shelved.domain.room.dto.RoomStateResponse.RoomUsageCount;
 import com.shelved.domain.room.dto.RoomTimerResponse;
@@ -48,6 +49,7 @@ public class RoomLifecycleService {
     private final HintRepository hintRepository;
     private final AiRequestRepository aiRequestRepository;
     private final AiRequestQueryService aiRequestQueryService;
+    private final NpcMessageRepository npcMessageRepository;
     private final RoomAccessService roomAccessService;
     private final RoomTimeSettler roomTimeSettler;
     private final RoomSettlementService roomSettlementService;
@@ -87,7 +89,7 @@ public class RoomLifecycleService {
                 accusationCount,
                 null,
                 aiRequestQueryService.getActiveAiRequestList(roomId),
-                List.of()
+                npcMessageRepository.findConversationSummaryList(roomId)
         );
     }
 
