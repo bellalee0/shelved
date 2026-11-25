@@ -81,6 +81,50 @@ class ClaudeLlmClientTest {
     }
 
     @Test
+    void call_분류요청_thinking끔_응답형식강제() {
+
+        // given 분류 모델은 생각이 기본으로 켜져 있어, 짧은 출력 한도를 생각에 다 쓰고 텍스트 없이 끝날 수 있다
+        server.expect(requestTo(MESSAGES_URL))
+                .andExpect(jsonPath("$.model").value("example-filter-model"))
+                .andExpect(jsonPath("$.thinking.type").value("disabled"))
+                // 메타 질문에 설명문으로 답하지 않도록 응답 형식을 {"blocked": boolean}으로 강제한다
+                .andExpect(jsonPath("$.output_config.format.type").value("json_schema"))
+                .andExpect(jsonPath("$.output_config.format.schema.type").value("object"))
+                .andExpect(jsonPath("$.output_config.format.schema.properties.blocked.type").value("boolean"))
+                .andExpect(jsonPath("$.output_config.format.schema.required[0]").value("blocked"))
+                .andExpect(jsonPath("$.output_config.format.schema.additionalProperties").value(false))
+                .andRespond(withSuccess("""
+                        {"content":[{"type":"text","text":"{\\"blocked\\": false}"}],"usage":{"input_tokens":5,"output_tokens":5}}
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        claudeLlmClient.call(new LlmRequest(LlmRequestType.QUESTION_FILTER, LlmModelTier.FILTER,
+                "가상 사건의 질문 분류기다.", List.of(LlmMessage.user("어젯밤 무엇을 했나요?")), 64));
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    void call_본응답요청_thinking과응답형식미지정() {
+
+        // given 본 응답은 모델 기본값(생각 켜짐)을 그대로 쓴다
+        server.expect(requestTo(MESSAGES_URL))
+                .andExpect(jsonPath("$.model").value("example-main-model"))
+                .andExpect(jsonPath("$.thinking").doesNotExist())
+                .andExpect(jsonPath("$.output_config").doesNotExist())
+                .andRespond(withSuccess("""
+                        {"content":[{"type":"text","text":"서재 근처에는 가지 않았습니다."}],"usage":{"input_tokens":5,"output_tokens":5}}
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        claudeLlmClient.call(npcRequest("어젯밤 9시에 서재 근처에 있었나요?"));
+
+        // then
+        server.verify();
+    }
+
+    @Test
     void call_사용량없음_토큰null() {
 
         // given
@@ -158,6 +202,27 @@ class ClaudeLlmClientTest {
                 .isInstanceOfSatisfying(LlmException.class, e -> assertThat(e.getErrorType()).isEqualTo(LlmErrorType.LLM_INVALID_RESPONSE));
         assertThatThrownBy(() -> claudeLlmClient.call(npcRequest("둘째 질문")))
                 .isInstanceOfSatisfying(LlmException.class, e -> assertThat(e.getErrorType()).isEqualTo(LlmErrorType.LLM_INVALID_RESPONSE));
+    }
+
+    @Test
+    void call_텍스트없음_실패사유에stop_reason포함() {
+
+        // given 빈 content로 끝난 응답 (예: 모델이 출력 없이 종료하거나 거절)
+        server.expect(requestTo(MESSAGES_URL)).andRespond(withSuccess("""
+                {"content":[],"stop_reason":"refusal","usage":{"input_tokens":12,"output_tokens":0}}
+                """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(MESSAGES_URL)).andRespond(withSuccess("""
+                {"content":[],"usage":{"input_tokens":12,"output_tokens":0}}
+                """, MediaType.APPLICATION_JSON));
+
+        // when & then 원인을 구분할 수 있게 stop_reason을 사유에 담는다 (응답 본문은 담지 않는다)
+        assertThatThrownBy(() -> claudeLlmClient.call(npcRequest("첫 질문")))
+                .isInstanceOfSatisfying(LlmException.class, e -> {
+                    assertThat(e.getErrorType()).isEqualTo(LlmErrorType.LLM_INVALID_RESPONSE);
+                    assertThat(e.getMessage()).contains("텍스트 없음").contains("stop_reason=refusal");
+                });
+        assertThatThrownBy(() -> claudeLlmClient.call(npcRequest("둘째 질문")))
+                .isInstanceOfSatisfying(LlmException.class, e -> assertThat(e.getMessage()).contains("stop_reason=null"));
     }
 
     private static LlmRequest npcRequest(String question) {
