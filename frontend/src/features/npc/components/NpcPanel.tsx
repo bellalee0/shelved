@@ -50,7 +50,8 @@ export function NpcPanel({
   const textareaId = useId();
   const counterId = `${textareaId}-counter`;
   const [draft, setDraft] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  // 입력 영역(맨 아래). 새 말풍선·안내가 생기면 여기가 보이도록 패널을 맨 아래로 내린다
+  const footerRef = useRef<HTMLDivElement>(null);
 
   const { messagesQuery, request } = useNpcChat({
     roomId,
@@ -64,9 +65,10 @@ export function NpcPanel({
   const { state, isBusy } = request;
   const messages = messagesQuery.data?.messages ?? [];
 
-  // 새 말풍선이 생기면 아래로 내린다 (jsdom에는 scrollIntoView가 없다)
+  // 새 말풍선·차단 안내가 생기면 입력 영역까지 내린다. 마지막 말풍선이 아니라 입력 영역을 기준으로 해야
+  // 답변을 읽고 바로 다음 질문을 쓸 수 있다 (jsdom에는 scrollIntoView가 없다)
   useEffect(() => {
-    endRef.current?.scrollIntoView?.({ block: 'end' });
+    footerRef.current?.scrollIntoView?.({ block: 'end' });
   }, [messages.length, state.phase]);
 
   const question = draft.trim();
@@ -135,9 +137,7 @@ export function NpcPanel({
           </Button>
         </div>
       )}
-      <div ref={endRef} />
-
-      <div className="mt-auto flex flex-col gap-2 border-t border-line pt-4">
+      <div ref={footerRef} className="mt-auto flex flex-col gap-2 border-t border-line pt-4">
         {!suspect.canConverse ? (
           <p className="text-sm text-muted">{NOT_CONVERSABLE_MESSAGE}</p>
         ) : (

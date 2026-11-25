@@ -57,6 +57,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   resetApiSession();
+  // 스크롤 테스트에서 붙인 함수를 지워 jsdom 기본 상태로 돌린다
+  delete (Element.prototype as Partial<Element>).scrollIntoView;
 });
 
 describe('NpcPanel', () => {
@@ -77,6 +79,24 @@ describe('NpcPanel', () => {
     expect(bubbles[0]).toHaveTextContent(QUESTION);
     expect(bubbles[1]).toHaveTextContent('톰');
     expect(screen.queryByText('답변 생성 중…')).not.toBeInTheDocument();
+  });
+
+  it('답변이 오면 입력 영역까지 스크롤한다', async () => {
+    // given
+    const scrolled: Element[] = [];
+    Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
+      scrolled.push(this);
+    });
+    const { onAnswered } = renderPanel();
+    const textarea = await typeQuestion(QUESTION);
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }));
+    await waitFor(() => expect(onAnswered).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(within(conversation()).getAllByRole('listitem')).toHaveLength(2));
+
+    // then 마지막 말풍선이 아니라 입력창을 담은 입력 영역이 마지막 스크롤 대상이다
+    await waitFor(() => expect(scrolled.at(-1)?.contains(textarea)).toBe(true));
   });
 
   it('Enter로 보내고 Shift+Enter는 보내지 않는다', async () => {

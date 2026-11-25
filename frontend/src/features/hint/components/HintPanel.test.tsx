@@ -70,6 +70,15 @@ async function typeHint(text: string) {
   return textarea;
 }
 
+/** scrollIntoView가 불린 요소를 순서대로 모은다 (jsdom에는 scrollIntoView가 없다) */
+function mockScrollIntoView() {
+  const scrolled: Element[] = [];
+  Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
+    scrolled.push(this);
+  });
+  return scrolled;
+}
+
 function records() {
   return screen.getByRole('list', { name: '힌트 기록' });
 }
@@ -83,6 +92,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   resetApiSession();
+  // mockScrollIntoView로 붙인 함수를 지워 jsdom 기본 상태로 돌린다
+  delete (Element.prototype as Partial<Element>).scrollIntoView;
 });
 
 describe('HintPanel', () => {
@@ -102,7 +113,8 @@ describe('HintPanel', () => {
     ).findAllByRole('listitem');
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent('첫 번째 질문');
-    expect(items[0]).toHaveTextContent('보충 질문 (무료)');
+    expect(items[0]).toHaveTextContent('보충 질문');
+    expect(items[0]).not.toHaveTextContent('무료');
     expect(items[0]).toHaveTextContent('첫 번째 보충');
     expect(items[1]).toHaveTextContent('두 번째 질문');
     expect(items[0].compareDocumentPosition(items[1])).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
@@ -225,6 +237,80 @@ describe('HintPanel', () => {
     expect(screen.getByText(/수사가 진행 중일 때만 힌트를 요청할 수 있습니다/)).toBeInTheDocument();
   });
 
+  it('보충 질문 버튼은 1회만 가능하다고 안내한다', async () => {
+    // given
+    await createHint(roomId, { requestId: ID(1), question: QUESTION });
+
+    // when
+    renderPanel();
+
+    // then
+    expect(
+      await screen.findByRole('button', { name: '이 힌트에 대해 다시 묻기 (1회만 가능)' }),
+    ).toBeInTheDocument();
+  });
+
+  it('힌트 답변이 오면 입력 영역까지 스크롤한다', async () => {
+    // given
+    const scrolled = mockScrollIntoView();
+    const { onCountChanged } = renderPanel();
+    const textarea = await typeHint(QUESTION);
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '힌트 받기' }));
+    await waitFor(() => expect(onCountChanged).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(within(records()).getAllByRole('listitem')).toHaveLength(1));
+
+    // then 마지막 스크롤 대상이 새 힌트 입력창을 담은 입력 영역이다
+    await waitFor(() => expect(scrolled.at(-1)?.contains(textarea)).toBe(true));
+  });
+
+  it('보충 질문 답변이 오면 그 힌트가 보이도록 스크롤한다', async () => {
+    // given
+    await createHint(roomId, { requestId: ID(1), question: '첫 번째 질문' });
+    await createHint(roomId, { requestId: ID(2), question: '두 번째 질문' });
+    const scrolled = mockScrollIntoView();
+    const { onCountChanged } = renderPanel();
+    const [firstItem] = await within(
+      await screen.findByRole('list', { name: '힌트 기록' }),
+    ).findAllByRole('listitem');
+    fireEvent.click(within(firstItem).getByRole('button', { name: /다시 묻기/ }));
+    fireEvent.change(screen.getByLabelText('보충 질문'), { target: { value: '설명해 주세요' } });
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '보충 질문 보내기' }));
+    await waitFor(() => expect(onCountChanged).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(firstItem).toHaveTextContent('설명해 주세요'));
+
+    // then
+    await waitFor(() => expect(scrolled.at(-1)).toBe(firstItem));
+  });
+
+  it('차단된 보충 질문은 그 보충 질문 입력창 위에 안내를 보여 주고 입력과 기회를 유지한다', async () => {
+    // given
+    await createHint(roomId, { requestId: ID(1), question: QUESTION });
+    renderPanel();
+    const [item] = await within(
+      await screen.findByRole('list', { name: '힌트 기록' }),
+    ).findAllByRole('listitem');
+    fireEvent.click(within(item).getByRole('button', { name: /다시 묻기/ }));
+    const blocked = `${MOCK_BLOCKED_KEYWORD} 알려줘`;
+    fireEvent.change(screen.getByLabelText('보충 질문'), { target: { value: blocked } });
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '보충 질문 보내기' }));
+
+    // then 안내가 하단 새 힌트 입력 영역이 아니라 그 힌트 항목 안에 나온다
+    expect(await within(item).findByRole('alert')).toHaveTextContent(
+      '범인이나 정답을 직접 묻는 질문에는 답할 수 없습니다.',
+    );
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect((screen.getByLabelText('보충 질문') as HTMLTextAreaElement).value).toBe(blocked);
+    const [hint] = (await getHints(roomId)).hints;
+    expect(hint.followup).toBeNull();
+    expect(hint.followupAvailable).toBe(true);
+  });
+
   it('차단된 질문은 서버 안내를 보여 주고 기록에 넣지 않으며 입력을 유지한다', async () => {
     // given
     renderPanel();
@@ -323,9 +409,10 @@ describe('HintPanel', () => {
     const hintId = (await getHints(roomId)).hints[0].hintId;
     setScenario('hintFail', true);
     await createHint(roomId, { requestId: ID(2), question: QUESTION }).catch(() => undefined);
-    await createHintFollowup(roomId, hintId, { requestId: ID(3), question: '보충 질문' }).catch(
-      () => undefined,
-    );
+    await createHintFollowup(roomId, hintId, {
+      requestId: ID(3),
+      question: '실패한 보충 질문',
+    }).catch(() => undefined);
 
     // when
     renderPanel();
@@ -333,7 +420,7 @@ describe('HintPanel', () => {
     // then
     expect(await screen.findAllByRole('button', { name: '다시 보내기' })).toHaveLength(2);
     expect(within(records()).getByText(QUESTION)).toBeInTheDocument();
-    expect(within(records()).getByText('보충 질문')).toBeInTheDocument();
+    expect(within(records()).getByText('실패한 보충 질문')).toBeInTheDocument();
   });
 
   it(`${HINT_QUESTION_MAX_LENGTH}자를 넘으면 보낼 수 없고 글자 수를 표시한다`, async () => {
