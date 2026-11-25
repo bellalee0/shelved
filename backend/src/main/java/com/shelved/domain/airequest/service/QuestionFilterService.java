@@ -77,7 +77,8 @@ public class QuestionFilterService {
         try {
             response = llmUsageRecordingClient.call(request, callContext);
         } catch (LlmException e) {
-            log.warn("질문 분류 호출 실패 requestId={} errorType={}", requestId, e.getErrorType());
+            // 예외 메시지에는 실패 구분·상태 코드·stop_reason만 있고 질문·응답 본문은 없다 (LlmException)
+            log.warn("질문 분류 호출 실패 requestId={} errorType={} reason={}", requestId, e.getErrorType(), e.getMessage());
             throw new CustomException(failureCode, new AiRequestFailureDetail(requestId));
         }
 

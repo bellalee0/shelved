@@ -54,9 +54,7 @@ function QaPair({
         pending ? 'opacity-70' : ''
       }`}
     >
-      <p className="text-xs font-bold text-muted">
-        {isFollowup ? '보충 질문 (무료)' : '새 힌트 질문'}
-      </p>
+      <p className="text-xs font-bold text-muted">{isFollowup ? '보충 질문' : '새 힌트 질문'}</p>
       <p className="self-end rounded-md bg-accent px-3 py-2 text-sm break-words whitespace-pre-wrap text-surface">
         {question}
       </p>
@@ -97,7 +95,7 @@ function activeInput<T>(state: AiRequestState<T>): T | null {
 }
 
 /**
- * 힌트 대화창. 열 때 힌트 기록·횟수를 불러오고(횟수를 차감하지 않는다), 새 힌트와 무료 보충 질문을 보낸다.
+ * 힌트 대화창. 열 때 힌트 기록·횟수를 불러오고(횟수를 차감하지 않는다), 새 힌트와 보충 질문(힌트당 1회, 횟수 차감 없음)을 보낸다.
  * 창을 닫아도 서버의 요청은 취소되지 않는다. 다시 열면 기록의 pendingRequests로 "답변 생성 중"·"다시 보내기"를 복원한다.
  *
  * 동시 요청은 단순하게 제한한다: AI 요청이 하나라도 처리 중이면 새 힌트·보충 질문 입력을 모두 막는다.
@@ -117,7 +115,13 @@ export function HintPanel({
   // 보충 질문 입력창이 열려 있는 힌트와 그 입력 내용
   const [followupHintId, setFollowupHintId] = useState<number | null>(null);
   const [followupDraft, setFollowupDraft] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  // 보충 질문이 접수되지 않은(차단 등) 힌트. 안내를 그 힌트의 보충 질문 입력창 위에 보여 준다
+  const [followupRejectedHintId, setFollowupRejectedHintId] = useState<number | null>(null);
+  // 입력 영역(맨 아래)과 힌트별 항목. 새 내용이 생기면 그 위치가 보이도록 스크롤한다
+  const footerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef(new Map<number, HTMLLIElement>());
+  // 마지막으로 보충 질문을 다룬 힌트. 답변이 오면 입력창은 닫혀 있으므로 이 값으로 그 힌트를 보여 준다
+  const lastFollowupHintIdRef = useRef<number | null>(null);
 
   const { hintsQuery, hintRequest, followupRequest } = useHintChat({
     roomId,
@@ -128,6 +132,7 @@ export function HintPanel({
       setDraft((current) => (current === '' ? input.question : current)),
     onFollowupRejected: (input: FollowupQuestionInput) => {
       setFollowupHintId(input.hintId);
+      setFollowupRejectedHintId(input.hintId);
       setFollowupDraft((current) => (current === '' ? input.question : current));
     },
     onSessionRejected,
@@ -138,10 +143,25 @@ export function HintPanel({
   const pendingHintInput = activeInput(hintRequest.state);
   const pendingFollowupInput = activeInput(followupRequest.state);
 
-  // 새 말풍선이 생기면 아래로 내린다 (jsdom에는 scrollIntoView가 없다)
+  const followupCount = hints.filter((hint) => hint.followup !== null).length;
+  const activeFollowupHintId = followupHintId ?? pendingFollowupInput?.hintId ?? null;
+
+  // 새 힌트·차단 안내가 생기면 입력 영역까지 내린다. 마지막 기록이 아니라 입력 영역을 기준으로 해야
+  // 답변을 읽고 바로 다음 질문을 쓸 수 있다 (jsdom에는 scrollIntoView가 없다)
   useEffect(() => {
-    endRef.current?.scrollIntoView?.({ block: 'end' });
-  }, [hints.length, hintRequest.state.phase, followupRequest.state.phase]);
+    footerRef.current?.scrollIntoView?.({ block: 'end' });
+  }, [hints.length, hintRequest.state.phase]);
+
+  // 보충 질문은 그 힌트 바로 아래에 있으므로 입력창을 열 때·답변 생성 중·답변이 왔을 때 그 힌트가 보이게 한다
+  useEffect(() => {
+    if (activeFollowupHintId !== null) {
+      lastFollowupHintIdRef.current = activeFollowupHintId;
+    }
+    const target = activeFollowupHintId ?? lastFollowupHintIdRef.current;
+    if (target !== null) {
+      itemRefs.current.get(target)?.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, [activeFollowupHintId, followupRequest.state.phase, followupCount]);
 
   const count = hintsQuery.data
     ? withPendingReservation(hintsQuery.data.hintCount, hintRequest.isBusy)
@@ -159,6 +179,7 @@ export function HintPanel({
 
   function handleSubmitFollowup(hintId: number) {
     if (followupRequest.submit({ hintId, question: followupDraft.trim() })) {
+      setFollowupRejectedHintId(null);
       setFollowupDraft('');
       setFollowupHintId(null);
     }
@@ -194,8 +215,17 @@ export function HintPanel({
       hasConnection,
     });
     if (reason === null && followupHintId === hint.hintId) {
+      const followupRejection =
+        followupRejectedHintId === hint.hintId && followupRequest.state.phase === 'idle'
+          ? followupRequest.state.error?.message
+          : undefined;
       return (
-        <div className="ml-4 border-l-2 border-accent/40 pl-3">
+        <div className="ml-4 flex flex-col gap-2 border-l-2 border-accent/40 pl-3">
+          {followupRejection && (
+            <p role="alert" className="text-sm text-danger">
+              {followupRejection}
+            </p>
+          )}
           <QuestionForm
             label="보충 질문"
             placeholder="이 힌트에 대해 궁금한 점을 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)"
@@ -218,7 +248,7 @@ export function HintPanel({
           disabled={disabled}
           onClick={() => setFollowupHintId(hint.hintId)}
         >
-          이 힌트에 대해 다시 묻기 (무료 1회)
+          이 힌트에 대해 다시 묻기 (1회만 가능)
         </Button>
         {reason !== null && <p className="text-xs text-muted">{FOLLOWUP_BLOCK_MESSAGES[reason]}</p>}
         {reason === null && busy && (
@@ -228,10 +258,10 @@ export function HintPanel({
     );
   }
 
-  // 마지막 전송이 접수되지 않았을 때(차단·한도 초과 등)의 안내. 서버 message를 그대로 보여 준다
+  // 새 힌트가 접수되지 않았을 때(차단·한도 초과 등)의 안내. 서버 message를 그대로 보여 준다.
+  // 보충 질문의 안내는 그 힌트의 보충 질문 입력창 위에 따로 보여 준다
   const rejectionMessage =
-    (hintRequest.state.phase === 'idle' ? hintRequest.state.error?.message : null) ??
-    (followupRequest.state.phase === 'idle' ? followupRequest.state.error?.message : null);
+    hintRequest.state.phase === 'idle' ? hintRequest.state.error?.message : null;
 
   return (
     <SidePanel title="힌트" onClose={onClose}>
@@ -248,7 +278,17 @@ export function HintPanel({
 
       <ol aria-label="힌트 기록" className="flex flex-col gap-5">
         {hints.map((hint) => (
-          <li key={hint.hintId} className="flex flex-col gap-3">
+          <li
+            key={hint.hintId}
+            ref={(element) => {
+              if (element) {
+                itemRefs.current.set(hint.hintId, element);
+              } else {
+                itemRefs.current.delete(hint.hintId);
+              }
+            }}
+            className="flex flex-col gap-3"
+          >
             <QaPair kind="HINT" question={hint.question} answer={hint.content} />
             {renderFollowup(hint)}
           </li>
@@ -272,9 +312,7 @@ export function HintPanel({
       (followupRequest.isBusy && pendingFollowupInput === null) ? (
         <LoadingIndicator label="이전 질문의 답변을 기다리는 중…" />
       ) : null}
-      <div ref={endRef} />
-
-      <div className="mt-auto flex flex-col gap-2 border-t border-line pt-4">
+      <div ref={footerRef} className="mt-auto flex flex-col gap-2 border-t border-line pt-4">
         {rejectionMessage && (
           <p role="alert" className="text-sm text-danger">
             {rejectionMessage}

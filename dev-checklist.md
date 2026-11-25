@@ -94,7 +94,7 @@
 - [x] [W1] 쓰지 않는 브랜치·worktree 정리 — 미커밋 API 보완 내용은 `dev`로 옮긴 뒤 삭제 (담당: Claude)
 - [x] [W1] 루트 `.editorconfig` — UTF-8·LF·마지막 개행, Java 4칸 / TS·JSON·YAML 2칸 (common.md 포맷 규칙) (담당: BE-1)
 - [x] [W1] JSON 네이밍/에러 응답/날짜 형식 등 API 공통 컨벤션 확정 — 초안은 `docs/api/README.md`·`errors.md`에 작성됨 (메모: FE-2·BE-3 구현과 INT로 확인)
-- [~] [W1] Google Cloud OAuth client ID 발급, Claude API 키 발급 (소유자, 메모: OAuth client ID 확인(INT), Claude API 키는 미확인)
+- [~] [W1] Google Cloud OAuth client ID 발급, Claude API 키 발급 (소유자, 메모: 실제 호출 확인 완료)
 
 ### 백엔드 기반
 
@@ -103,7 +103,7 @@
 - [x] [W1] PostgreSQL 로컬 실행 환경 (`docker-compose.yml`) (담당: BE-1)
 - [x] [W1] 환경별 프로필 — 테스트 `create-drop`, 폐기 가능한 로컬 `update`, 보존할 개발·시연 DB `validate` (backend.md 환경별 스키마 관리) (담당: BE-1)
 - [x] [W1] `application.yml` + `@ConfigurationProperties` (`common/config`, 키 `shelved.{영역}.{항목}`) — 난이도별 제한시간·힌트 횟수, 지목 기회(3), 하트비트 간격(5s)·이탈 판정(15s), AI 작업 시간 제한, 채점 재시도 최소 간격(10s), 노트 최대 글자 수, 원문 업로드 크기 한도, 표지 크기 한도(5MB), Claude 모델명(본 응답용·질문 분류용 `shelved.llm.filter-model`), 입·출력 토큰 예산, 에셋 경로(`shelved.assets.base-path`), 표지 저장 경로 (담당: BE-1)
-- [~] [W1] 잠정 초기값 적용 (사건 A 플레이테스트 후 조정) — 하트비트 간격 5초·이탈 판정 15초, 채점 재시도 최소 간격 10초, 노트 최대 5000자·입력 멈춘 뒤 2초 후 자동 저장, 게임 AI 호출 시간 제한 60초, 관리자 제작 채팅 시간 제한 300초, `PROCESSING` 복구 기준은 시간 제한 + 60초, AI 요청 상태 조회 간격 2초 (담당: BE-1, 서버 설정값만 적용. 자동 저장 2초·상태 조회 간격 2초는 프론트엔드 값)
+- [~] [W1] 잠정 초기값 적용 (사건 A 플레이테스트 후 조정) — 하트비트 간격 5초·이탈 판정 15초, 채점 재시도 최소 간격 10초, 노트 최대 5000자·입력 멈춘 뒤 2초 후 자동 저장, 게임 AI 호출 시간 제한 60초, 관리자 제작 채팅 시간 제한 300초, `PROCESSING` 복구 기준은 시간 제한 + 60초, AI 요청 상태 조회 간격 2초 (담당: BE-1, 서버 설정값만 적용. 자동 저장 2초·상태 조회 간격 2초는 프론트엔드 값, NPC 응답 최대 33초 관측(시간 제한 60초))
 - [x] [W1] `Clock` 빈 등록 (게임 시간 판정용, backend.md 12) (담당: BE-1)
 - [x] [W1] `CommonResponse`, `ErrorData`, `PageResponse`, `SuccessMessage`, `ValidationMessage` (담당: BE-1)
 - [x] [W1] `ErrorCode` — `docs/api/errors.md`의 전체 코드·상태·메시지를 그대로 정의 (담당: BE-1)
@@ -211,7 +211,7 @@
 - [x] [W3] `GET /api/rooms/{roomId}/ai-requests/{requestId}` — 참가자 권한 검사, 일시정지·종료 후에도 조회, 내부 입력 컨텍스트 미노출 (담당: BE-8)
 - [x] [W3] 작업 시간 제한·서버 재시작 복구 — 오래된 `PROCESSING`을 `FAILED`로 정리하는 스케줄러·시작 시 복구 (담당: BE-8)
 - [x] [W3] 직접 정답 요구 차단 모듈 — NPC 질문·새 힌트·보충 질문마다 작은 모델(`shelved.llm.filter-model`)로 의도 분류 호출(단순 금칙어 금지), AI 요청 접수·기회 확보 전에 수행, 차단 질문은 기록하지 않음(`400 QUESTION_BLOCKED`), 분류 호출은 `QUESTION_FILTER`로 사용량 기록, 분류 실패·형식 오류 시 접수하지 않고 해당 API의 `502` 반환(기회 미차감) (담당: BE-9, `QuestionFilterService.validateQuestion`에 실패 코드를 넘겨 재사용. NPC 질문에 연결, 힌트·보충 질문은 BE-10)
-- [~] [W3] 분류 프롬프트·판정 예시 — 차단: 범인 정체·범행 여부를 직접 또는 우회적으로 묻는 질문 / 허용: 행적·목격 사실·물증 질문, 증거 기반 추궁 (가상 사건 예시로 단위 테스트) (담당: BE-9, `prompts/question-filter.txt`에 차단 7·허용 8 예시. 응답 형식 파싱은 단위 테스트 완료, 실제 분류 정확도는 Fake라 미검증 → INT-3에서 확인)
+- [x] [W3] 분류 프롬프트·판정 예시 — 차단: 범인 정체·범행 여부를 직접 또는 우회적으로 묻는 질문 / 허용: 행적·목격 사실·물증 질문, 증거 기반 추궁 (가상 사건 예시로 단위 테스트) (담당: BE-9, 메모: INT-3 실제 호출로 확인)
 - [x] [W3] 테스트 — 같은 `requestId` 재전송 시 같은 결과(이후 횟수가 바뀌어도 당시 스냅샷), 동시 요청 한도 초과·중복 저장 없음(Testcontainers 통합 테스트), AI 실패 시 미차감, 늦은 응답 미반영, 재시작 복구 (담당: BE-8)
 
 ## 6. NPC 대화 (2.4절, 3.7절, `docs/api/investigation.md`)
@@ -219,7 +219,7 @@
 - [x] [W3] `POST /api/rooms/{roomId}/npc/{suspectId}/ask` — 세션 상태 공통 검사, 이 사건의 인물인지(`404 SUSPECT_NOT_FOUND`), `canConverse=false`면 `400 NPC_NOT_CONVERSABLE`, 질문 1~500자, 질문·답변을 `sequence_no` 순서로 저장, 실패 시 `502 NPC_ANSWER_FAILED` (담당: BE-9)
 - [x] [W3] 이미 완료된 같은 `requestId`는 세션 상태 검사 없이 저장된 결과 반환 (담당: BE-9, 완료·처리 중 재전송은 분류 호출도 하지 않음)
 - [x] [W3] NPC 시스템 프롬프트 구성 — `persona_prompt` + 난이도별 응답 방식(쉬움: 자진해서 살짝 덧붙임 / 보통: 친절하게, 묻지 않은 것은 말하지 않음 / 어려움: 물어본 것만) + 용어집 + 해당 NPC 대화 이력 (2.3절) (담당: BE-9, 이력은 최근 `shelved.npc.history-message-limit`개(잠정 30). persona → `persona_prompt` 변환은 `PersonaPromptComposer`, 시드 반영 포함)
-- [~] [W3] 원작 기반 응답 원칙 반영 — 인물이 알 수 없는 사실 답변 금지, 설정에 없는 사건 사실·거짓말 즉흥 생성 금지, 증거 기반 추궁 허용·자백 여부는 설정 따름 (2.4절) (담당: BE-9, `prompts/npc-system.txt`에 반영. 실제 답변 품질은 Fake라 미검증 → INT-3에서 확인)
+- [x] [W3] 원작 기반 응답 원칙 반영 — 인물이 알 수 없는 사실 답변 금지, 설정에 없는 사건 사실·거짓말 즉흥 생성 금지, 증거 기반 추궁 허용·자백 여부는 설정 따름 (2.4절) (담당: BE-9, 메모: INT-3 실제 호출로 확인)
 - [x] [W3] `GET /api/rooms/{roomId}/npc/{suspectId}/messages` — `sequenceNo` 순, `pendingRequests` 포함, 모든 상태에서 조회 (담당: BE-9, `GET state`의 `conversations` 집계 포함)
 - [x] [W3] 테스트 — 대화 불가 인물 거부, 다른 사건 인물 거부, 차단 질문 미기록, NPC별 동시 1건 (담당: BE-9, `NpcAskIntegrationTest`·`NpcMessageIntegrationTest`)
 
@@ -240,8 +240,8 @@
 - [x] [W3] `GET /api/rooms/{roomId}/hints` — 힌트·보충 질문 시간순, `hintCount`, `followupAvailable`, `pendingRequests`, 종료 후에도 조회 (담당: BE-10)
 - [x] [W3] `POST /api/rooms/{roomId}/hints` — 난이도별 한도(쉬움 5/보통 3/어려움 1, 처리 중 확보분 포함), 세션당 동시 1건, 정상 답변 저장 시에만 1회 사용, 실패 시 `502 HINT_GENERATION_FAILED` (담당: BE-10)
 - [x] [W3] `POST /api/rooms/{roomId}/hints/{hintId}/followup` — 이 세션의 힌트인지(`404 HINT_NOT_FOUND`), 힌트당 1회(`409 HINT_FOLLOWUP_ALREADY_USED`), 힌트 횟수 0이어도 가능, 새 정보 요구 시 안내 답변도 1회 사용 처리 (담당: BE-10. 안내 답변 사용 처리는 Fake 답변으로 확인)
-- [~] [W3] 힌트 프롬프트 — 플레이어 질문, NPC 대화, 물증 조사 이력, 이전 힌트, 사건 정보 참고. 범인·트릭 정답 직접 공개 금지, NPC 진술의 출처 유지(거짓일 수 있는 진술을 사실처럼 말하지 않음) (담당: BE-10. 컨텍스트 구성·출처 표기·한도는 테스트로 확인, 품질(정답 비공개·출처 유지)은 INT-3 확인)
-- [~] [W3] 보충 질문 프롬프트 — 원래 질문·힌트 답변 범위 안에서만 풀어 설명, 새 단서·정답 정보 추가 금지 (담당: BE-10. 정답·트릭·NPC 설정·수사 기록을 입력에서 뺀 것은 테스트로 확인, 품질은 INT-3 확인)
+- [x] [W3] 힌트 프롬프트 — 플레이어 질문, NPC 대화, 물증 조사 이력, 이전 힌트, 사건 정보 참고. 범인·트릭 정답 직접 공개 금지, NPC 진술의 출처 유지(거짓일 수 있는 진술을 사실처럼 말하지 않음) (담당: BE-10, 메모: INT-3 실제 호출로 확인)
+- [x] [W3] 보충 질문 프롬프트 — 원래 질문·힌트 답변 범위 안에서만 풀어 설명, 새 단서·정답 정보 추가 금지 (담당: BE-10, 메모: INT-3 실제 호출로 확인)
 - [x] [W3] `HINT_FOLLOWUP` 유형으로 사용량 기록 (담당: BE-10. 새 힌트 `HINT`, 분류 `QUESTION_FILTER`도 확인)
 - [x] [W3] 테스트 — 한도 소진, 동시 요청 한도 초과 없음, 보충 질문 중복 거부, 차단 질문 미차감, 실패 미차감 (담당: BE-10)
 
