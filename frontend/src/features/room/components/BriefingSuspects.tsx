@@ -27,7 +27,7 @@ export function BriefingSuspectList({ suspects, manifest }: BriefingSuspectListP
       <ul className="flex flex-col gap-2">
         {suspects.map((suspect) => (
           <li key={suspect.suspectId} className="flex items-center gap-3">
-            <SuspectFace suspect={suspect} manifest={manifest} />
+            <SuspectFace name={suspect.name} spriteKey={suspect.spriteKey} manifest={manifest} />
             <div className="flex min-w-0 flex-col">
               <span className="font-bold">{suspect.name}</span>
               {suspect.publicIntro && <span className="text-muted">{suspect.publicIntro}</span>}
@@ -39,20 +39,29 @@ export function BriefingSuspectList({ suspects, manifest }: BriefingSuspectListP
   );
 }
 
-/** 얼굴. 스프라이트가 없으면 이름 첫 글자를 넣은 원으로 대신한다. 이름은 옆 글자로 읽히므로 그림은 가린다 */
-function SuspectFace({
-  suspect,
-  manifest,
-}: {
-  suspect: BriefingSuspect;
+type SuspectFaceProps = {
+  name: string;
+  spriteKey: string | null;
   manifest: AssetManifest | null;
-}) {
-  const entry = findFaceEntry(manifest, suspect.spriteKey);
+};
+
+/**
+ * 인물 얼굴(manifest를 직접 읽는다). 지목 창처럼 사전 정보 밖에서 같은 모양의 얼굴을 그릴 때 쓴다.
+ * 게임 화면이 Props(renderFace)로 넘겨 주므로 다른 기능이 room 내부 파일을 가져오지 않는다.
+ */
+export function SuspectPortrait({ name, spriteKey }: { name: string; spriteKey: string | null }) {
+  const { data: manifest } = useAssetManifest(spriteKey !== null);
+  return <SuspectFace name={name} spriteKey={spriteKey} manifest={manifest ?? null} />;
+}
+
+/** 얼굴. 스프라이트가 없으면 이름 첫 글자를 넣은 원으로 대신한다. 이름은 옆 글자로 읽히므로 그림은 가린다 */
+function SuspectFace({ name, spriteKey, manifest }: SuspectFaceProps) {
+  const entry = findFaceEntry(manifest, spriteKey);
   if (entry) {
     return (
       <div
         role="img"
-        aria-label={`${suspect.name} 얼굴`}
+        aria-label={`${name} 얼굴`}
         data-testid="suspect-face"
         className="shrink-0 rounded-full border border-line bg-surface"
         style={spriteFaceStyle(entry, FACE_SIZE_PX)}
@@ -66,7 +75,7 @@ function SuspectFace({
       className="flex shrink-0 items-center justify-center rounded-full bg-line font-bold"
       style={{ width: FACE_SIZE_PX, height: FACE_SIZE_PX }}
     >
-      {nameInitial(suspect.name)}
+      {nameInitial(name)}
     </div>
   );
 }

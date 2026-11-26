@@ -9,6 +9,7 @@ import type { AiRequestStatusResponse } from './types';
 //   idle ──submit──▶ sending ──200──▶ idle (onCompleted)
 //                       ├──202·응답 없음──▶ processing ──(2초마다 상태 조회)──▶ idle / failed
 //                       ├──5xx──▶ failed ──retry(같은 requestId·입력)──▶ sending
+//                       ├──429(재시도 간격 전)──▶ failed 유지 (retryAvailableAt 갱신)
 //                       └──4xx(차단·검증·세션 오류)──▶ idle + error (onRejected, 재시도 대상 아님)
 
 export type AiRequestPhase = 'idle' | 'sending' | 'processing' | 'failed';
@@ -18,6 +19,8 @@ export type AiRequestError = {
   code: string | null;
   /** 화면에 그대로 보여 줄 문구 (백엔드 message 우선) */
   message: string;
+  /** 같은 요청을 다시 보낼 수 있는 서버 시각 (지목 채점 실패·429의 detail, 상태 조회의 retryAvailableAt). 없으면 생략 */
+  retryAvailableAt?: string;
 };
 
 export type AiRequestState<TInput> = {
@@ -33,6 +36,15 @@ export type AiRequestState<TInput> = {
 export type AiRequestControllerOptions<TInput, TResult> = {
   /** AI POST. 같은 requestId·입력이면 서버가 중복 실행하지 않는다 */
   send: (requestId: string, input: TInput) => Promise<AiPostResult<TResult>>;
+  /**
+   * 실패한 요청을 같은 requestId·입력으로 다시 보낼 때 쓰는 전송 함수. previousError는 그 실패 사유다.
+   * 재시도의 요청 형식이 다른 도메인(지목 재채점은 연결 헤더를 붙이지 않는다)만 넘긴다. 없으면 send를 쓴다
+   */
+  sendRetry?: (
+    requestId: string,
+    input: TInput,
+    previousError: AiRequestError | null,
+  ) => Promise<AiPostResult<TResult>>;
   /** GET ai-requests/{requestId} */
   getStatus: (requestId: string) => Promise<AiRequestStatusResponse>;
   /** 상태 조회의 result(unknown)를 완료 결과로 확인한다. 형식이 다르면 null */
@@ -82,12 +94,17 @@ function defaultIsSameInput<TInput>(a: TInput, b: TInput) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function readDetailRequestId(detail: unknown): string | null {
-  if (typeof detail === 'object' && detail !== null && 'requestId' in detail) {
-    const value = (detail as { requestId: unknown }).requestId;
+function readDetailString(detail: unknown, key: string): string | null {
+  if (typeof detail === 'object' && detail !== null && key in detail) {
+    const value = (detail as Record<string, unknown>)[key];
     return typeof value === 'string' ? value : null;
   }
   return null;
+}
+
+/** retryAvailableAt이 있을 때만 붙인다 (없는 요청 유형의 오류 객체 모양은 그대로 둔다) */
+function withRetryAvailableAt(error: AiRequestError, retryAvailableAt: string | null) {
+  return retryAvailableAt === null ? error : { ...error, retryAvailableAt };
 }
 
 export function createAiRequestController<TInput, TResult>(
@@ -207,7 +224,10 @@ export function createAiRequestController<TInput, TResult>(
       return;
     }
     if (status.status === 'FAILED') {
-      const error = status.error ?? { code: null, message: DEFAULT_FAILED_MESSAGE };
+      const error = withRetryAvailableAt(
+        status.error ?? { code: null, message: DEFAULT_FAILED_MESSAGE },
+        status.retryAvailableAt ?? null,
+      );
       if (error.code !== null && SESSION_REJECTION_CODES.has(error.code)) {
         // 처리 중 세션이 끝난 경우 등. 다시 보낼 수 없으므로 세션 흐름에 맡긴다
         stop();
@@ -235,9 +255,12 @@ export function createAiRequestController<TInput, TResult>(
       startPolling(current, requestId, input);
       return;
     }
-    const apiError: AiRequestError = { code: error.code, message: error.message };
+    const apiError = withRetryAvailableAt(
+      { code: error.code, message: error.message },
+      readDetailString(error.detail, 'retryAvailableAt'),
+    );
     if (error.code === 'AI_REQUEST_IN_PROGRESS') {
-      const processingId = readDetailRequestId(error.detail);
+      const processingId = readDetailString(error.detail, 'requestId');
       if (processingId === requestId) {
         startPolling(current, requestId, input);
         return;
@@ -251,6 +274,11 @@ export function createAiRequestController<TInput, TResult>(
       reject(input, apiError);
       return;
     }
+    if (error.status === 429) {
+      // 재시도 간격 전에 다시 보냈다 (지목 GRADING_RETRY_TOO_SOON). 실패 상태를 유지하고 다시 보낼 수 있는 시각만 바꾼다
+      fail(requestId, input, apiError);
+      return;
+    }
     if (error.status !== null && error.status >= 500) {
       // AI 실패(502 NPC_ANSWER_FAILED 등). 기회는 차감되지 않았고 같은 requestId·입력으로 다시 보낸다
       fail(requestId, input, apiError);
@@ -260,12 +288,16 @@ export function createAiRequestController<TInput, TResult>(
     reject(input, apiError);
   }
 
-  async function run(requestId: string, input: TInput) {
+  /** retryOf: 실패한 요청을 다시 보내는 경우 그 실패 사유 (새 요청이면 undefined) */
+  async function run(requestId: string, input: TInput, retryOf?: AiRequestError | null) {
     const current = begin();
     setState({ phase: 'sending', requestId, input, error: null });
     let outcome: AiPostResult<TResult>;
     try {
-      outcome = await options.send(requestId, input);
+      outcome =
+        retryOf !== undefined && options.sendRetry
+          ? await options.sendRetry(requestId, input, retryOf)
+          : await options.send(requestId, input);
     } catch (error) {
       if (isCurrent(current)) {
         handleSendError(current, requestId, input, error);
@@ -316,7 +348,7 @@ export function createAiRequestController<TInput, TResult>(
         state.input !== null &&
         isSameInput(state.input, input);
       const requestId = reuse ? state.requestId! : (options.createRequestId ?? randomId)();
-      void run(requestId, input);
+      void run(requestId, input, reuse ? state.error : undefined);
       return true;
     },
 
@@ -325,7 +357,7 @@ export function createAiRequestController<TInput, TResult>(
       if (state.phase !== 'failed' || state.requestId === null || state.input === null) {
         return false;
       }
-      void run(state.requestId, state.input);
+      void run(state.requestId, state.input, state.error);
       return true;
     },
 

@@ -9,8 +9,16 @@ import type { RoomMapResponse } from '../features/room/types';
 import { EventBus } from '../game/EventBus';
 import { GameEvents } from '../game/events';
 import { server } from '../mocks/node';
+import { acceptAccusation } from '../mocks/accusationDb';
 import { acceptNpcAsk, finishMockAiRequest } from '../mocks/aiRequestDb';
-import { findMockRoom, pauseMockRoom, seedMockRoom, startMockRoom } from '../mocks/roomDb';
+import { setScenario } from '../mocks/scenarios';
+import {
+  findMockRoom,
+  pauseMockRoom,
+  saveMockRoomDb,
+  seedMockRoom,
+  startMockRoom,
+} from '../mocks/roomDb';
 import { loginMockUser, resetLoginState } from '../mocks/testing/loginMockUser';
 
 // Phaser는 jsdom에서 그릴 수 없으므로, 받은 Props를 기록하고 마운트되면 MAP_READY를 보내는 가짜로 바꾼다.
@@ -568,5 +576,148 @@ describe('게임 화면 개인 노트', () => {
     expect(
       await screen.findByText('이 기기에 저장되지 않은 노트 초안이 있습니다.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('게임 화면 범인 지목', () => {
+  // 목의 판정 규칙(가상 사건): 사건 1의 범인은 마거릿, "종소리"·"시계" 둘 다 → 정답, 하나 → 부분 정답
+  const PARTIAL = '시계를 미리 돌려 두어 시각을 속였다.';
+  const CORRECT = '종소리가 울리기 전에 시계를 미리 돌려 두었다.';
+  const WRONG = '창문으로 몰래 드나들어 알리바이를 만들었다.';
+
+  async function accuse(suspectName: string, trick: string) {
+    fireEvent.click(await screen.findByRole('radio', { name: new RegExp(suspectName) }));
+    fireEvent.change(screen.getByLabelText('트릭 설명'), { target: { value: trick } });
+    const submit = screen.getByRole('button', { name: '제출' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+    fireEvent.click(screen.getByRole('button', { name: '제출하기' }));
+  }
+
+  it('부분 정답 뒤 보완 제출로 정답이면 GET state로 종료를 확인하고 "결과 보기"로만 결과 화면에 간다', async () => {
+    // given
+    const { room, router } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '지목' }));
+    expect(screen.getByRole('heading', { name: '범인 지목' })).toBeInTheDocument();
+    expect(inputEvents.at(-1)).toBe(false);
+
+    // when 부분 정답
+    await accuse('마거릿', PARTIAL);
+
+    // then HUD 횟수가 GET state로 맞춰지고 계속 수사한다
+    await waitFor(() => expect(screen.getAllByText('남은 지목 2').length).toBeGreaterThan(0));
+    expect(screen.getByRole('status')).toHaveTextContent('남은 기회 2회');
+
+    // when 이전 답안이 남아 있으므로 보완해 다시 제출한다
+    expect(screen.getByLabelText('트릭 설명')).toHaveValue(PARTIAL);
+    const before = requestedPaths.length;
+    await accuse('마거릿', CORRECT);
+
+    // then GET state로 종료를 확인한 뒤에도 자동으로 이동하지 않는다
+    expect(await screen.findByText('정답입니다! 사건을 해결했습니다.')).toBeInTheDocument();
+    expect(requestedPaths.slice(before)).toContain(`GET /api/rooms/${room.roomId}/state`);
+    expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}`);
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
+
+    // then
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}/result`),
+    );
+  });
+
+  it('3번째도 정답이 아니면 실패 안내 후 결과 보기를 보여 준다', async () => {
+    // given
+    const { room, router } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '지목' }));
+
+    // when
+    await accuse('해리스', WRONG);
+    await waitFor(() => expect(screen.getAllByText('남은 지목 2').length).toBeGreaterThan(0));
+    await accuse('톰', WRONG);
+    await waitFor(() => expect(screen.getAllByText('남은 지목 1').length).toBeGreaterThan(0));
+    await accuse('엘리스', WRONG);
+
+    // then
+    expect(
+      await screen.findByText('지목 기회를 모두 사용했습니다. 수사가 끝났습니다.'),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}`);
+    fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}/result`),
+    );
+  });
+
+  it('지목 창을 닫아도 채점은 이어지고, 채점 중에는 HUD 지목 버튼에 점을 보여 준다', async () => {
+    // given
+    setScenario('accusationSlow', true);
+    await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '지목' }));
+    await accuse('마거릿', PARTIAL);
+    await screen.findAllByText('채점 중입니다…');
+
+    // when
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    // then
+    expect(screen.queryByRole('heading', { name: '범인 지목' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /지목/ })).toContainElement(
+      screen.getByRole('img', { name: '처리 중인 요청 있음' }),
+    );
+    await waitFor(
+      () =>
+        expect(screen.queryByRole('img', { name: '처리 중인 요청 있음' })).not.toBeInTheDocument(),
+      { timeout: 6000 },
+    );
+    // 창이 닫혀 있어도 결과 뒤 GET state를 다시 받아 HUD 횟수를 맞춘다
+    await waitFor(() => expect(screen.getByText('남은 지목 2')).toBeInTheDocument());
+  }, 10_000);
+
+  it('재접속하면 state.aiRequests의 채점 중 지목을 복원해 점을 보여 주고 창에서 이어서 본다', async () => {
+    // given 이전 화면에서 보낸 지목이 채점 중인 채 새로고침했다
+    const user = await loginMockUser();
+    const room = seedMockRoom(user.userId, { caseId: 1, status: 'PAUSED' });
+    acceptAccusation(room, {
+      requestId: '00000000-0000-4000-8000-000000000001',
+      suspectId: 2,
+      trickExplanation: PARTIAL,
+      pollsUntilDone: 3,
+      failFirstAttempt: false,
+    });
+    saveMockRoomDb();
+    renderAt(`/rooms/${room.roomId}`);
+    const resume = await screen.findByRole('button', { name: '수사 이어하기' });
+    await waitFor(() => expect(resume).toBeEnabled());
+    fireEvent.click(resume);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // then
+    expect(screen.getByRole('button', { name: /지목/ })).toContainElement(
+      screen.getByRole('img', { name: '처리 중인 요청 있음' }),
+    );
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: /지목/ }));
+
+    // then
+    expect(await screen.findByText('방금 받은 결과', {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 12_000);
+
+  it('채점 실패 후 "나중에 다시 시도"는 저장 후 나가기처럼 일시정지하고 메인으로 간다', async () => {
+    // given
+    setScenario('accusationFail', true);
+    const { room, user, router } = await startPlaying();
+    fireEvent.click(screen.getByRole('button', { name: '지목' }));
+    await accuse('마거릿', PARTIAL);
+
+    // when
+    fireEvent.click(await screen.findByRole('button', { name: '나중에 다시 시도' }));
+
+    // then
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(findMockRoom(room.roomId, user.userId)?.status).toBe('PAUSED');
+    expect(findMockRoom(room.roomId, user.userId)?.pendingGradingStatus).toBe('ERROR');
   });
 });

@@ -10,6 +10,7 @@ import {
   toServerTime,
   type MockAiRequest,
   type MockHint,
+  type MockQuestionRequest,
   type MockRoom,
 } from './roomDb';
 
@@ -125,9 +126,10 @@ export function acceptHintRequest(
     /** true면 첫 실행을 실패로 끝낸다 (재시도는 성공) */
     failFirstAttempt: boolean;
   },
-): MockAiRequest {
+): MockQuestionRequest {
   const nowMs = currentTimeMs();
-  let request = requestsOf(room).find((item) => item.requestId === params.requestId);
+  const found = requestsOf(room).find((item) => item.requestId === params.requestId);
+  let request = found && found.type !== 'ACCUSATION' ? found : undefined;
   if (!request) {
     request = {
       requestId: params.requestId,
@@ -155,7 +157,7 @@ export function acceptHintRequest(
 }
 
 /** 처리 중인 힌트·보충 질문 요청을 끝낸다. 성공이면 기록에 한 번만 저장한다 (실패는 차감·사용 처리 없음) */
-export function finishMockHintRequest(room: MockRoom, request: MockAiRequest) {
+export function finishMockHintRequest(room: MockRoom, request: MockQuestionRequest) {
   const nowMs = currentTimeMs();
   request.pollsUntilDone = null;
   request.updatedAtMs = nowMs;

@@ -6,9 +6,11 @@ import {
   toServerTime,
   type MockAiRequest,
   type MockNpcMessage,
+  type MockQuestionRequest,
   type MockRoom,
 } from './roomDb';
 import { finishMockHintRequest } from './hintDb';
+import { finishMockAccusation } from './accusationDb';
 
 // NPC 대화 기록과 AI 요청 상태를 담는 목 "DB". handlers/npc·aiRequests·room(state)이 함께 쓴다.
 // 실제 AI 대신 정해진 중립 문장으로 답한다. 가상 사건용이며 인물의 내부 설정·정답과 관련이 없다.
@@ -56,7 +58,10 @@ export function toAiRequestStatus(request: MockAiRequest): AiRequestStatusRespon
     input: request.input,
     result: request.status === 'SUCCEEDED' ? request.result : null,
     error: request.status === 'FAILED' ? request.error : null,
-    retryAvailableAt: null,
+    retryAvailableAt:
+      request.status === 'FAILED' && request.retryAvailableAtMs != null
+        ? toServerTime(request.retryAvailableAtMs)
+        : null,
     acceptedAt: toServerTime(request.acceptedAtMs),
     updatedAt: toServerTime(request.updatedAtMs),
   };
@@ -148,9 +153,10 @@ export function acceptNpcAsk(
     /** true면 첫 실행을 실패로 끝낸다 (재시도는 성공) */
     failFirstAttempt: boolean;
   },
-): MockAiRequest {
+): MockQuestionRequest {
   const nowMs = currentTimeMs();
-  let request = findMockAiRequest(room, params.requestId);
+  const found = findMockAiRequest(room, params.requestId);
+  let request = found?.type === 'NPC_ASK' ? found : undefined;
   if (!request) {
     request = {
       requestId: params.requestId,
@@ -179,6 +185,10 @@ export function acceptNpcAsk(
 
 /** 처리 중인 요청을 끝낸다. 성공이면 질문·답변을 대화 기록에 한 번만 저장한다 */
 export function finishMockAiRequest(room: MockRoom, request: MockAiRequest) {
+  if (request.type === 'ACCUSATION') {
+    finishMockAccusation(room, request);
+    return;
+  }
   if (request.type !== 'NPC_ASK' || request.targetId === null) {
     finishMockHintRequest(room, request);
     return;

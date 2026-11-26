@@ -44,7 +44,7 @@ function roomState(aiRequests: AiRequestStatusResponse[]): RoomStateResponse {
   };
 }
 
-function renderHud(aiRequests: AiRequestStatusResponse[]) {
+function renderHud(aiRequests: AiRequestStatusResponse[], accusationPending = false) {
   render(
     <GameHud
       roomState={roomState(aiRequests)}
@@ -53,6 +53,8 @@ function renderHud(aiRequests: AiRequestStatusResponse[]) {
       onOpenBriefing={() => undefined}
       onOpenConversations={() => undefined}
       onOpenHint={() => undefined}
+      onOpenAccusation={() => undefined}
+      accusationPending={accusationPending}
       onExit={() => undefined}
       actionsEnabled
     />,
@@ -69,10 +71,35 @@ describe('GameHud 처리 중 표시', () => {
     expect(screen.getAllByRole('img', { name: '처리 중인 요청 있음' })).toHaveLength(1);
   });
 
-  it('요청이 없거나 알 수 없는 유형이면 표시하지 않는다', () => {
-    renderHud([pendingRequest('ACCUSATION')]);
+  it('요청이 없으면 표시하지 않는다', () => {
+    renderHud([]);
 
     expect(screen.queryByRole('img', { name: '처리 중인 요청 있음' })).not.toBeInTheDocument();
+  });
+
+  it('재접속 직후 채점 중·재채점 대기 지목이 있으면 지목 버튼에만 표시한다', () => {
+    renderHud([
+      { ...pendingRequest('ACCUSATION'), input: { suspectId: 1, trickExplanation: '설명' } },
+    ]);
+
+    expect(screen.getByRole('button', { name: /지목/ })).toContainElement(
+      screen.getByRole('img', { name: '처리 중인 요청 있음' }),
+    );
+    expect(screen.getAllByRole('img', { name: '처리 중인 요청 있음' })).toHaveLength(1);
+  });
+
+  it('이 화면에서 지목이 채점 중이면 GET state를 다시 받기 전에도 지목 버튼에 표시한다', () => {
+    renderHud([], true);
+
+    expect(screen.getByRole('button', { name: /지목/ })).toContainElement(
+      screen.getByRole('img', { name: '처리 중인 요청 있음' }),
+    );
+  });
+
+  it('지목 버튼은 진행 중일 때 활성화된다', () => {
+    renderHud([]);
+
+    expect(screen.getByRole('button', { name: '지목' })).toBeEnabled();
   });
 
   it('힌트 버튼은 진행 중일 때 활성화된다', () => {

@@ -70,6 +70,33 @@ export type GradingStatus = 'PENDING' | 'COMPLETED' | 'ERROR';
 
 export type Verdict = 'CORRECT' | 'PARTIAL' | 'INCORRECT';
 
+/**
+ * 지목 1건 (docs/api/hint-accusation.md "AccusationResponse"). 백엔드 AccusationResponse와 같다.
+ * GET state의 pendingAccusation(room)과 지목 API(accusation)가 함께 쓰므로 shared에 둔다
+ * (room ↔ accusation 타입이 서로를 가져오는 순환을 피한다).
+ * 항목별 판정·정답 기준은 어떤 응답에도 오지 않는다.
+ */
+export type AccusationResponse = {
+  accusationId: number;
+  requestId: string;
+  suspectId: number;
+  suspectName: string;
+  trickExplanation: string;
+  /** 서버 접수 시각 */
+  submittedAt: string;
+  gradingStatus: GradingStatus;
+  /** COMPLETED일 때만 */
+  verdict: Verdict | null;
+  /** COMPLETED일 때만. 난이도별 상세도이며 문단·줄바꿈이 들어 있을 수 있다 */
+  feedback: string | null;
+  /** 정상 채점 완료된 몇 번째 지목인지 (1~3). 완료 전 null */
+  attemptNo: number | null;
+  /** ERROR일 때 같은 답안 재채점이 가능한 서버 시각 */
+  retryAvailableAt: string | null;
+  /** 채점 실패 후 새 답안을 내서 대체된 지목 (재채점 불가) */
+  superseded: boolean;
+};
+
 export type MessageSenderType = 'USER' | 'NPC';
 
 export type AdminMessageSenderType = 'ADMIN' | 'AI';

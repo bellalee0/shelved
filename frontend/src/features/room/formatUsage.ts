@@ -1,7 +1,2 @@
-import type { UsageCount } from './types';
-
-/** "남은 지목 2 (처리 중 1)"처럼 사용 완료와 처리 중을 구분해 보여 준다 */
-export function formatUsage(label: string, count: UsageCount): string {
-  const reserved = count.reserved > 0 ? ` (처리 중 ${count.reserved})` : '';
-  return `남은 ${label} ${count.remaining}${reserved}`;
-}
+// 지목 창도 같은 표기를 쓰므로 shared/utils로 옮겼다. 기존 import 경로를 위해 다시 내보낸다
+export { formatUsage } from '../../shared/utils/formatUsage';

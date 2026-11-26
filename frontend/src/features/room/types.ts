@@ -1,5 +1,6 @@
 // 백엔드 room 도메인 DTO와 같은 이름·필드의 타입 (docs/api/room.md)
 import type {
+  AccusationResponse,
   AiRequestStatusResponse,
   Difficulty,
   GradingStatus,
@@ -96,11 +97,8 @@ export type RoomStateResponse = {
   heartbeatIntervalMs: number;
   hintCount: UsageCount;
   accusationCount: UsageCount;
-  /**
-   * 채점 중이거나 채점 실패한 지목 (AccusationResponse, docs/api/hint-accusation.md).
-   * 지목 작업에서 정확한 타입으로 바꾼다.
-   */
-  pendingAccusation: Record<string, unknown> | null;
+  /** 채점 중(PENDING)이거나 채점 실패(ERROR)한 지목. 없으면 null */
+  pendingAccusation: AccusationResponse | null;
   /** PROCESSING이거나 재시도 대기 중인 FAILED 요청 */
   aiRequests: AiRequestStatusResponse[];
   conversations: ConversationSummary[];

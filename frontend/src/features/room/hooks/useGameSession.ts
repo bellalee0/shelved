@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { isApiError } from '../../../shared/api/apiError';
 import { setConnectionId } from '../../../shared/api/client';
@@ -49,7 +49,8 @@ const INITIAL_SESSION: SessionData = {
  * 게임 화면의 세션 흐름을 한 곳에서 관리한다 (docs/api/room.md "입장·재접속 흐름").
  *
  * 들어오면 항상 재접속 흐름으로 시작한다: pause(헤더 없음) → state·briefing·map 병렬 → 단계 분기.
- * 개인 노트는 useNote가, 힌트·지목 기록은 3~4주차 작업이 따로 불러온다.
+ * 개인 노트는 useNote가, 힌트·지목 기록은 각 창(HintPanel·AccusationPanel)이 열 때 불러온다.
+ * 처리 중·실패 지목은 state.aiRequests·pendingAccusation으로 게임 화면의 useAccusation이 복원한다.
  * - start·resume은 사용자 버튼으로만 보낸다 (StrictMode에서 effect가 두 번 돌아도 한 번만 나가게)
  * - 페이지를 떠날 때 pause를 보내지 않는다. 하트비트를 멈추고 connectionId만 지운다 (탭 닫기는 서버 이탈 감지가 처리)
  * - connectionId는 메모리(setConnectionId)에만 둔다
@@ -70,6 +71,8 @@ export function useGameSession(roomId: number, userId: number) {
   const [reconnectKey, setReconnectKey] = useState(0);
   // 연결이 있다가 사라졌는지 (하트비트 PAUSED·연결 교체 등). 다음 start·resume 성공이 재연결이다
   const lostConnectionRef = useRef(false);
+  // true면 종료 상태를 확인해도 결과 화면으로 바로 가지 않는다 (마지막 지목의 피드백을 읽을 시간을 준다)
+  const [endedNavigationHeld, setEndedNavigationHeld] = useState(false);
 
   // 현재 연결. 응답 처리 중 최신 값을 동기적으로 보려고 상태와 함께 ref에도 둔다
   const connectionRef = useRef<Connection | null>(null);
@@ -133,7 +136,6 @@ export function useGameSession(roomId: number, userId: number) {
         getBriefing(roomId),
         queryClient.fetchQuery(roomMapQueryOptions(roomId, userId)),
       ]);
-      // 힌트(GET hints)·지목(GET accusations) 복원은 3~4주차 API가 생기면 여기에 함께 불러온다
       if (run !== runRef.current) {
         return;
       }
@@ -313,10 +315,20 @@ export function useGameSession(roomId: number, userId: number) {
   }, [session.phase, session.timer, displayRemainingMs, checkState]);
 
   useEffect(() => {
-    if (session.phase === 'ended') {
+    if (session.phase === 'ended' && !endedNavigationHeld) {
       navigate(`/rooms/${roomId}/result`, { replace: true });
     }
-  }, [session.phase, roomId, navigate]);
+  }, [session.phase, endedNavigationHeld, roomId, navigate]);
+
+  // 서버 시각 − 브라우저 시각. 서버 시각으로 온 값(지목 재채점 가능 시각 등)을 화면에서 셀 때 쓴다.
+  // 화면 타이머와 같은 기준점(마지막으로 받은 serverTime과 받은 시각)에서 계산한다
+  const serverClockOffsetMs = useMemo(() => {
+    if (session.timer === null) {
+      return 0;
+    }
+    const serverMs = Date.parse(session.timer.timer.serverTime);
+    return Number.isNaN(serverMs) ? 0 : serverMs - session.timer.receivedAtMs;
+  }, [session.timer]);
 
   return {
     phase: session.phase,
@@ -328,6 +340,7 @@ export function useGameSession(roomId: number, userId: number) {
     /** 연결을 잃었다가 다시 연결할 때마다 바뀐다. useNote의 resyncKey로 넘긴다 */
     reconnectKey,
     displayRemainingMs,
+    serverClockOffsetMs,
     isConnectionUnstable: heartbeatState.isUnstable,
     /** start·resume 실패 문구 (409는 재조회로 처리하므로 여기에 오지 않는다) */
     actionError,
@@ -338,5 +351,10 @@ export function useGameSession(roomId: number, userId: number) {
     checkState,
     handleSessionRejected,
     disconnect,
+    /**
+     * 종료 상태가 되어도 결과 화면으로 바로 가지 않게 잡아 둔다 (true) / 놓는다 (false).
+     * 놓는 순간 이미 종료 상태면 결과 화면으로 간다
+     */
+    setEndedNavigationHeld,
   };
 }

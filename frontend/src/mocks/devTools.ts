@@ -1,4 +1,5 @@
 import { useAuthStore } from '../features/auth/store';
+import { findMockCase } from './data/clocktowerCase';
 import { findMockUserIdByAccessToken } from './handlers/auth';
 import {
   currentTimeMs,
@@ -102,6 +103,21 @@ const shelvedMock = {
       revision: room.note.revision + 1,
       updatedAtMs: currentTimeMs(),
     };
+    saveMockRoomDb();
+  },
+  /**
+   * 진행 중 세션의 남은 시간을 remainingMs로 줄인다 (마감 후 새 지목 409 ROOM_TIME_EXPIRED·채점 대기 확인용).
+   * 화면 타이머는 다음 하트비트·상태 조회 때 맞춰진다
+   */
+  shortenTime(roomId: number, remainingMs = 5000) {
+    const room = findMockRoom(roomId, currentUserId());
+    if (!room || room.status !== 'IN_PROGRESS' || room.segmentStartedAtMs === null) {
+      throw new Error('진행 중인 세션에서만 쓸 수 있습니다.');
+    }
+    const nowMs = currentTimeMs();
+    const limitMs = (findMockCase(room.caseId)?.card.timeLimitSec ?? 0) * 1000;
+    room.elapsedActiveMs = Math.max(0, limitMs - remainingMs);
+    room.segmentStartedAtMs = nowMs;
     saveMockRoomDb();
   },
   /** 목 세션·노트를 모두 지운다 (목 사용자·토큰은 그대로) */

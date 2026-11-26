@@ -6,7 +6,8 @@ export type RightPanel =
   | { kind: 'NPC'; suspectId: number }
   | { kind: 'BRIEFING' }
   | { kind: 'CONVERSATIONS' }
-  | { kind: 'HINT' };
+  | { kind: 'HINT' }
+  | { kind: 'ACCUSATION' };
 
 export type GameWindowId = 'PANEL' | 'NOTE';
 
