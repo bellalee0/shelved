@@ -23,7 +23,19 @@ import org.springframework.web.client.RestClientResponseException;
  * - 입력이 max-input-tokens를 넘으면 잘라 보내지 않고 호출 전에 LLM_INPUT_TOO_LARGE로 실패한다
  * - 시간 제한은 RestClient의 읽기 시간 제한으로 적용한다 (게임 호출 game-timeout, 사건 제작 casebuilder-chat-timeout)
  * - 요청·응답 본문과 API 키는 로그·예외 메시지에 남기지 않는다 (응답 오류 본문도 버린다)
- * - 분류 호출(FILTER)은 생각(thinking)을 끄고 응답 형식을 {"blocked": boolean}으로 강제한다. 본 응답은 모델 기본값을 쓴다
+ * - 생각(thinking)·effort·구조화 출력 스키마는 요청(LlmRequest)에 담긴 값만 본문으로 옮긴다. 용도별 값은 호출하는 쪽이 정한다
+ *   (분류: QuestionFilterService, 채점: GradingPromptBuilder). 요청에 없으면 보내지 않아 모델 기본값을 쓴다
+ *
+ * <p>Messages API 형식 (claude-api 스킬·공식 문서 기준 2026-11 확인, 실제 호출로 확인하지 않음)</p>
+ * <ul>
+ *     <li>구조화 출력: output_config.format = {"type": "json_schema", "schema": {...}}. 스키마는 enum·const·required·anyOf 등을 지원하고,
+ *     모든 object에 additionalProperties: false가 필요하다. minLength·maxLength·minimum·maximum 같은 수치·길이 제약은 지원하지 않으므로
+ *     길이 상한은 서버 검증으로 한다</li>
+ *     <li>생각: thinking = {"type": "adaptive"} 또는 {"type": "disabled"}. budget_tokens는 현재 모델에서 400.
+ *     Opus 5.5·Sonnet 5.5는 disabled도 400이다 (LlmThinking 참고). 생각 토큰은 max_tokens 안에서 쓰인다</li>
+ *     <li>effort: output_config.effort = low/medium/high/xhigh/max (output_config 안, 최상위 아님)</li>
+ *     <li>구조화 출력과 생각은 함께 쓸 수 있다 (Works with: extended thinking)</li>
+ * </ul>
  */
 public class ClaudeLlmClient implements LlmClient {
 
@@ -32,15 +44,6 @@ public class ClaudeLlmClient implements LlmClient {
     private static final String API_KEY_HEADER = "x-api-key";
     private static final String VERSION_HEADER = "anthropic-version";
     private static final String API_VERSION = "2023-06-01";
-
-    // 분류 응답 {"blocked": true|false} (QuestionFilterResponseParser가 읽는 형식)
-    private static final Map<String, Object> FILTER_OUTPUT_FORMAT = Map.of(
-            "type", "json_schema",
-            "schema", Map.of(
-                    "type", "object",
-                    "properties", Map.of("blocked", Map.of("type", "boolean")),
-                    "required", List.of("blocked"),
-                    "additionalProperties", false));
 
     private final LlmProperties llmProperties;
     private final RestClient gameRestClient;
@@ -106,13 +109,21 @@ public class ClaudeLlmClient implements LlmClient {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
         body.put("max_tokens", Math.min(request.maxOutputTokens(), llmProperties.maxOutputTokens()));
-        if (request.modelTier() == LlmModelTier.FILTER) {
-            // 분류는 JSON 한 줄만 낸다. 분류 모델(Haiku 5.5)은 생각이 기본으로 켜져 있어 짧은 출력 한도를
-            // 생각에 다 쓰면 텍스트 없이 max_tokens로 끝나므로 끈다. 생각 끄기를 허용하지 않는 모델로 바꾸면 400이 된다
-            body.put("thinking", Map.of("type", "disabled"));
-            // "어떻게 질문하면 돼?" 같은 메타 질문에 설명문으로 답하지 않도록 응답 형식을 구조화된 출력으로 강제한다.
-            // FILTER 등급은 질문 분류(QuestionFilterService) 전용이다. 다른 용도로 쓰게 되면 이 스키마를 요청 쪽으로 옮긴다
-            body.put("output_config", Map.of("format", FILTER_OUTPUT_FORMAT));
+        switch (request.thinking()) {
+            case ADAPTIVE -> body.put("thinking", Map.of("type", "adaptive"));
+            case DISABLED -> body.put("thinking", Map.of("type", "disabled"));
+            case MODEL_DEFAULT -> {
+            }
+        }
+        Map<String, Object> outputConfig = new LinkedHashMap<>();
+        if (request.outputSchema() != null) {
+            outputConfig.put("format", Map.of("type", "json_schema", "schema", request.outputSchema()));
+        }
+        if (request.effort() != null) {
+            outputConfig.put("effort", request.effort().apiValue());
+        }
+        if (!outputConfig.isEmpty()) {
+            body.put("output_config", outputConfig);
         }
         if (request.systemPrompt() != null && !request.systemPrompt().isBlank()) {
             body.put("system", request.systemPrompt());

@@ -2,6 +2,7 @@ package com.shelved.infra.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -15,13 +16,16 @@ import com.shelved.common.enums.LlmProvider;
 import com.shelved.common.enums.LlmRequestType;
 import com.shelved.common.exception.CustomException;
 import com.shelved.common.exception.ErrorCode;
+import com.shelved.domain.airequest.service.QuestionFilterService;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -81,25 +85,109 @@ class ClaudeLlmClientTest {
     }
 
     @Test
-    void call_분류요청_thinking끔_응답형식강제() {
+    void call_분류요청_요청쪽에서지정한thinking끔과응답형식_본문이이전과같음() {
 
-        // given 분류 모델은 생각이 기본으로 켜져 있어, 짧은 출력 한도를 생각에 다 쓰고 텍스트 없이 끝날 수 있다
+        // given 분류 스키마·thinking 끄기는 QuestionFilterService가 요청에 담는다. 본문은 클라이언트가 하드코딩하던 때와 같아야 한다
         server.expect(requestTo(MESSAGES_URL))
-                .andExpect(jsonPath("$.model").value("example-filter-model"))
-                .andExpect(jsonPath("$.thinking.type").value("disabled"))
-                // 메타 질문에 설명문으로 답하지 않도록 응답 형식을 {"blocked": boolean}으로 강제한다
-                .andExpect(jsonPath("$.output_config.format.type").value("json_schema"))
-                .andExpect(jsonPath("$.output_config.format.schema.type").value("object"))
-                .andExpect(jsonPath("$.output_config.format.schema.properties.blocked.type").value("boolean"))
-                .andExpect(jsonPath("$.output_config.format.schema.required[0]").value("blocked"))
-                .andExpect(jsonPath("$.output_config.format.schema.additionalProperties").value(false))
+                .andExpect(content().json("""
+                        {
+                          "model": "example-filter-model",
+                          "max_tokens": 64,
+                          "thinking": {"type": "disabled"},
+                          "output_config": {
+                            "format": {
+                              "type": "json_schema",
+                              "schema": {
+                                "type": "object",
+                                "properties": {"blocked": {"type": "boolean"}},
+                                "required": ["blocked"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "system": "가상 사건의 질문 분류기다.",
+                          "messages": [{"role": "user", "content": "어젯밤 무엇을 했나요?"}]
+                        }
+                        """, JsonCompareMode.STRICT))
                 .andRespond(withSuccess("""
                         {"content":[{"type":"text","text":"{\\"blocked\\": false}"}],"usage":{"input_tokens":5,"output_tokens":5}}
                         """, MediaType.APPLICATION_JSON));
 
         // when
+        claudeLlmClient.call(QuestionFilterService.filterRequest("가상 사건의 질문 분류기다.", "어젯밤 무엇을 했나요?"));
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    void call_스키마없는분류등급요청_thinking과응답형식미지정() {
+
+        // given 클라이언트는 모델 등급만 보고 스키마·thinking을 붙이지 않는다
+        server.expect(requestTo(MESSAGES_URL))
+                .andExpect(jsonPath("$.thinking").doesNotExist())
+                .andExpect(jsonPath("$.output_config").doesNotExist())
+                .andRespond(withSuccess("""
+                        {"content":[{"type":"text","text":"ALLOW"}],"usage":{"input_tokens":5,"output_tokens":5}}
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
         claudeLlmClient.call(new LlmRequest(LlmRequestType.QUESTION_FILTER, LlmModelTier.FILTER,
                 "가상 사건의 질문 분류기다.", List.of(LlmMessage.user("어젯밤 무엇을 했나요?")), 64));
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    void call_채점요청_스키마와생각effort를본문에담음() {
+
+        // given
+        Map<String, Object> schema = Map.of(
+                "type", "object",
+                "properties", Map.of("feedback", Map.of("type", "string")),
+                "required", List.of("feedback"),
+                "additionalProperties", false);
+        LlmRequest request = new LlmRequest(LlmRequestType.GRADING, LlmModelTier.MAIN, "가상 사건의 채점자다.",
+                List.of(LlmMessage.user("녹음기를 사용했다")), 200)
+                .withOutputSchema(schema)
+                .withThinking(LlmThinking.ADAPTIVE, LlmEffort.HIGH);
+        server.expect(requestTo(MESSAGES_URL))
+                .andExpect(jsonPath("$.model").value("example-main-model"))
+                .andExpect(jsonPath("$.thinking.type").value("adaptive"))
+                .andExpect(jsonPath("$.output_config.effort").value("high"))
+                .andExpect(jsonPath("$.output_config.format.type").value("json_schema"))
+                .andExpect(jsonPath("$.output_config.format.schema.properties.feedback.type").value("string"))
+                .andExpect(jsonPath("$.output_config.format.schema.additionalProperties").value(false))
+                .andRespond(withSuccess("""
+                        {"content":[{"type":"thinking","thinking":""},{"type":"text","text":"{}"}],"usage":{"input_tokens":5,"output_tokens":5}}
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        LlmResponse response = claudeLlmClient.call(request);
+
+        // then 생각 블록은 버리고 텍스트만 읽는다
+        server.verify();
+        assertThat(response.text()).isEqualTo("{}");
+    }
+
+    @Test
+    void call_스키마만지정_모델기본값이면thinking과effort미포함() {
+
+        // given
+        LlmRequest request = new LlmRequest(LlmRequestType.GRADING, LlmModelTier.MAIN, "가상 사건의 채점자다.",
+                List.of(LlmMessage.user("녹음기를 사용했다")), 200)
+                .withOutputSchema(Map.of("type", "object", "additionalProperties", false));
+        server.expect(requestTo(MESSAGES_URL))
+                .andExpect(jsonPath("$.thinking").doesNotExist())
+                .andExpect(jsonPath("$.output_config.effort").doesNotExist())
+                .andExpect(jsonPath("$.output_config.format.type").value("json_schema"))
+                .andRespond(withSuccess("""
+                        {"content":[{"type":"text","text":"{}"}],"usage":{"input_tokens":5,"output_tokens":5}}
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        claudeLlmClient.call(request);
 
         // then
         server.verify();
