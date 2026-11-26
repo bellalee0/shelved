@@ -9,6 +9,7 @@ import type {
   RoomSummaryResponse,
 } from '../../features/room/types';
 import type { PageResponse } from '../../shared/api/types';
+import { accusationCountOf, pendingAccusationOf } from '../accusationDb';
 import { conversationsOf, pendingAiRequestsOf } from '../aiRequestDb';
 import { findMockCase, MOCK_GAME_CONFIG } from '../data/clocktowerCase';
 import { hintCountOf } from '../hintDb';
@@ -153,9 +154,8 @@ export const roomHandlers = [
       timer: timerOf(room),
       heartbeatIntervalMs: MOCK_GAME_CONFIG.heartbeatIntervalMs,
       hintCount: hintCountOf(room),
-      // 지목은 4주차 작업에서 사용 횟수를 반영한다
-      accusationCount: usageOf(card.accusationLimit),
-      pendingAccusation: null,
+      accusationCount: accusationCountOf(room),
+      pendingAccusation: pendingAccusationOf(room),
       aiRequests: pendingAiRequestsOf(room),
       conversations: conversationsOf(room),
     };
@@ -284,10 +284,6 @@ export const roomHandlers = [
     return ok(connectionResponseOf(connectionId, room), '수사 이어하기 성공');
   }),
 ];
-
-function usageOf(limit: number) {
-  return { limit, used: 0, reserved: 0, remaining: limit };
-}
 
 function connectionResponseOf(connectionId: string, room: MockRoom): RoomConnectionResponse {
   return {

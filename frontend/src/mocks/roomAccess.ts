@@ -1,5 +1,5 @@
 import { authenticate, mockErrorResponse } from './handlers/auth';
-import { findMockRoom, settleMockRoom, type MockRoom } from './roomDb';
+import { findMockRoom, isOutOfTime, settleMockRoom, type MockRoom } from './roomDb';
 
 // 세션을 다루는 핸들러(room·evidence·note)가 공통으로 거치는 검사. 백엔드의 인증 필터 + 세션 조회에 해당한다.
 
@@ -55,7 +55,8 @@ export function checkOperable(request: Request, loaded: LoadedRoom): Response | 
       '수사 연결 정보가 없습니다. 게임 화면을 다시 열어 주세요.',
     );
   }
-  if (loaded.expiredNow) {
+  // 이번에 만료됐거나, 시간은 끝났지만 채점 결과를 기다리는 중(awaitingGrading)
+  if (loaded.expiredNow || isOutOfTime(loaded.room)) {
     return mockErrorResponse(409, 'ROOM_TIME_EXPIRED', '제한시간이 끝났습니다.');
   }
   if (loaded.room.status !== 'IN_PROGRESS') {

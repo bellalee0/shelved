@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'msw';
+import { accusationHandlers } from './accusation';
 import { aiRequestHandlers } from './aiRequests';
 import { authHandlers } from './auth';
 import { casesHandlers } from './cases';
@@ -20,5 +21,6 @@ export const handlers: RequestHandler[] = [
   ...noteHandlers,
   ...npcHandlers,
   ...hintHandlers,
+  ...accusationHandlers,
   ...aiRequestHandlers,
 ];

@@ -41,15 +41,13 @@ export type MockHint = {
   } | null;
 };
 
-/** AI 요청 한 건 (mocks/aiRequestDb.ts). NPC 질문·새 힌트·보충 질문을 쓴다 */
-export type MockAiRequest = {
+/** AI 요청 한 건의 공통 필드 (mocks/aiRequestDb.ts) */
+type MockAiRequestBase = {
   requestId: string;
-  type: 'NPC_ASK' | 'HINT' | 'HINT_FOLLOWUP';
-  /** NPC_ASK: suspectId, HINT_FOLLOWUP: hintId, HINT: null */
+  /** NPC_ASK: suspectId, HINT_FOLLOWUP: hintId, HINT·ACCUSATION: null */
   targetId: number | null;
   status: 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
-  input: { question: string };
-  /** SUCCEEDED일 때 최초 성공 당시 응답 (NpcAskResponse) */
+  /** SUCCEEDED일 때 최초 성공 당시 응답 (NpcAskResponse 등) */
   result: unknown;
   error: { code: string; message: string } | null;
   /** 실행 번호. 실패 후 같은 requestId로 다시 보내면 올라간다 */
@@ -60,6 +58,37 @@ export type MockAiRequest = {
   failOnFinish: boolean;
   acceptedAtMs: number;
   updatedAtMs: number;
+  /** ACCUSATION이 FAILED일 때 같은 답안 재채점이 가능한 시각. 그 외 null·없음 */
+  retryAvailableAtMs?: number | null;
+};
+
+/** 질문을 보내는 AI 요청: NPC 질문·새 힌트·보충 질문 */
+export type MockQuestionRequest = MockAiRequestBase & {
+  type: 'NPC_ASK' | 'HINT' | 'HINT_FOLLOWUP';
+  input: { question: string };
+};
+
+/** 지목 채점 요청 (mocks/accusationDb.ts) */
+export type MockAccusationRequest = MockAiRequestBase & {
+  type: 'ACCUSATION';
+  input: { suspectId: number; trickExplanation: string };
+};
+
+export type MockAiRequest = MockQuestionRequest | MockAccusationRequest;
+
+/** 지목 한 건 (mocks/accusationDb.ts) */
+export type MockAccusation = {
+  accusationId: number;
+  requestId: string;
+  suspectId: number;
+  trickExplanation: string;
+  submittedAtMs: number;
+  gradingStatus: 'PENDING' | 'COMPLETED' | 'ERROR';
+  verdict: 'CORRECT' | 'PARTIAL' | 'INCORRECT' | null;
+  feedback: string | null;
+  attemptNo: number | null;
+  retryAvailableAtMs: number | null;
+  superseded: boolean;
 };
 
 export type MockRoom = {
@@ -86,6 +115,8 @@ export type MockRoom = {
   aiRequests?: MockAiRequest[];
   /** 힌트 기록. 위 선택 필드와 같은 이유로 선택 필드다 */
   hints?: MockHint[];
+  /** 지목 기록. 위 선택 필드와 같은 이유로 선택 필드다 */
+  accusations?: MockAccusation[];
 };
 
 type MockRoomDb = {
@@ -216,7 +247,8 @@ export function settleMockRoom(room: MockRoom): boolean {
 
   if (elapsedMs >= limitMs) {
     expireMockRoom(room, room.segmentStartedAtMs + (limitMs - room.elapsedActiveMs));
-    return true;
+    // 채점 대기로 보류됐으면 EXPIRED가 아니다 (조작 API는 isOutOfTime으로 ROOM_TIME_EXPIRED를 준다)
+    return (room.status as RoomStatus) === 'EXPIRED';
   }
   if (isAway) {
     room.elapsedActiveMs = elapsedMs;
@@ -227,12 +259,48 @@ export function settleMockRoom(room: MockRoom): boolean {
   return false;
 }
 
+/**
+ * 마감 전에 접수한 지목의 채점이 끝나지 않았는지 (채점 중이거나, 대체되지 않은 채점 실패).
+ * 이때 시간이 끝나면 EXPIRED로 확정하지 않고 결과를 보류한다 (awaitingGrading)
+ */
+export function hasUnresolvedGrading(room: MockRoom): boolean {
+  return (room.accusations ?? []).some(
+    (accusation) =>
+      !accusation.superseded &&
+      (accusation.gradingStatus === 'PENDING' || accusation.gradingStatus === 'ERROR'),
+  );
+}
+
 function expireMockRoom(room: MockRoom, endedAtMs: number) {
   room.elapsedActiveMs = timeLimitMsOf(room);
-  room.status = 'EXPIRED';
   room.segmentStartedAtMs = null;
   room.connectionId = null;
+  if (hasUnresolvedGrading(room)) {
+    // 시간은 끝났지만 채점 결과를 기다린다. 상태는 그대로 두고 남은 시간 0 + awaitingGrading으로 보여 준다
+    return;
+  }
+  room.status = 'EXPIRED';
   room.endedAtMs = endedAtMs;
+}
+
+/** 지목 결과로 세션을 끝낸다 (CLEARED·FAILED, 채점 대기 중이던 세션의 EXPIRED). 진행 중이면 지금까지의 시간을 확정한다 */
+export function endMockRoom(room: MockRoom, status: 'CLEARED' | 'FAILED' | 'EXPIRED') {
+  const nowMs = currentTimeMs();
+  if (room.status === 'IN_PROGRESS' && room.segmentStartedAtMs !== null) {
+    room.elapsedActiveMs = Math.min(
+      timeLimitMsOf(room),
+      room.elapsedActiveMs + (nowMs - room.segmentStartedAtMs),
+    );
+  }
+  room.status = status;
+  room.segmentStartedAtMs = null;
+  room.connectionId = null;
+  room.endedAtMs = nowMs;
+}
+
+/** 남은 시간이 0인지 (채점 대기로 보류된 세션 포함) */
+export function isOutOfTime(room: MockRoom): boolean {
+  return !isEnded(room.status) && remainingMsOf(room) <= 0;
 }
 
 /** 지금 시각 기준의 누적 진행 시간. IN_PROGRESS는 진행 중인 구간을 더한다 */
@@ -256,7 +324,7 @@ export function timerOf(room: MockRoom): RoomTimerResponse {
     timeLimitSec: timeLimitMsOf(room) / 1000,
     elapsedActiveMs: Math.min(liveElapsedMs(room), timeLimitMsOf(room)),
     remainingMs: remainingMsOf(room),
-    awaitingGrading: false,
+    awaitingGrading: isOutOfTime(room) && hasUnresolvedGrading(room),
     serverTime: toServerTime(currentTimeMs()),
   };
 }
@@ -305,6 +373,10 @@ export function pauseMockRoom(room: MockRoom) {
   const elapsedMs = room.elapsedActiveMs + (nowMs - room.segmentStartedAtMs);
   if (elapsedMs >= timeLimitMsOf(room)) {
     expireMockRoom(room, nowMs);
+    if (room.status === 'IN_PROGRESS') {
+      // 채점 대기로 보류된 세션은 일시정지 상태로 둔다 (재채점은 연결 없이 보낸다)
+      room.status = 'PAUSED';
+    }
     return;
   }
   room.elapsedActiveMs = elapsedMs;
