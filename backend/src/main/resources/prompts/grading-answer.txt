@@ -1,0 +1,3 @@
+<submitted_answer>
+{{trickExplanation}}
+</submitted_answer>

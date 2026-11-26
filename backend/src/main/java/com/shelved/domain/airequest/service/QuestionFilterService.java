@@ -12,9 +12,11 @@ import com.shelved.infra.llm.LlmMessage;
 import com.shelved.infra.llm.LlmModelTier;
 import com.shelved.infra.llm.LlmRequest;
 import com.shelved.infra.llm.LlmResponse;
+import com.shelved.infra.llm.LlmThinking;
 import com.shelved.infra.llm.LlmUsageRecordingClient;
 import com.shelved.infra.llm.PromptTemplateLoader;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
@@ -43,6 +45,16 @@ public class QuestionFilterService {
     // 응답은 {"blocked": true|false} 하나라 짧게 둔다
     static final int MAX_OUTPUT_TOKENS = 64;
 
+    /**
+     * 분류 응답 {"blocked": true|false} (QuestionFilterResponseParser가 읽는 형식).
+     * "어떻게 질문하면 돼?" 같은 메타 질문에 설명문으로 답하지 않도록 응답 형식을 구조화 출력으로 강제한다
+     */
+    public static final Map<String, Object> OUTPUT_SCHEMA = Map.of(
+            "type", "object",
+            "properties", Map.of("blocked", Map.of("type", "boolean")),
+            "required", List.of("blocked"),
+            "additionalProperties", false);
+
     private final LlmUsageRecordingClient llmUsageRecordingClient;
     private final PromptTemplateLoader promptTemplateLoader;
     private final QuestionFilterResponseParser responseParser;
@@ -65,13 +77,7 @@ public class QuestionFilterService {
      */
     public void validateQuestion(String question, String requestId, LlmCallContext callContext, ErrorCode failureCode) {
 
-        LlmRequest request = new LlmRequest(
-                LlmRequestType.QUESTION_FILTER,
-                LlmModelTier.FILTER,
-                promptTemplateLoader.load(PROMPT_NAME),
-                List.of(LlmMessage.user(question)),
-                MAX_OUTPUT_TOKENS
-        );
+        LlmRequest request = filterRequest(promptTemplateLoader.load(PROMPT_NAME), question);
 
         LlmResponse response;
         try {
@@ -94,5 +100,19 @@ public class QuestionFilterService {
             log.info("직접적인 정답 요구 질문 차단 requestId={}", requestId);
             throw new CustomException(QUESTION_BLOCKED);
         }
+    }
+
+    /**
+     * 분류 요청. 분류는 JSON 한 줄만 낸다. 분류 모델(Haiku 5.5)은 생각이 기본으로 켜져 있어 짧은 출력 한도를 생각에 다 쓰면
+     * 텍스트 없이 max_tokens로 끝나므로 끈다. 생각 끄기를 허용하지 않는 모델(Opus 5.5·Sonnet 5.5 등)로 바꾸면 400이 된다
+     */
+    public static LlmRequest filterRequest(String systemPrompt, String question) {
+        return new LlmRequest(
+                LlmRequestType.QUESTION_FILTER,
+                LlmModelTier.FILTER,
+                systemPrompt,
+                List.of(LlmMessage.user(question)),
+                MAX_OUTPUT_TOKENS
+        ).withOutputSchema(OUTPUT_SCHEMA).withThinking(LlmThinking.DISABLED, null);
     }
 }
