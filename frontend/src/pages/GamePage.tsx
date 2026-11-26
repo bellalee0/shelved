@@ -1,11 +1,18 @@
-import { lazy, Suspense, useCallback } from 'react';
+import { lazy, Suspense, useCallback, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import {
+  AccusationPanel,
+  useAccusation,
+  type AccusationController,
+  type AccusationSuspect,
+} from '../features/accusation';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { EvidencePanel } from '../features/evidence/components/EvidencePanel';
 import { NoteWindow, useNote } from '../features/note';
 import { HintPanel } from '../features/hint';
 import { ConversationLogPanel, joinConversations, NpcPanel } from '../features/npc';
 import { BriefingPanel } from '../features/room/components/BriefingPanel';
+import { SuspectPortrait } from '../features/room/components/BriefingSuspects';
 import { ExitDialog } from '../features/room/components/ExitDialog';
 import { GameHud } from '../features/room/components/GameHud';
 import { SessionOverlay } from '../features/room/components/SessionOverlay';
@@ -18,6 +25,7 @@ import { useMapLoadStatus } from '../features/room/hooks/useMapLoadStatus';
 import { useSaveAndExit } from '../features/room/hooks/useSaveAndExit';
 import { canMoveOnMap, canOperateSession } from '../features/room/inputPermission';
 import type {
+  AiRequestStatusResponse,
   RoomBriefingResponse,
   RoomMapResponse,
   RoomStateResponse,
@@ -27,6 +35,13 @@ import type {
 const PhaserGame = lazy(() =>
   import('../game/PhaserGame').then((module) => ({ default: module.PhaserGame })),
 );
+
+const NO_AI_REQUESTS: AiRequestStatusResponse[] = [];
+
+/** 지목 창의 인물 얼굴. 사전 정보 인물 목록과 같은 방식(스프라이트가 없으면 이름 첫 글자 원) */
+function renderSuspectFace(suspect: AccusationSuspect) {
+  return <SuspectPortrait name={suspect.name} spriteKey={suspect.spriteKey} />;
+}
 
 function parseRoomId(value: string | undefined) {
   const roomId = Number(value);
@@ -70,7 +85,8 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
   const hasOverlay = session.phase !== 'playing';
   const windows = useGameWindows(hasOverlay);
 
-  const { disconnect, checkState } = session;
+  const { disconnect, checkState, setEndedNavigationHeld } = session;
+  const { openPanel } = windows;
   const handleLeave = useCallback(() => {
     disconnect();
     navigate('/');
@@ -84,6 +100,34 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
       void checkState();
     }
   }, [sessionPhase, checkState]);
+
+  // 지목 채점이 끝나면 GET state를 다시 받아 HUD 횟수·세션 상태를 맞춘다. 마감 후·일시정지에도 재채점이 끝날 수 있어
+  // 진행 중이 아니어도 다시 받되, 입장 흐름 중(entering·enterFailed)에는 그 흐름이 state를 받으므로 겹치지 않게 한다
+  const refreshAfterAccusation = useCallback(() => {
+    if (sessionPhase !== 'entering' && sessionPhase !== 'enterFailed') {
+      void checkState();
+    }
+  }, [sessionPhase, checkState]);
+  const accusation = useAccusation({
+    roomId,
+    aiRequests: session.roomState?.aiRequests ?? NO_AI_REQUESTS,
+    pendingAccusation: session.roomState?.pendingAccusation ?? null,
+    reconnectKey: session.reconnectKey,
+    onStateChanged: refreshAfterAccusation,
+    onSessionRejected: session.handleSessionRejected,
+    // 마지막 지목이면 GET state가 종료를 확인해도 결과 화면으로 바로 가지 않고, 지목 창에서 피드백을 읽게 한다
+    onFinalResult: () => {
+      setEndedNavigationHeld(true);
+      openPanel({ kind: 'ACCUSATION' });
+    },
+  });
+  // 결과를 읽던 지목 창을 닫으면 결과 화면으로 간다 ("결과 보기"를 누른 것과 같다)
+  const accusationOpen = windows.panel?.kind === 'ACCUSATION';
+  useEffect(() => {
+    if (!accusationOpen) {
+      setEndedNavigationHeld(false);
+    }
+  }, [accusationOpen, setEndedNavigationHeld]);
 
   const baseConditions = {
     mapReady: map.status === 'ready',
@@ -138,6 +182,8 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
           onOpenBriefing={() => windows.openPanel({ kind: 'BRIEFING' })}
           onOpenConversations={() => windows.openPanel({ kind: 'CONVERSATIONS' })}
           onOpenHint={() => windows.openPanel({ kind: 'HINT' })}
+          onOpenAccusation={() => windows.openPanel({ kind: 'ACCUSATION' })}
+          accusationPending={accusation.hasActivity}
           onExit={() => void exit.start()}
           actionsEnabled={session.phase === 'playing' && exit.step === 'idle'}
         />
@@ -169,6 +215,11 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
                 hasConnection={session.hasConnection && session.phase !== 'replaced'}
                 remainingMs={session.displayRemainingMs}
                 reconnectKey={session.reconnectKey}
+                accusation={accusation}
+                sessionEnded={session.phase === 'ended'}
+                serverClockOffsetMs={session.serverClockOffsetMs}
+                onShowResult={() => setEndedNavigationHeld(false)}
+                onRetryLater={() => void exit.start()}
                 onNpcAnswered={handleNpcAnswered}
                 onHintCountChanged={handleNpcAnswered}
                 onSessionRejected={session.handleSessionRejected}
@@ -218,6 +269,12 @@ type RightPanelContentProps = {
   /** 화면 타이머의 남은 시간 */
   remainingMs: number | null;
   reconnectKey: number;
+  accusation: AccusationController;
+  /** GET state로 세션 종료를 확인했다 */
+  sessionEnded: boolean;
+  serverClockOffsetMs: number;
+  onShowResult: () => void;
+  onRetryLater: () => void;
   onNpcAnswered: () => void;
   onHintCountChanged: () => void;
   onSessionRejected: (code: string) => void;
@@ -235,6 +292,11 @@ function RightPanelContent({
   hasConnection,
   remainingMs,
   reconnectKey,
+  accusation,
+  sessionEnded,
+  serverClockOffsetMs,
+  onShowResult,
+  onRetryLater,
   onNpcAnswered,
   onHintCountChanged,
   onSessionRejected,
@@ -290,6 +352,28 @@ function RightPanelContent({
           resyncKey={reconnectKey}
           onCountChanged={onHintCountChanged}
           onSessionRejected={onSessionRejected}
+          onClose={onClose}
+        />
+      );
+    case 'ACCUSATION':
+      return (
+        <AccusationPanel
+          roomId={roomId}
+          accusation={accusation}
+          // 지목 대상은 GET map의 suspects 전체다 (맵에 배치되지 않은 인물 포함)
+          suspects={mapData?.suspects ?? []}
+          renderFace={renderSuspectFace}
+          timerStatus={roomState?.timer.status ?? null}
+          remainingMs={remainingMs}
+          awaitingGrading={roomState?.timer.awaitingGrading ?? false}
+          hasConnection={hasConnection}
+          accusationCount={roomState?.accusationCount ?? null}
+          pendingAccusation={roomState?.pendingAccusation ?? null}
+          sessionEnded={sessionEnded}
+          serverClockOffsetMs={serverClockOffsetMs}
+          resyncKey={reconnectKey}
+          onShowResult={onShowResult}
+          onRetryLater={onRetryLater}
           onClose={onClose}
         />
       );

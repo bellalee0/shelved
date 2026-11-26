@@ -14,6 +14,9 @@ type GameHudProps = {
   onOpenBriefing: () => void;
   onOpenConversations: () => void;
   onOpenHint: () => void;
+  onOpenAccusation: () => void;
+  /** 이 화면에서 지목이 채점 중이거나 재채점을 기다린다 (GET state를 다시 받기 전에도 점을 보여 준다) */
+  accusationPending?: boolean;
   onExit: () => void;
   /** 진행 중일 때만 버튼을 누를 수 있다 */
   actionsEnabled: boolean;
@@ -39,6 +42,8 @@ export function GameHud({
   onOpenBriefing,
   onOpenConversations,
   onOpenHint,
+  onOpenAccusation,
+  accusationPending = false,
   onExit,
   actionsEnabled,
 }: GameHudProps) {
@@ -78,9 +83,9 @@ export function GameHud({
           힌트
           {badges.hint && <PendingBadge />}
         </Button>
-        {/* 지목은 이후 작업에서 연결한다 */}
-        <Button variant="secondary" disabled>
+        <Button variant="secondary" onClick={onOpenAccusation} disabled={!actionsEnabled}>
           지목
+          {(badges.accusation || accusationPending) && <PendingBadge />}
         </Button>
         <Button variant="ghost" onClick={onExit} disabled={!actionsEnabled}>
           저장 후 나가기

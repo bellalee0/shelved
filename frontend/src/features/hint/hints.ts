@@ -75,7 +75,7 @@ export function readFollowupQuestionInput(
 /**
  * 대화창에 다시 표시할 요청 하나를 고른다 (type별로 하나). 처리 중인 요청이 있으면 그것,
  * 없으면 가장 최근에 접수된 실패 요청이다 (재시도 대상은 마지막 실패 하나로 단순화).
- * 알 수 없는 유형(예: ACCUSATION)은 무시한다.
+ * 다른 유형(NPC_ASK·ACCUSATION)은 각자의 창이 복원한다.
  */
 export function pickPendingRequest(
   pendingRequests: AiRequestStatusResponse[],
