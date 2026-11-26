@@ -579,3 +579,104 @@ describe('useAiRequest 복원', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+describe('useAiRequest 재시도 형식 확장 (지목 재채점)', () => {
+  it('sendRetry가 있으면 실패한 요청의 재시도·같은 입력 재전송은 sendRetry로, 새 요청은 send로 보낸다', async () => {
+    // given
+    const sendRetry =
+      vi.fn<
+        (requestId: string, input: Input, previousError: unknown) => Promise<AiPostResult<Result>>
+      >();
+    const { result, options } = setup({ sendRetry });
+    options.send.mockRejectedValueOnce(
+      apiError(502, 'GRADING_FAILED', { retryAvailableAt: '2026-11-12T10:00:10' }),
+    );
+    await act(async () => {
+      result.current.submit(QUESTION);
+    });
+
+    // then 실패 사유에 재시도 가능 시각을 남긴다
+    expect(result.current.state).toMatchObject({
+      phase: 'failed',
+      error: { code: 'GRADING_FAILED', retryAvailableAt: '2026-11-12T10:00:10' },
+    });
+
+    // when 다시 보내기
+    sendRetry.mockResolvedValueOnce(completed('request-1'));
+    await act(async () => {
+      result.current.retry();
+    });
+
+    // then
+    expect(sendRetry).toHaveBeenCalledWith(
+      'request-1',
+      QUESTION,
+      expect.objectContaining({ code: 'GRADING_FAILED' }),
+    );
+    expect(options.send).toHaveBeenCalledTimes(1);
+
+    // when 새 요청
+    options.send.mockResolvedValueOnce(completed('request-2'));
+    await act(async () => {
+      result.current.submit({ question: '다른 질문' });
+    });
+
+    // then
+    expect(options.send).toHaveBeenLastCalledWith('request-2', { question: '다른 질문' });
+    expect(sendRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('429면 실패 상태를 유지하고 detail의 재시도 가능 시각으로 바꾼다 (자동으로 다시 보내지 않는다)', async () => {
+    // given
+    const { result, options } = setup();
+    options.send
+      .mockRejectedValueOnce(apiError(502, 'GRADING_FAILED', { retryAvailableAt: 'T1' }))
+      .mockRejectedValueOnce(apiError(429, 'GRADING_RETRY_TOO_SOON', { retryAvailableAt: 'T2' }));
+    await act(async () => {
+      result.current.submit(QUESTION);
+    });
+
+    // when
+    await act(async () => {
+      result.current.retry();
+    });
+    await advance(POLL_MS * 3);
+
+    // then
+    expect(result.current.state).toMatchObject({
+      phase: 'failed',
+      requestId: 'request-1',
+      error: { code: 'GRADING_RETRY_TOO_SOON', retryAvailableAt: 'T2' },
+    });
+    expect(options.send).toHaveBeenCalledTimes(2);
+    expect(options.onRejected).not.toHaveBeenCalled();
+  });
+
+  it('상태 조회로 실패를 확인하면 상태 객체의 retryAvailableAt을 남긴다', async () => {
+    // given
+    const { result, options } = setup();
+    options.send.mockResolvedValueOnce({
+      kind: 'processing',
+      data: statusOf('request-1', 'PROCESSING'),
+    });
+    options.getStatus.mockResolvedValueOnce(
+      statusOf('request-1', 'FAILED', {
+        error: { code: 'GRADING_FAILED', message: '채점 실패' },
+        retryAvailableAt: 'T3',
+      }),
+    );
+    await act(async () => {
+      result.current.submit(QUESTION);
+    });
+
+    // when
+    await advance(POLL_MS);
+
+    // then
+    expect(result.current.state.error).toEqual({
+      code: 'GRADING_FAILED',
+      message: '채점 실패',
+      retryAvailableAt: 'T3',
+    });
+  });
+});
