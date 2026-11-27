@@ -3,7 +3,6 @@ package com.shelved.domain.room.service;
 import com.shelved.common.config.GameProperties;
 import com.shelved.common.entity.PlayResult;
 import com.shelved.common.entity.Room;
-import com.shelved.common.enums.GradingStatus;
 import com.shelved.common.enums.RoomStatus;
 import com.shelved.domain.accusation.repository.AccusationRepository;
 import com.shelved.domain.hint.repository.HintRepository;
@@ -12,8 +11,6 @@ import com.shelved.domain.room.dto.RoomTimerResponse;
 import com.shelved.domain.room.repository.PlayResultRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -34,9 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class RoomTimeSettler {
-
-    // 마감 전 접수됐지만 채점이 끝나지 않은 지목
-    private static final Set<GradingStatus> UNRESOLVED_GRADING_STATUSES = EnumSet.of(GradingStatus.PENDING, GradingStatus.ERROR);
 
     private final AccusationRepository accusationRepository;
     private final HintRepository hintRepository;
@@ -135,8 +129,9 @@ public class RoomTimeSettler {
         );
     }
 
+    // 마감 전 접수됐지만 채점이 끝나지 않은 지목(채점 중·채점 실패). 새 답안으로 대체된 실패 지목은 재채점할 수 없으므로 세지 않는다
     private boolean hasUnresolvedAccusation(Room room) {
-        return accusationRepository.existsByRoomIdAndGradingStatusIn(room.getId(), UNRESOLVED_GRADING_STATUSES);
+        return accusationRepository.existsUnresolvedByRoomId(room.getId());
     }
 
     private static long elapsedAt(Room room, LocalDateTime at) {

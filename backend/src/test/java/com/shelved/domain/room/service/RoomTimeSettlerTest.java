@@ -2,7 +2,6 @@ package com.shelved.domain.room.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -94,7 +93,7 @@ class RoomTimeSettlerTest {
         // given: 제한시간 직후(1201초)에 마지막 접속 확인, 그 뒤 끊김
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC + 1));
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
         given(hintRepository.countByRoomId(any())).willReturn(2L);
 
         // when
@@ -155,7 +154,7 @@ class RoomTimeSettlerTest {
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC - 5));
         LocalDateTime now = T0.plusSeconds(LIMIT_SEC + 5);
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
 
         // when
         settler.settle(room, now);
@@ -222,7 +221,7 @@ class RoomTimeSettlerTest {
         // given
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC - 5));
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
 
         // when
         settler.pause(room, T0.plusSeconds(LIMIT_SEC + 5));
@@ -239,7 +238,7 @@ class RoomTimeSettlerTest {
         // given
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC - 5));
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(true);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(true);
         LocalDateTime now = T0.plusSeconds(LIMIT_SEC + 5);
 
         // when
@@ -280,7 +279,7 @@ class RoomTimeSettlerTest {
 
         // given
         Room room = startedRoom();
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
         given(playResultRepository.existsByRoomId(any())).willReturn(true);
 
         // when
