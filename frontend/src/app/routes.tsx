@@ -8,6 +8,7 @@ import { GamePage } from '../pages/GamePage';
 import { LoginPage } from '../pages/LoginPage';
 import { NicknamePage } from '../pages/NicknamePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { RankingPage } from '../pages/RankingPage';
 import { ResultPage } from '../pages/ResultPage';
 
 /**
@@ -32,6 +33,7 @@ export const routes: RouteObject[] = [
           // 로그인이 필요한 화면(게임, 결과, 랭킹 등)은 여기에 추가한다
           { path: '/rooms/:roomId', element: <GamePage /> },
           { path: '/rooms/:roomId/result', element: <ResultPage /> },
+          { path: '/cases/:caseId/ranking', element: <RankingPage /> },
           {
             element: <RequireAdmin />,
             children: [{ path: '/admin', element: <AdminHomePage /> }],
