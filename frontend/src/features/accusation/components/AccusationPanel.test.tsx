@@ -333,11 +333,30 @@ describe('AccusationPanel 결과', () => {
     // when 게임 화면이 GET state로 종료를 확인했다
     view.rerenderWith({ onFinalResult, onShowResult, sessionEnded: true });
 
-    // then
-    await waitFor(() =>
-      expect(screen.getByText('정답입니다! 사건을 해결했습니다.')).toBeInTheDocument(),
-    );
+    // then 화면 가운데 팝업에 종료 안내·방금 받은 판정과 피드백·결과 보기가 함께 보인다
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' });
+    expect(popup).toHaveTextContent('정답입니다! 사건을 해결했습니다.');
+    await waitFor(() => expect(popup).toHaveTextContent(/판정\s*정답/));
     expect(screen.queryByLabelText('트릭 설명')).not.toBeInTheDocument();
+    fireEvent.click(within(popup).getByRole('button', { name: '결과 보기' }));
+    expect(onShowResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('종료 팝업을 닫으면 지목 창은 남고, 창 안의 "결과 보기"를 계속 쓸 수 있다', async () => {
+    // given
+    const onShowResult = vi.fn();
+    const view = renderHarness({ onShowResult });
+    await submitAnswer('마거릿', CORRECT);
+    await screen.findByText('수사 결과를 확인하는 중…');
+    view.rerenderWith({ onShowResult, sessionEnded: true });
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' });
+
+    // when
+    fireEvent.click(within(popup).getByRole('button', { name: '닫기' }));
+
+    // then
+    expect(screen.queryByRole('dialog', { name: '수사 종료' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '패널 닫기' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
     expect(onShowResult).toHaveBeenCalledTimes(1);
   });

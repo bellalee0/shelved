@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AccusationResponse, RoomStatus } from '../../../shared/api/types';
 import { Button } from '../../../shared/components/Button';
 import { ErrorMessage } from '../../../shared/components/ErrorMessage';
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator';
+import { Modal } from '../../../shared/components/Modal';
 import { SidePanel } from '../../../shared/components/SidePanel';
 import { formatUsage } from '../../../shared/utils/formatUsage';
 import type { UsageCount } from '../../room/types';
@@ -275,6 +276,8 @@ type ResultNoticeProps = {
 /**
  * 방금 받은 결과 아래의 안내. 종료 여부는 결과 스냅샷(roomStatus)이 아니라 GET state로 확인한 값(sessionEnded)으로 정한다.
  * 결과를 읽을 시간을 주기 위해 결과 화면으로 자동 이동하지 않고 "결과 보기" 버튼을 둔다.
+ * 지난 지목이 쌓이면 안내가 창 아래로 밀리므로, 종료되면 화면 가운데 팝업으로도 보여 준다.
+ * 팝업이 지목 창을 가리기 때문에 방금 받은 판정·피드백을 함께 담고, 닫아도 창 안의 안내는 남는다.
  */
 function ResultNotice({
   latestResult,
@@ -283,24 +286,46 @@ function ResultNotice({
   remaining,
   onShowResult,
 }: ResultNoticeProps) {
+  const [popupClosed, setPopupClosed] = useState(false);
+
   if (sessionEnded) {
     const endedStatus = isEndedRoomStatus(timerStatus)
       ? (timerStatus as 'CLEARED' | 'FAILED' | 'EXPIRED')
       : null;
+    const message = endedStatus && (
+      <p className={endedStatus === 'CLEARED' ? 'text-lg font-bold text-accent' : 'font-bold'}>
+        {ENDED_MESSAGES[endedStatus]}
+      </p>
+    );
+    const showResultButton = (
+      <Button className="self-start" onClick={onShowResult}>
+        결과 보기
+      </Button>
+    );
     return (
-      <div
-        role="status"
-        className="flex flex-col gap-2 rounded-md border-2 border-accent bg-paper px-4 py-3"
-      >
-        {endedStatus && (
-          <p className={endedStatus === 'CLEARED' ? 'text-lg font-bold text-accent' : 'font-bold'}>
-            {ENDED_MESSAGES[endedStatus]}
-          </p>
+      <>
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-md border-2 border-accent bg-paper px-4 py-3"
+        >
+          {message}
+          {showResultButton}
+        </div>
+        {!popupClosed && (
+          <Modal title="수사 종료" onClose={() => setPopupClosed(true)}>
+            <div className="flex flex-col gap-3">
+              {message}
+              {latestResult && (
+                // 피드백이 길어도 "결과 보기"가 화면 밖으로 밀리지 않게 이 영역만 스크롤한다
+                <div className="max-h-[50vh] overflow-y-auto">
+                  <VerdictFeedback accusation={latestResult.accusation} />
+                </div>
+              )}
+              {showResultButton}
+            </div>
+          </Modal>
         )}
-        <Button className="self-start" onClick={onShowResult}>
-          결과 보기
-        </Button>
-      </div>
+      </>
     );
   }
   if (latestResult === null) {
