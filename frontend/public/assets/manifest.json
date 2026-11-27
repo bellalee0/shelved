@@ -73,6 +73,24 @@
         }
       }
     },
+    "npc-manservant-01": {
+      "path": "/assets/sprites/npc-manservant-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
     "npc-old-man-01": {
       "path": "/assets/sprites/npc-old-man-01.png",
       "frameWidth": 64,
@@ -109,6 +127,24 @@
         }
       }
     },
+    "npc-uniform-man-01": {
+      "path": "/assets/sprites/npc-uniform-man-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
     "npc-workman-01": {
       "path": "/assets/sprites/npc-workman-01.png",
       "frameWidth": 64,
@@ -129,6 +165,24 @@
     },
     "npc-young-man-01": {
       "path": "/assets/sprites/npc-young-man-01.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "walk": {
+          "frameCount": 9,
+          "frameRate": 8,
+          "rows": {
+            "up": 0,
+            "left": 1,
+            "down": 2,
+            "right": 3
+          },
+          "idleFrame": 0
+        }
+      }
+    },
+    "npc-young-woman-01": {
+      "path": "/assets/sprites/npc-young-woman-01.png",
       "frameWidth": 64,
       "frameHeight": 64,
       "animations": {
