@@ -569,17 +569,19 @@ describe('AccusationPanel 복원', () => {
   });
 });
 
-describe('AccusationPanel 채점 중 영역 스크롤', () => {
-  /** 부드러운 스크롤을 요청받은 요소의 글. jsdom에는 scrollIntoView가 없어 목으로 둔다 */
-  let smoothScrolled: string[] = [];
+describe('AccusationPanel 이번 지목 기록 스크롤', () => {
+  /** scrollIntoView를 받은 요소와 위치. jsdom에는 scrollIntoView가 없어 목으로 둔다 */
+  let scrolled: { tag: string; text: string; block: ScrollLogicalPosition | undefined }[] = [];
   const original = Element.prototype.scrollIntoView;
 
   beforeEach(() => {
-    smoothScrolled = [];
+    scrolled = [];
     Element.prototype.scrollIntoView = function (this: Element, options) {
-      if (typeof options === 'object' && options.behavior === 'smooth') {
-        smoothScrolled.push(this.textContent ?? '');
-      }
+      scrolled.push({
+        tag: this.tagName,
+        text: this.textContent ?? '',
+        block: typeof options === 'object' ? options.block : undefined,
+      });
     };
   });
 
@@ -587,7 +589,15 @@ describe('AccusationPanel 채점 중 영역 스크롤', () => {
     Element.prototype.scrollIntoView = original;
   });
 
-  it('지목을 제출하면 채점 중 영역으로 스크롤하고, 창을 닫았다 열 때는 다시 옮기지 않는다', async () => {
+  /** 모든 스크롤이 이번 지목 기록(li)을 창 맨 위에 맞췄는지 */
+  function expectOnlyRecordAtTop(trick: string) {
+    for (const call of scrolled) {
+      expect(call).toMatchObject({ tag: 'LI', block: 'start' });
+      expect(call.text).toContain(trick);
+    }
+  }
+
+  it('지목을 제출하면 이번 기록을 위에 맞추고, 창을 닫았다 열 때는 다시 옮기지 않는다', async () => {
     // given
     setScenario('accusationSlow', true);
     renderHarness();
@@ -596,7 +606,9 @@ describe('AccusationPanel 채점 중 영역 스크롤', () => {
     await submitAnswer('마거릿', PARTIAL);
 
     // then
-    await waitFor(() => expect(smoothScrolled).toEqual(['채점 중입니다…']));
+    await waitFor(() => expect(scrolled).toHaveLength(1));
+    expect(scrolled[0].text).toContain('채점 중입니다…');
+    expectOnlyRecordAtTop(PARTIAL);
 
     // when 채점 중에 창을 다시 연다
     fireEvent.click(screen.getByRole('button', { name: '패널 닫기' }));
@@ -604,10 +616,23 @@ describe('AccusationPanel 채점 중 영역 스크롤', () => {
     await screen.findByRole('list', { name: '지목 기록' });
 
     // then
-    expect(smoothScrolled).toHaveLength(1);
+    expect(scrolled).toHaveLength(1);
   });
 
-  it('"같은 답안 다시 채점"을 눌러도 채점 중 영역으로 스크롤한다', async () => {
+  it('결과를 받아도 아래 안내로 내려가지 않고 판정이 담긴 이번 기록에 맞춘다', async () => {
+    // given
+    renderHarness();
+
+    // when
+    await submitAnswer('마거릿', PARTIAL);
+    await screen.findByText('방금 받은 결과');
+
+    // then
+    await waitFor(() => expect(scrolled.at(-1)?.text).toContain('방금 받은 결과'));
+    expectOnlyRecordAtTop(PARTIAL);
+  });
+
+  it('"같은 답안 다시 채점"을 눌러도 이번 기록을 위에 맞춘다', async () => {
     // given
     setScenario('accusationFail', true);
     const view = renderHarness();
@@ -618,12 +643,14 @@ describe('AccusationPanel 채점 중 영역 스크롤', () => {
     view.rerenderWith({ serverClockOffsetMs: 11_000 });
     const retry = screen.getByRole('button', { name: '같은 답안 다시 채점' });
     await waitFor(() => expect(retry).toBeEnabled());
-    smoothScrolled = [];
+    scrolled = [];
 
     // when
     fireEvent.click(retry);
 
     // then
-    await waitFor(() => expect(smoothScrolled).toEqual(['채점 중입니다…']));
+    await waitFor(() => expect(scrolled.length).toBeGreaterThan(0));
+    expect(scrolled[0].text).toContain('채점 중입니다…');
+    expectOnlyRecordAtTop(PARTIAL);
   });
 });

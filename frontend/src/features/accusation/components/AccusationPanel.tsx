@@ -90,7 +90,8 @@ export function AccusationPanel({
 }: AccusationPanelProps) {
   const listQuery = useAccusations(roomId);
   const { refetch } = listQuery;
-  const resultRef = useRef<HTMLDivElement>(null);
+  // 이번 지목의 기록 항목 (채점 중·실패, 없으면 방금 받은 결과)
+  const currentRecordRef = useRef<HTMLLIElement>(null);
 
   // 재접속하면 열려 있던 창의 기록을 다시 받는다 (NPC·힌트 창과 같은 방식)
   const handledResyncKeyRef = useRef(resyncKey);
@@ -104,23 +105,21 @@ export function AccusationPanel({
 
   const { state, isBusy, latestResult } = accusation;
 
-  // 제출·재채점을 누르면 채점 중 표시가 창 위쪽에 있어 보이지 않으므로 그 위치로 옮긴다.
-  // 이미 채점 중인 창을 열 때(처음 값이 true)는 옮기지 않는다
-  const gradingRef = useRef<HTMLDivElement>(null);
-  const wasBusyRef = useRef(isBusy);
-  useEffect(() => {
-    if (isBusy && !wasBusyRef.current) {
-      gradingRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-    }
-    wasBusyRef.current = isBusy;
-  }, [isBusy]);
   const activeRequestId = state.phase === 'idle' ? null : state.requestId;
   const records = listQuery.data?.accusations ?? [];
 
-  // 방금 받은 결과가 생기면 그 위치를 보여 준다 (jsdom에는 scrollIntoView가 없다)
+  // 제출·재채점을 누르면 채점 중 표시가, 결과를 받으면 판정·피드백이 보이도록 이번 기록을 창 맨 위에 맞춘다.
+  // 이미 채점 중인 창을 열 때(처음 값이 true)는 옮기지 않는다
+  const wasBusyRef = useRef(isBusy);
+  useEffect(() => {
+    if (isBusy && !wasBusyRef.current) {
+      scrollToRecord(currentRecordRef.current);
+    }
+    wasBusyRef.current = isBusy;
+  }, [isBusy]);
   useEffect(() => {
     if (latestResult) {
-      resultRef.current?.scrollIntoView?.({ block: 'nearest' });
+      scrollToRecord(currentRecordRef.current);
     }
   }, [latestResult]);
 
@@ -147,11 +146,7 @@ export function AccusationPanel({
   /** 이 화면이 다루는 지목(채점 중·실패)의 상태. 실패면 재채점 영역을 붙인다 */
   function renderActiveStatus() {
     if (isBusy) {
-      return (
-        <div ref={gradingRef}>
-          <LoadingIndicator label="채점 중입니다…" />
-        </div>
-      );
+      return <LoadingIndicator label="채점 중입니다…" />;
     }
     return (
       <GradingRetry
@@ -192,9 +187,11 @@ export function AccusationPanel({
               const isActive =
                 record.requestId === activeRequestId && record.gradingStatus !== 'COMPLETED';
               const highlighted = latestResult?.accusation.accusationId === record.accusationId;
+              const isCurrent = activeRequestId !== null ? isActive : highlighted;
               return (
                 <AccusationRecordItem
                   key={record.accusationId}
+                  itemRef={isCurrent ? currentRecordRef : undefined}
                   suspectName={record.suspectName}
                   trickExplanation={record.trickExplanation}
                   attemptNo={record.gradingStatus === 'COMPLETED' ? record.attemptNo : null}
@@ -207,6 +204,7 @@ export function AccusationPanel({
             })}
             {showActiveSeparately && activeInput && (
               <AccusationRecordItem
+                itemRef={currentRecordRef}
                 suspectName={activeDisplay?.suspectName ?? suspectNameOf(activeInput.suspectId)}
                 trickExplanation={activeInput.trickExplanation}
                 attemptNo={null}
@@ -223,6 +221,7 @@ export function AccusationPanel({
         !records.some((record) => record.accusationId === latestResult.accusation.accusationId) && (
           <ol aria-label="방금 받은 결과" className="flex flex-col gap-3">
             <AccusationRecordItem
+              itemRef={activeRequestId === null ? currentRecordRef : undefined}
               suspectName={latestResult.accusation.suspectName}
               trickExplanation={latestResult.accusation.trickExplanation}
               attemptNo={latestResult.accusation.attemptNo}
@@ -233,15 +232,13 @@ export function AccusationPanel({
           </ol>
         )}
 
-      <div ref={resultRef}>
-        <ResultNotice
-          latestResult={latestResult}
-          sessionEnded={sessionEnded}
-          timerStatus={timerStatus}
-          remaining={count?.remaining ?? null}
-          onShowResult={onShowResult}
-        />
-      </div>
+      <ResultNotice
+        latestResult={latestResult}
+        sessionEnded={sessionEnded}
+        timerStatus={timerStatus}
+        remaining={count?.remaining ?? null}
+        onShowResult={onShowResult}
+      />
 
       {state.phase === 'idle' && state.error && (
         <p role="alert" className="text-sm text-danger">
@@ -277,6 +274,11 @@ export function AccusationPanel({
       )}
     </SidePanel>
   );
+}
+
+/** 지목 창(스크롤 영역)에서 기록 항목을 맨 위에 맞춘다 (jsdom에는 scrollIntoView가 없다) */
+function scrollToRecord(element: HTMLElement | null) {
+  element?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
 }
 
 type ResultNoticeProps = {

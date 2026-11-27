@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import type { AccusationResponse } from '../../../shared/api/types';
 import { VERDICT_LABELS } from '../../../shared/constants/labels';
 import { GRADING_FAILED_MESSAGE } from './GradingRetry';
@@ -44,6 +44,8 @@ type AccusationRecordItemProps = {
   superseded?: boolean;
   /** 상태 표시 (판정·피드백, 채점 중, 채점 실패·재채점 등) */
   children: ReactNode;
+  /** 항목 요소. 지목 창이 이번 지목 기록으로 스크롤할 때 쓴다 */
+  itemRef?: Ref<HTMLLIElement>;
 };
 
 /** 지목 기록 한 건의 틀: "N번째 지목"(완료된 것만)·대상·제출한 트릭 설명 + 상태 */
@@ -54,9 +56,11 @@ export function AccusationRecordItem({
   highlighted = false,
   superseded = false,
   children,
+  itemRef,
 }: AccusationRecordItemProps) {
   return (
     <li
+      ref={itemRef}
       className={`flex flex-col gap-2 rounded-md border px-3 py-3 ${
         highlighted ? 'border-2 border-accent bg-paper' : 'border-line'
       } ${superseded ? 'opacity-60' : ''}`}
