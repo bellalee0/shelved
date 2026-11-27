@@ -381,7 +381,7 @@
 - [x] [W2] 정적 에셋 폴더 구조 확정 (`maps/`, `tilesets/`, `sprites/`, kebab-case 파일명) 및 `manifest.json`(spriteKey·맵 경로), 백엔드 `shelved.assets.base-path` 연결 (담당: AS-1, 메모: 백엔드 `base-path`는 기존 설정 확인, manifest 읽기는 출시 검사(MVP 제외))
 - [x] [W2] 플레이어 공통 스프라이트 1종, 사건별 NPC 스프라이트(3~5종씩) (담당: AS-1, 메모: 범용 NPC 7종, 사건별 배정은 시드에서)
 - [x] [W2] 공개 에셋 점검 — 맵 JSON·manifest에 범인 여부·정답·NPC 설정·물증 설명·원작 제목 미포함 (담당: AS-1, 메모: 자동 테스트 `assetManifest.test.ts`)
-- [ ] [W5] 사건 B·C 배경에 필요한 타일셋 추가 소싱 & 라이선스 확인 — 기존 타일 재사용 우선, `CREDITS.md`·`manifest.json` 갱신 (코딩 에이전트 담당)
+- [~] [W5] 사건 B·C 배경에 필요한 타일셋 추가 소싱 & 라이선스 확인 — 기존 타일 재사용 우선, `CREDITS.md`·`manifest.json` 갱신 (코딩 에이전트 담당) (담당: AS-2, 메모: 실외 폐허·나무·담장 등 추가, NPC 3종 추가, 사건 C 필요분은 후속)
 
 ### 사건 콘텐츠 (정답 정보는 로컬에만)
 
