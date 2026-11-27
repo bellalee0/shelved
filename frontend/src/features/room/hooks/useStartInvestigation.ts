@@ -51,6 +51,11 @@ export function useStartInvestigation() {
 
   return {
     start,
+    /** "진행 중인 수사가 있습니다" 안내를 닫는다 */
+    clearExistingRoom: () => {
+      setExistingRoomId(null);
+      mutation.reset();
+    },
     isStarting: mutation.isPending,
     /** 시작 실패 시 사용자에게 보여줄 백엔드 message. 이어하기 안내 대상(409)이면 null */
     errorMessage: existingRoomId === null && mutation.error ? mutation.error.message : null,
