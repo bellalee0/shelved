@@ -33,6 +33,7 @@ public enum SuccessMessage {
     ROOM_HEARTBEAT_SUCCESS("접속 확인 성공"),
     ROOM_PAUSE_SUCCESS("일시정지 성공"),
     ROOM_RESUME_SUCCESS("수사 이어하기 성공"),
+    ROOM_RESULT_GET_SUCCESS("세션 결과 조회 성공"),
 
     // AI 요청
     AI_REQUEST_GET_SUCCESS("AI 요청 상태 조회 성공"),
