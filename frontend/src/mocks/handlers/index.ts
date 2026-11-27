@@ -7,6 +7,7 @@ import { evidenceHandlers } from './evidence';
 import { hintHandlers } from './hint';
 import { noteHandlers } from './note';
 import { npcHandlers } from './npc';
+import { rankingHandlers } from './ranking';
 import { roomHandlers } from './room';
 
 /**
@@ -23,4 +24,5 @@ export const handlers: RequestHandler[] = [
   ...hintHandlers,
   ...accusationHandlers,
   ...aiRequestHandlers,
+  ...rankingHandlers,
 ];

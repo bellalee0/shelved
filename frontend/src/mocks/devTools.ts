@@ -1,4 +1,6 @@
 import { useAuthStore } from '../features/auth/store';
+import { acceptAccusation } from './accusationDb';
+import { finishMockAiRequest } from './aiRequestDb';
 import { findMockCase } from './data/clocktowerCase';
 import { findMockUserIdByAccessToken } from './handlers/auth';
 import {
@@ -30,6 +32,25 @@ function currentUserId(): number {
   return userId;
 }
 
+/** 상태 조회 세 번째(약 6초 뒤)에 채점이 끝나는 채점 대기 세션의 남은 조회 횟수 */
+const SEED_PENDING_POLLS = 3;
+
+/** 마감 전에 낸 지목이 채점 중이거나 실패한 채 시간이 끝난 세션 (가상 답안. 목 범인·키워드를 맞히면 해결된다) */
+function seedAwaitingGradingRoom(userId: number, kind: 'gradingError' | 'gradingPending') {
+  const room = seedMockRoom(userId, { caseId: 2, status: 'PAUSED', remainingMs: 0 });
+  const failed = kind === 'gradingError';
+  const request = acceptAccusation(room, {
+    requestId: crypto.randomUUID(),
+    suspectId: 11,
+    trickExplanation: '종소리로 시계의 시각을 착각하게 했다고 생각합니다.',
+    pollsUntilDone: failed ? null : SEED_PENDING_POLLS,
+    failFirstAttempt: failed,
+  });
+  if (failed) {
+    finishMockAiRequest(room, request);
+  }
+}
+
 const shelvedMock = {
   /** 켤 수 있는 오류 재현 스위치 이름 목록 */
   scenarioNames: SCENARIO_NAMES,
@@ -48,28 +69,16 @@ const shelvedMock = {
   /**
    * 미리 만들어 둔 세션을 내 계정에 추가한다.
    * - active: 시계탑 사건의 일시정지 세션(남은 12:48) → 카드에 "진행 중" 배지
-   * - gradingError: 등대 사건의 채점 실패 세션(남은 시간 0) → "다시 채점하기"
-   * - gradingPending: 등대 사건의 채점 대기 세션 → "채점 대기"
+   * - gradingError: 등대 사건의 채점 실패 세션(남은 시간 0, 10초 뒤 재채점 가능) → "다시 채점하기"
+   * - gradingPending: 등대 사건의 채점 대기 세션(채점 대기 화면을 열면 약 6초 뒤 해결) → "채점 대기"
    * - ended: 시계탑 사건 해결 + 등대 사건 시간 만료 → "지난 수사"
    */
   seedRooms(kind: SeedKind = 'active') {
     const userId = currentUserId();
     if (kind === 'active') {
       seedMockRoom(userId, { caseId: 1, status: 'PAUSED', remainingMs: 768_750 });
-    } else if (kind === 'gradingError') {
-      seedMockRoom(userId, {
-        caseId: 2,
-        status: 'PAUSED',
-        remainingMs: 0,
-        pendingGradingStatus: 'ERROR',
-      });
-    } else if (kind === 'gradingPending') {
-      seedMockRoom(userId, {
-        caseId: 2,
-        status: 'PAUSED',
-        remainingMs: 0,
-        pendingGradingStatus: 'PENDING',
-      });
+    } else if (kind === 'gradingError' || kind === 'gradingPending') {
+      seedAwaitingGradingRoom(userId, kind);
     } else {
       seedMockRoom(userId, {
         caseId: 1,

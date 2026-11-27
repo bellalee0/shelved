@@ -11,6 +11,7 @@ const SCENARIO_STORAGE_KEY = 'shelved.mock.scenario';
 export const SCENARIO_NAMES = [
   'casesError',
   'roomsError',
+  'rankingError',
   'networkError',
   'npcSlow',
   'npcFail',
@@ -54,17 +55,19 @@ export function clearScenarios() {
  * - networkError: 모든 사건·세션·물증·노트 요청이 네트워크 오류로 실패
  * - casesError: GET /api/cases 가 500
  * - roomsError: GET /api/rooms 가 500
+ * - rankingError: GET /api/rankings/{caseId} 가 500
  * NPC 질문 스위치(npcSlow·npcFail·npcNoResponse)는 handlers/npc.ts가, 힌트·보충 질문 스위치(hintSlow·hintFail·hintNoResponse)는 handlers/hint.ts가,
  * 지목 스위치(accusationSlow·accusationFail)는 handlers/accusation.ts가 직접 읽는다.
  */
-export function checkScenario(target: 'cases' | 'rooms' | 'other'): Response | null {
+export function checkScenario(target: 'cases' | 'rooms' | 'ranking' | 'other'): Response | null {
   const enabled = getEnabledScenarios();
   if (enabled.includes('networkError')) {
     return HttpResponse.error();
   }
   if (
     (target === 'cases' && enabled.includes('casesError')) ||
-    (target === 'rooms' && enabled.includes('roomsError'))
+    (target === 'rooms' && enabled.includes('roomsError')) ||
+    (target === 'ranking' && enabled.includes('rankingError'))
   ) {
     return mockErrorResponse(500, 'INTERNAL_SERVER_ERROR', '서버 내부 오류가 발생했습니다.');
   }
