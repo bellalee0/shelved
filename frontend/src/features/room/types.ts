@@ -164,3 +164,37 @@ export type RoomConnectionResponse = {
   heartbeatIntervalMs: number;
   timer: RoomTimerResponse;
 };
+
+/** 원작 공개 (결과 화면). 종료 전에는 어떤 응답에도 오지 않는다 */
+export type RoomResultSource = {
+  novelTitle: string;
+  novelAuthor: string;
+  novelIntro: string;
+};
+
+export type RoomResultCulprit = {
+  suspectId: number;
+  name: string;
+};
+
+/** GET /api/rooms/{roomId}/result. 종료(CLEARED/FAILED/EXPIRED)된 세션의 리빌·플레이 기록 */
+export type RoomResultResponse = {
+  roomId: number;
+  caseId: number;
+  displayTitle: string;
+  /** 관리자 테스트 세션이면 랭킹·다시 도전을 숨긴다 */
+  isTest: boolean;
+  status: RoomStatus;
+  endedAt: string;
+  /** CLEARED: 정답 접수 시점까지, FAILED: 종료 시점까지, EXPIRED: 제한시간 */
+  durationSec: number;
+  hintUsedCount: number;
+  /** 정상 채점 완료된 지목 수 */
+  accusationCompletedCount: number;
+  source: RoomResultSource;
+  culprit: RoomResultCulprit;
+  trickSummary: string;
+  revealExplanation: string;
+  /** 오래된 순 */
+  accusations: AccusationResponse[];
+};
