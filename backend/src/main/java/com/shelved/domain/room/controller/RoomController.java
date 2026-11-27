@@ -6,6 +6,7 @@ import static com.shelved.common.enums.SuccessMessage.ROOM_HEARTBEAT_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_LIST_GET_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_MAP_GET_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_PAUSE_SUCCESS;
+import static com.shelved.common.enums.SuccessMessage.ROOM_RESULT_GET_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_RESUME_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_START_SUCCESS;
 import static com.shelved.common.enums.SuccessMessage.ROOM_STATE_GET_SUCCESS;
@@ -18,11 +19,13 @@ import com.shelved.domain.room.dto.RoomConnectionResponse;
 import com.shelved.domain.room.dto.RoomCreateRequest;
 import com.shelved.domain.room.dto.RoomCreateResponse;
 import com.shelved.domain.room.dto.RoomMapResponse;
+import com.shelved.domain.room.dto.RoomResultResponse;
 import com.shelved.domain.room.dto.RoomStateResponse;
 import com.shelved.domain.room.dto.RoomStatusFilter;
 import com.shelved.domain.room.dto.RoomSummaryResponse;
 import com.shelved.domain.room.dto.RoomTimerResponse;
 import com.shelved.domain.room.service.RoomLifecycleService;
+import com.shelved.domain.room.service.RoomResultService;
 import com.shelved.domain.room.service.RoomService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,7 +47,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "세션", description = "플레이 세션 생성·목록·사전 정보·맵·상태·시작·하트비트·일시정지·이어하기")
+@Tag(name = "세션", description = "플레이 세션 생성·목록·사전 정보·맵·상태·시작·하트비트·일시정지·이어하기·결과")
 @RestController
 @RequestMapping("/api/rooms")
 @RequiredArgsConstructor
@@ -54,6 +57,7 @@ public class RoomController {
 
     private final RoomService roomService;
     private final RoomLifecycleService roomLifecycleService;
+    private final RoomResultService roomResultService;
 
     @Operation(summary = "내 세션 목록", description = "이어하기·결과 보기 목록. 테스트 세션 제외, 최신 생성순. status: ACTIVE | ENDED, 생략 시 전체")
     @GetMapping
@@ -166,5 +170,18 @@ public class RoomController {
 
         return ResponseEntity.status(HttpStatus.OK)
                 .body(CommonResponse.success(ROOM_RESUME_SUCCESS, response));
+    }
+
+    @Operation(summary = "결과(리빌) 조회", description = "최종 종료(CLEARED/FAILED/EXPIRED)된 세션의 원작·범인·트릭·리빌 해설·플레이 기록·지목 기록. "
+            + "종료 전(채점 대기 포함)에는 409 ROOM_NOT_ENDED이며 정답 정보를 반환하지 않는다. 조회 시 상태 조회와 같은 시간 정산을 적용한다")
+    @GetMapping("/{roomId}/result")
+    public ResponseEntity<CommonResponse<RoomResultResponse>> getRoomResult(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long roomId
+    ) {
+        RoomResultResponse response = roomResultService.getRoomResult(authUser, roomId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(ROOM_RESULT_GET_SUCCESS, response));
     }
 }
