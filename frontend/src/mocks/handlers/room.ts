@@ -5,13 +5,15 @@ import type {
   RoomCreateResponse,
   RoomListStatus,
   RoomMapResponse,
+  RoomResultResponse,
   RoomStateResponse,
   RoomSummaryResponse,
 } from '../../features/room/types';
 import type { PageResponse } from '../../shared/api/types';
-import { accusationCountOf, pendingAccusationOf } from '../accusationDb';
+import { accusationCountOf, accusationsFor, pendingAccusationOf } from '../accusationDb';
 import { conversationsOf, pendingAiRequestsOf } from '../aiRequestDb';
 import { findMockCase, MOCK_GAME_CONFIG } from '../data/clocktowerCase';
+import { findMockReveal } from '../data/reveals';
 import { hintCountOf } from '../hintDb';
 import { authenticatePlayer, connectionReplacedResponse, loadOwnedRoom } from '../roomAccess';
 import {
@@ -35,7 +37,7 @@ import { checkScenario } from '../scenarios';
 import { mockErrorResponse, ok } from './auth';
 
 // docs/api/room.md 의 세션 API 중 2주차 범위(목록·생성·state·briefing·map·start·heartbeat·pause·resume).
-// result는 이후 작업에서 추가한다. ai-requests는 handlers/aiRequests.ts에 있다.
+// result(종료 전 409 ROOM_NOT_ENDED)도 여기에 있다. ai-requests는 handlers/aiRequests.ts에 있다.
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const DEFAULT_PAGE_SIZE = 20;
@@ -193,6 +195,37 @@ export const roomHandlers = [
       evidences: evidences.map(({ evidenceId, name, x, y }) => ({ evidenceId, name, x, y })),
     };
     return ok(data, '맵 조회 성공');
+  }),
+
+  // 결과(리빌): 종료한 세션만. 채점 대기 중인 세션도 아직 끝나지 않은 것이다
+  http.get(`${API_BASE_URL}/api/rooms/:roomId/result`, ({ request, params }) => {
+    const scenarioResponse = checkScenario('other');
+    if (scenarioResponse) {
+      return scenarioResponse;
+    }
+    const loaded = loadOwnedRoom(request, params.roomId);
+    if ('error' in loaded) {
+      return loaded.error;
+    }
+    saveMockRoomDb();
+    const { room } = loaded;
+    if (!isEnded(room.status) || room.endedAtMs === null) {
+      return mockErrorResponse(409, 'ROOM_NOT_ENDED', '아직 종료되지 않은 수사입니다.');
+    }
+    const data: RoomResultResponse = {
+      roomId: room.roomId,
+      caseId: room.caseId,
+      displayTitle: findMockCase(room.caseId)!.card.displayTitle,
+      isTest: false,
+      status: room.status,
+      endedAt: toServerTime(room.endedAtMs),
+      durationSec: Math.floor(room.elapsedActiveMs / 1000),
+      hintUsedCount: hintCountOf(room).used,
+      accusationCompletedCount: accusationCountOf(room).used,
+      ...findMockReveal(room.caseId)!,
+      accusations: accusationsFor(room),
+    };
+    return ok(data, '결과 조회 성공');
   }),
 
   // 수사 시작: READY에서만 가능, 새 connectionId 발급

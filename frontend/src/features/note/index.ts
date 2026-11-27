@@ -3,3 +3,4 @@ export { useNote } from './hooks/useNote';
 export type { NoteHandle, UseNoteParams } from './hooks/useNote';
 export type { NoteFlushResult } from './autosave';
 export { NoteWindow } from './components/NoteWindow';
+export { NoteRecords } from './components/NoteRecords';

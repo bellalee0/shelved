@@ -112,3 +112,25 @@ export function RecordStatus({ accusation }: { accusation: AccusationResponse })
       return <p className="text-xs text-danger">{GRADING_FAILED_MESSAGE}</p>;
   }
 }
+
+/**
+ * 읽기 전용 지목 기록 목록 (결과 화면). 지목 창과 같은 항목 모양이며 재채점 버튼은 없다.
+ * accusations는 서버가 준 순서(오래된 순)대로 그린다
+ */
+export function AccusationRecordList({ accusations }: { accusations: AccusationResponse[] }) {
+  return (
+    <ol aria-label="내 지목 기록" className="flex flex-col gap-3">
+      {accusations.map((accusation) => (
+        <AccusationRecordItem
+          key={accusation.accusationId}
+          suspectName={accusation.suspectName}
+          trickExplanation={accusation.trickExplanation}
+          attemptNo={accusation.attemptNo}
+          superseded={accusation.superseded}
+        >
+          <RecordStatus accusation={accusation} />
+        </AccusationRecordItem>
+      ))}
+    </ol>
+  );
+}

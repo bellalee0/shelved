@@ -2,5 +2,6 @@
 export { NpcPanel } from './components/NpcPanel';
 export type { NpcPanelSuspect } from './components/NpcPanel';
 export { ConversationLogPanel } from './components/ConversationLogPanel';
+export { NpcRecord } from './components/NpcRecord';
 export { joinConversations } from './messages';
 export type { ConversationListItem } from './messages';

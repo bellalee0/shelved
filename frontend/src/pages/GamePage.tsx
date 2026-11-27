@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import {
   AccusationPanel,
+  AwaitingGradingStatus,
   useAccusation,
   type AccusationController,
   type AccusationSuspect,
@@ -30,6 +31,7 @@ import type {
   RoomMapResponse,
   RoomStateResponse,
 } from '../features/room/types';
+import { parsePositiveInt } from '../shared/utils/parsePositiveInt';
 
 // Phaser는 용량이 커서 게임 화면에 들어올 때만 따로 내려받는다
 const PhaserGame = lazy(() =>
@@ -43,14 +45,9 @@ function renderSuspectFace(suspect: AccusationSuspect) {
   return <SuspectPortrait name={suspect.name} spriteKey={suspect.spriteKey} />;
 }
 
-function parseRoomId(value: string | undefined) {
-  const roomId = Number(value);
-  return Number.isInteger(roomId) && roomId > 0 ? roomId : null;
-}
-
 /** 게임 화면(/rooms/:roomId). 주소의 roomId를 확인한 뒤 실제 화면을 조립한다 */
 export function GamePage() {
-  const roomId = parseRoomId(useParams().roomId);
+  const roomId = parsePositiveInt(useParams().roomId);
   const { user } = useAuth();
 
   if (roomId === null || !user) {
@@ -69,6 +66,16 @@ export function GamePage() {
   return <GameScreen key={`${user.userId}-${roomId}`} roomId={roomId} userId={user.userId} />;
 }
 
+/** 다른 화면이 이동하며 넘긴 안내 문구 (router state의 notice) */
+function readNotice(state: unknown): string | null {
+  return typeof state === 'object' &&
+    state !== null &&
+    'notice' in state &&
+    typeof state.notice === 'string'
+    ? state.notice
+    : null;
+}
+
 type GameScreenProps = {
   roomId: number;
   userId: number;
@@ -80,6 +87,7 @@ type GameScreenProps = {
  */
 function GameScreen({ roomId, userId }: GameScreenProps) {
   const navigate = useNavigate();
+  const notice = readNotice(useLocation().state);
   const session = useGameSession(roomId, userId);
   const map = useMapLoadStatus();
   const hasOverlay = session.phase !== 'playing';
@@ -238,6 +246,19 @@ function GameScreen({ roomId, userId }: GameScreenProps) {
         actionError={session.actionError}
         isSubmitting={session.isSubmitting}
         hasUnsavedDraft={note.hasUnsavedDraft}
+        recordsPath={`/rooms/${roomId}/records`}
+        notice={notice}
+        gradingStatus={
+          <AwaitingGradingStatus
+            accusation={accusation}
+            pendingAccusation={session.roomState?.pendingAccusation ?? null}
+            suspects={session.mapData?.suspects ?? []}
+            timerStatus={session.roomState?.timer.status ?? null}
+            serverClockOffsetMs={session.serverClockOffsetMs}
+            // 마감 후라 노트를 저장하거나 일시정지할 것이 없으므로 바로 나간다
+            onLater={handleLeave}
+          />
+        }
         onStart={() => void session.start()}
         onResume={() => void session.resume()}
         onReenter={session.reenter}
