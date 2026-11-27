@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AccusationResponse, RoomStatus } from '../../../shared/api/types';
 import { Button } from '../../../shared/components/Button';
 import { ErrorMessage } from '../../../shared/components/ErrorMessage';
 import { LoadingIndicator } from '../../../shared/components/LoadingIndicator';
+import { Modal } from '../../../shared/components/Modal';
 import { SidePanel } from '../../../shared/components/SidePanel';
 import { formatUsage } from '../../../shared/utils/formatUsage';
 import type { UsageCount } from '../../room/types';
@@ -89,7 +90,8 @@ export function AccusationPanel({
 }: AccusationPanelProps) {
   const listQuery = useAccusations(roomId);
   const { refetch } = listQuery;
-  const resultRef = useRef<HTMLDivElement>(null);
+  // 이번 지목의 기록 항목 (채점 중·실패, 없으면 방금 받은 결과)
+  const currentRecordRef = useRef<HTMLLIElement>(null);
 
   // 재접속하면 열려 있던 창의 기록을 다시 받는다 (NPC·힌트 창과 같은 방식)
   const handledResyncKeyRef = useRef(resyncKey);
@@ -102,13 +104,22 @@ export function AccusationPanel({
   }, [resyncKey, refetch]);
 
   const { state, isBusy, latestResult } = accusation;
+
   const activeRequestId = state.phase === 'idle' ? null : state.requestId;
   const records = listQuery.data?.accusations ?? [];
 
-  // 방금 받은 결과가 생기면 그 위치를 보여 준다 (jsdom에는 scrollIntoView가 없다)
+  // 제출·재채점을 누르면 채점 중 표시가, 결과를 받으면 판정·피드백이 보이도록 이번 기록을 창 맨 위에 맞춘다.
+  // 이미 채점 중인 창을 열 때(처음 값이 true)는 옮기지 않는다
+  const wasBusyRef = useRef(isBusy);
+  useEffect(() => {
+    if (isBusy && !wasBusyRef.current) {
+      scrollToRecord(currentRecordRef.current);
+    }
+    wasBusyRef.current = isBusy;
+  }, [isBusy]);
   useEffect(() => {
     if (latestResult) {
-      resultRef.current?.scrollIntoView?.({ block: 'nearest' });
+      scrollToRecord(currentRecordRef.current);
     }
   }, [latestResult]);
 
@@ -176,9 +187,11 @@ export function AccusationPanel({
               const isActive =
                 record.requestId === activeRequestId && record.gradingStatus !== 'COMPLETED';
               const highlighted = latestResult?.accusation.accusationId === record.accusationId;
+              const isCurrent = activeRequestId !== null ? isActive : highlighted;
               return (
                 <AccusationRecordItem
                   key={record.accusationId}
+                  itemRef={isCurrent ? currentRecordRef : undefined}
                   suspectName={record.suspectName}
                   trickExplanation={record.trickExplanation}
                   attemptNo={record.gradingStatus === 'COMPLETED' ? record.attemptNo : null}
@@ -191,6 +204,7 @@ export function AccusationPanel({
             })}
             {showActiveSeparately && activeInput && (
               <AccusationRecordItem
+                itemRef={currentRecordRef}
                 suspectName={activeDisplay?.suspectName ?? suspectNameOf(activeInput.suspectId)}
                 trickExplanation={activeInput.trickExplanation}
                 attemptNo={null}
@@ -207,6 +221,7 @@ export function AccusationPanel({
         !records.some((record) => record.accusationId === latestResult.accusation.accusationId) && (
           <ol aria-label="방금 받은 결과" className="flex flex-col gap-3">
             <AccusationRecordItem
+              itemRef={activeRequestId === null ? currentRecordRef : undefined}
               suspectName={latestResult.accusation.suspectName}
               trickExplanation={latestResult.accusation.trickExplanation}
               attemptNo={latestResult.accusation.attemptNo}
@@ -217,15 +232,13 @@ export function AccusationPanel({
           </ol>
         )}
 
-      <div ref={resultRef}>
-        <ResultNotice
-          latestResult={latestResult}
-          sessionEnded={sessionEnded}
-          timerStatus={timerStatus}
-          remaining={count?.remaining ?? null}
-          onShowResult={onShowResult}
-        />
-      </div>
+      <ResultNotice
+        latestResult={latestResult}
+        sessionEnded={sessionEnded}
+        timerStatus={timerStatus}
+        remaining={count?.remaining ?? null}
+        onShowResult={onShowResult}
+      />
 
       {state.phase === 'idle' && state.error && (
         <p role="alert" className="text-sm text-danger">
@@ -263,6 +276,11 @@ export function AccusationPanel({
   );
 }
 
+/** 지목 창(스크롤 영역)에서 기록 항목을 맨 위에 맞춘다 (jsdom에는 scrollIntoView가 없다) */
+function scrollToRecord(element: HTMLElement | null) {
+  element?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+}
+
 type ResultNoticeProps = {
   latestResult: AccusationCreateResponse | null;
   sessionEnded: boolean;
@@ -275,6 +293,8 @@ type ResultNoticeProps = {
 /**
  * 방금 받은 결과 아래의 안내. 종료 여부는 결과 스냅샷(roomStatus)이 아니라 GET state로 확인한 값(sessionEnded)으로 정한다.
  * 결과를 읽을 시간을 주기 위해 결과 화면으로 자동 이동하지 않고 "결과 보기" 버튼을 둔다.
+ * 지난 지목이 쌓이면 안내가 창 아래로 밀리므로, 종료되면 화면 가운데 팝업으로도 보여 준다.
+ * 팝업이 지목 창을 가리기 때문에 방금 받은 판정·피드백을 함께 담고, 닫아도 창 안의 안내는 남는다.
  */
 function ResultNotice({
   latestResult,
@@ -283,24 +303,46 @@ function ResultNotice({
   remaining,
   onShowResult,
 }: ResultNoticeProps) {
+  const [popupClosed, setPopupClosed] = useState(false);
+
   if (sessionEnded) {
     const endedStatus = isEndedRoomStatus(timerStatus)
       ? (timerStatus as 'CLEARED' | 'FAILED' | 'EXPIRED')
       : null;
+    const message = endedStatus && (
+      <p className={endedStatus === 'CLEARED' ? 'text-lg font-bold text-accent' : 'font-bold'}>
+        {ENDED_MESSAGES[endedStatus]}
+      </p>
+    );
+    const showResultButton = (
+      <Button className="self-start" onClick={onShowResult}>
+        결과 보기
+      </Button>
+    );
     return (
-      <div
-        role="status"
-        className="flex flex-col gap-2 rounded-md border-2 border-accent bg-paper px-4 py-3"
-      >
-        {endedStatus && (
-          <p className={endedStatus === 'CLEARED' ? 'text-lg font-bold text-accent' : 'font-bold'}>
-            {ENDED_MESSAGES[endedStatus]}
-          </p>
+      <>
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-md border-2 border-accent bg-paper px-4 py-3"
+        >
+          {message}
+          {showResultButton}
+        </div>
+        {!popupClosed && (
+          <Modal title="수사 종료" onClose={() => setPopupClosed(true)}>
+            <div className="flex flex-col gap-3">
+              {message}
+              {latestResult && (
+                // 피드백이 길어도 "결과 보기"가 화면 밖으로 밀리지 않게 이 영역만 스크롤한다
+                <div className="max-h-[50vh] overflow-y-auto">
+                  <VerdictFeedback accusation={latestResult.accusation} />
+                </div>
+              )}
+              {showResultButton}
+            </div>
+          </Modal>
         )}
-        <Button className="self-start" onClick={onShowResult}>
-          결과 보기
-        </Button>
-      </div>
+      </>
     );
   }
   if (latestResult === null) {

@@ -333,11 +333,30 @@ describe('AccusationPanel 결과', () => {
     // when 게임 화면이 GET state로 종료를 확인했다
     view.rerenderWith({ onFinalResult, onShowResult, sessionEnded: true });
 
-    // then
-    await waitFor(() =>
-      expect(screen.getByText('정답입니다! 사건을 해결했습니다.')).toBeInTheDocument(),
-    );
+    // then 화면 가운데 팝업에 종료 안내·방금 받은 판정과 피드백·결과 보기가 함께 보인다
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' });
+    expect(popup).toHaveTextContent('정답입니다! 사건을 해결했습니다.');
+    await waitFor(() => expect(popup).toHaveTextContent(/판정\s*정답/));
     expect(screen.queryByLabelText('트릭 설명')).not.toBeInTheDocument();
+    fireEvent.click(within(popup).getByRole('button', { name: '결과 보기' }));
+    expect(onShowResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('종료 팝업을 닫으면 지목 창은 남고, 창 안의 "결과 보기"를 계속 쓸 수 있다', async () => {
+    // given
+    const onShowResult = vi.fn();
+    const view = renderHarness({ onShowResult });
+    await submitAnswer('마거릿', CORRECT);
+    await screen.findByText('수사 결과를 확인하는 중…');
+    view.rerenderWith({ onShowResult, sessionEnded: true });
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' });
+
+    // when
+    fireEvent.click(within(popup).getByRole('button', { name: '닫기' }));
+
+    // then
+    expect(screen.queryByRole('dialog', { name: '수사 종료' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '패널 닫기' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
     expect(onShowResult).toHaveBeenCalledTimes(1);
   });
@@ -547,5 +566,119 @@ describe('AccusationPanel 복원', () => {
     ).toBeInTheDocument();
     expect(item).toHaveTextContent('마거릿');
     expect(posts).toHaveLength(0);
+  });
+});
+
+describe('AccusationPanel 이번 지목 기록 스크롤', () => {
+  /** scrollIntoView를 받은 요소와 위치. jsdom에는 scrollIntoView가 없어 목으로 둔다 */
+  let scrolled: { tag: string; text: string; block: ScrollLogicalPosition | undefined }[] = [];
+  const original = Element.prototype.scrollIntoView;
+
+  beforeEach(() => {
+    scrolled = [];
+    Element.prototype.scrollIntoView = function (this: Element, options) {
+      scrolled.push({
+        tag: this.tagName,
+        text: this.textContent ?? '',
+        block: typeof options === 'object' ? options.block : undefined,
+      });
+    };
+  });
+
+  afterEach(() => {
+    Element.prototype.scrollIntoView = original;
+  });
+
+  /** 모든 스크롤이 이번 지목 기록(li)을 창 맨 위에 맞췄는지 */
+  function expectOnlyRecordAtTop(trick: string) {
+    for (const call of scrolled) {
+      expect(call).toMatchObject({ tag: 'LI', block: 'start' });
+      expect(call.text).toContain(trick);
+    }
+  }
+
+  /** "제출" → 확인 상자의 스크롤 기록을 지우고 → "제출하기" */
+  async function submitAnswerAfterConfirmScroll() {
+    await fillAnswer('마거릿', PARTIAL);
+    const submit = screen.getByRole('button', { name: '제출' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+    scrolled = [];
+    fireEvent.click(screen.getByRole('button', { name: '제출하기' }));
+  }
+
+  it('"제출"을 누르면 확인 상자가 보이도록 창 아래로 스크롤한다', async () => {
+    // given
+    renderHarness();
+    await fillAnswer('마거릿', PARTIAL);
+    const submit = screen.getByRole('button', { name: '제출' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    expect(scrolled).toEqual([]);
+
+    // when
+    fireEvent.click(submit);
+
+    // then
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0].block).toBe('end');
+    expect(scrolled[0].text).toContain('제출하기');
+    expect(posts).toHaveLength(0);
+  });
+
+  it('지목을 제출하면 이번 기록을 위에 맞추고, 창을 닫았다 열 때는 다시 옮기지 않는다', async () => {
+    // given
+    setScenario('accusationSlow', true);
+    renderHarness();
+
+    // when
+    await submitAnswerAfterConfirmScroll();
+
+    // then
+    await waitFor(() => expect(scrolled).toHaveLength(1));
+    expect(scrolled[0].text).toContain('채점 중입니다…');
+    expectOnlyRecordAtTop(PARTIAL);
+
+    // when 채점 중에 창을 다시 연다
+    fireEvent.click(screen.getByRole('button', { name: '패널 닫기' }));
+    fireEvent.click(screen.getByRole('button', { name: '지목 창 열기' }));
+    await screen.findByRole('list', { name: '지목 기록' });
+
+    // then
+    expect(scrolled).toHaveLength(1);
+  });
+
+  it('결과를 받아도 아래 안내로 내려가지 않고 판정이 담긴 이번 기록에 맞춘다', async () => {
+    // given
+    renderHarness();
+
+    // when
+    await submitAnswerAfterConfirmScroll();
+    await screen.findByText('방금 받은 결과');
+
+    // then
+    await waitFor(() => expect(scrolled.at(-1)?.text).toContain('방금 받은 결과'));
+    expectOnlyRecordAtTop(PARTIAL);
+  });
+
+  it('"같은 답안 다시 채점"을 눌러도 이번 기록을 위에 맞춘다', async () => {
+    // given
+    setScenario('accusationFail', true);
+    const view = renderHarness();
+    await submitAnswer('마거릿', PARTIAL);
+    await screen.findByText('채점에 실패했습니다. 지목 기회는 차감되지 않았습니다.');
+    const base = currentTimeMs();
+    setMockClock(() => base + 11_000);
+    view.rerenderWith({ serverClockOffsetMs: 11_000 });
+    const retry = screen.getByRole('button', { name: '같은 답안 다시 채점' });
+    await waitFor(() => expect(retry).toBeEnabled());
+    scrolled = [];
+
+    // when
+    fireEvent.click(retry);
+
+    // then
+    await waitFor(() => expect(scrolled.length).toBeGreaterThan(0));
+    expect(scrolled[0].text).toContain('채점 중입니다…');
+    expectOnlyRecordAtTop(PARTIAL);
   });
 });

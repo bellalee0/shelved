@@ -616,12 +616,13 @@ describe('게임 화면 범인 지목', () => {
     await accuse('마거릿', CORRECT);
 
     // then GET state로 종료를 확인한 뒤에도 자동으로 이동하지 않는다
-    expect(await screen.findByText('정답입니다! 사건을 해결했습니다.')).toBeInTheDocument();
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' });
+    expect(popup).toHaveTextContent('정답입니다! 사건을 해결했습니다.');
     expect(requestedPaths.slice(before)).toContain(`GET /api/rooms/${room.roomId}/state`);
     expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}`);
 
     // when
-    fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
+    fireEvent.click(within(popup).getByRole('button', { name: '결과 보기' }));
 
     // then
     await waitFor(() =>
@@ -642,11 +643,10 @@ describe('게임 화면 범인 지목', () => {
     await accuse('엘리스', WRONG);
 
     // then
-    expect(
-      await screen.findByText('지목 기회를 모두 사용했습니다. 수사가 끝났습니다.'),
-    ).toBeInTheDocument();
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' });
+    expect(popup).toHaveTextContent('지목 기회를 모두 사용했습니다. 수사가 끝났습니다.');
     expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}`);
-    fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
+    fireEvent.click(within(popup).getByRole('button', { name: '결과 보기' }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}/result`),
     );
@@ -770,7 +770,8 @@ describe('게임 화면 · 시간 종료·채점 대기', () => {
     expectNoNewActions();
 
     // when 처리 중 확인(폴링)이 끝난다
-    const showResult = await screen.findByRole('button', { name: '결과 보기' }, { timeout: 6000 });
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' }, { timeout: 6000 });
+    const showResult = within(popup).getByRole('button', { name: '결과 보기' });
 
     // then 자동으로 이동하지 않는다
     expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}`);
@@ -819,7 +820,8 @@ describe('게임 화면 · 시간 종료·채점 대기', () => {
     fireEvent.click(retry);
 
     // then
-    expect(await screen.findByRole('button', { name: '결과 보기' })).toBeInTheDocument();
+    const popup = await screen.findByRole('dialog', { name: '수사 종료' });
+    expect(within(popup).getByRole('button', { name: '결과 보기' })).toBeInTheDocument();
     expect(sent).toEqual([
       {
         connectionId: null,

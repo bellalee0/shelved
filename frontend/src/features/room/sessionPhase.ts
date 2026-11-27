@@ -50,3 +50,26 @@ export function decideSessionPhase(timer: RoomTimerResponse, hasConnection: bool
       return hasConnection ? 'playing' : 'replaced';
   }
 }
+
+/**
+ * 화면이 이미 채점 대기였다면, 유예 구간(진행 중 + 남은 시간 0)에 채점이 끝나도 맵으로 돌아가지 않는다.
+ * 다음 하트비트가 종료나 일시정지를 확정할 때까지 채점 대기를 유지한다.
+ */
+export function holdAwaitingGrading(
+  prevPhase: SessionPhase,
+  nextPhase: SessionPhase,
+  timer: RoomTimerResponse,
+): SessionPhase {
+  return prevPhase === 'awaitingGrading' && nextPhase === 'playing' && timer.remainingMs === 0
+    ? 'awaitingGrading'
+    : nextPhase;
+}
+
+/**
+ * 연결(하트비트)을 유지할지. 하트비트는 서버가 IN_PROGRESS인 동안 멈추지 않는다 (docs/api/room.md heartbeat).
+ * 채점 대기 화면이어도 유예 구간이면 계속 보낸다. 멈추면 서버가 이탈로 보고 마감 전 마지막 접속 시각까지만
+ * 누적해, 남은 몇 초의 PAUSED로 되돌아간다.
+ */
+export function keepsConnection(phase: SessionPhase, timer: RoomTimerResponse): boolean {
+  return phase === 'playing' || (phase === 'awaitingGrading' && timer.status === 'IN_PROGRESS');
+}

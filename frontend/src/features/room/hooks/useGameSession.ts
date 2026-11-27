@@ -6,7 +6,12 @@ import { setConnectionId } from '../../../shared/api/client';
 import { EventBus } from '../../../game/EventBus';
 import { GameEvents } from '../../../game/events';
 import { getBriefing, getRoomState, pauseRoom, resumeRoom, startRoom } from '../api';
-import { decideSessionPhase, type SessionPhase } from '../sessionPhase';
+import {
+  decideSessionPhase,
+  holdAwaitingGrading,
+  keepsConnection,
+  type SessionPhase,
+} from '../sessionPhase';
 import { createTimerSnapshot, type TimerSnapshot } from '../timer';
 import type {
   RoomBriefingResponse,
@@ -69,6 +74,8 @@ export function useGameSession(roomId: number, userId: number) {
   const submittingRef = useRef<object | null>(null);
   // 이 화면이 연결을 잃었다가 다시 연결할 때마다 1씩 올린다. 노트가 이 값으로 서버 내용을 다시 받는다
   const [reconnectKey, setReconnectKey] = useState(0);
+  // 마지막으로 정한 단계. applyTimer가 렌더를 기다리지 않고 직전 단계를 보도록 ref로 둔다
+  const phaseRef = useRef<SessionPhase>(INITIAL_SESSION.phase);
   // 연결이 있다가 사라졌는지 (하트비트 PAUSED·연결 교체 등). 다음 start·resume 성공이 재연결이다
   const lostConnectionRef = useRef(false);
   // true면 종료 상태를 확인해도 결과 화면으로 바로 가지 않는다 (마지막 지목의 피드백을 읽을 시간을 준다)
@@ -85,7 +92,7 @@ export function useGameSession(roomId: number, userId: number) {
     setConnectionId(connection?.connectionId ?? null);
   }, []);
 
-  /** 서버 타이머로 단계를 정하고 화면 타이머를 다시 맞춘다. 진행 중이 아니게 되면 연결을 지운다 */
+  /** 서버 타이머로 단계를 정하고 화면 타이머를 다시 맞춘다. 서버가 진행 중이 아니게 되면 연결을 지운다 */
   const applyTimer = useCallback(
     (
       timer: RoomTimerResponse,
@@ -93,9 +100,14 @@ export function useGameSession(roomId: number, userId: number) {
     ) => {
       const connection =
         options.connection !== undefined ? options.connection : connectionRef.current;
-      const phase = decideSessionPhase(timer, connection !== null);
-      // PAUSED 전환·종료·채점 대기·다른 화면 진행이면 하트비트를 멈추도록 연결을 지운다
-      const nextConnection = phase === 'playing' ? connection : null;
+      const phase = holdAwaitingGrading(
+        phaseRef.current,
+        decideSessionPhase(timer, connection !== null),
+        timer,
+      );
+      phaseRef.current = phase;
+      // PAUSED 전환·종료·다른 화면 진행이면 하트비트를 멈추도록 연결을 지운다
+      const nextConnection = keepsConnection(phase, timer) ? connection : null;
       updateConnection(nextConnection);
       setSession((prev) => {
         const roomState = options.roomState ?? prev.roomState;
@@ -189,6 +201,7 @@ export function useGameSession(roomId: number, userId: number) {
     // 다시 들어오는 동안 다른 화면이 저장했을 수 있는 노트를 함께 다시 받는다 (room.md 재접속 흐름의 GET notes/me)
     lostConnectionRef.current = false;
     setReconnectKey((key) => key + 1);
+    phaseRef.current = 'entering';
     setSession((prev) => ({ ...prev, phase: 'entering', enterError: null, connection: null }));
     void runEntry(++runRef.current);
   }, [runEntry, updateConnection]);
@@ -266,6 +279,7 @@ export function useGameSession(roomId: number, userId: number) {
 
   const markReplaced = useCallback(() => {
     updateConnection(null);
+    phaseRef.current = 'replaced';
     setSession((prev) => ({ ...prev, phase: 'replaced', connection: null }));
   }, [updateConnection]);
 

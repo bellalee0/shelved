@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { decideSessionPhase } from './sessionPhase';
+import {
+  decideSessionPhase,
+  holdAwaitingGrading,
+  keepsConnection,
+  type SessionPhase,
+} from './sessionPhase';
 import type { RoomTimerResponse } from './types';
 
 function timerOf(override: Partial<RoomTimerResponse>): RoomTimerResponse {
@@ -44,5 +49,29 @@ describe('decideSessionPhase', () => {
 
     // then
     expect(phase).toBe(expected);
+  });
+});
+
+describe('keepsConnection', () => {
+  it.each<[string, SessionPhase, Partial<RoomTimerResponse>, boolean]>([
+    ['진행', 'playing', {}, true],
+    ['유예 구간의 채점 대기', 'awaitingGrading', { remainingMs: 0 }, true],
+    ['시간이 확정된 채점 대기', 'awaitingGrading', { status: 'PAUSED', remainingMs: 0 }, false],
+    ['일시정지', 'paused', { status: 'PAUSED' }, false],
+    ['종료', 'ended', { status: 'EXPIRED', remainingMs: 0 }, false],
+    ['다른 화면에서 진행', 'replaced', {}, false],
+  ])('%s', (_, phase, override, expected) => {
+    expect(keepsConnection(phase, timerOf(override))).toBe(expected);
+  });
+});
+
+describe('holdAwaitingGrading', () => {
+  it.each<[string, SessionPhase, SessionPhase, number, SessionPhase]>([
+    ['채점 대기 뒤 남은 시간 0이면 유지', 'awaitingGrading', 'playing', 0, 'awaitingGrading'],
+    ['남은 시간이 있으면 진행', 'awaitingGrading', 'playing', 1000, 'playing'],
+    ['채점 대기가 아니었으면 그대로', 'playing', 'playing', 0, 'playing'],
+    ['종료는 그대로', 'awaitingGrading', 'ended', 0, 'ended'],
+  ])('%s', (_, prev, next, remainingMs, expected) => {
+    expect(holdAwaitingGrading(prev, next, timerOf({ remainingMs }))).toBe(expected);
   });
 });

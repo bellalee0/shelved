@@ -6,7 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setConnectionId } from '../../../shared/api/client';
 import { EventBus } from '../../../game/EventBus';
 import { GameEvents } from '../../../game/events';
-import { getBriefing, getMap, getRoomState, pauseRoom, resumeRoom, startRoom } from '../api';
+import {
+  getBriefing,
+  getMap,
+  getRoomState,
+  heartbeat,
+  pauseRoom,
+  resumeRoom,
+  startRoom,
+} from '../api';
 import type {
   RoomBriefingResponse,
   RoomConnectionResponse,
@@ -205,5 +213,104 @@ describe('useGameSession 입장 시 맵 조회 실패', () => {
     // then
     await waitFor(() => expect(getMap).toHaveBeenCalled());
     expect(getBriefing).toHaveBeenCalled();
+  });
+});
+
+describe('useGameSession 채점 대기 중 하트비트', () => {
+  const INTERVAL_MS = 20;
+  const GRACE = timerOf({ status: 'IN_PROGRESS', remainingMs: 0, awaitingGrading: true });
+  const sleep = (ms: number) => act(() => new Promise((resolve) => setTimeout(resolve, ms)));
+  const beats = () => vi.mocked(heartbeat).mock.calls.length;
+
+  /** 수사를 시작한 뒤, 상태 재조회가 유예 구간(진행 중 + 남은 시간 0 + 채점 대기)을 돌려준 화면 */
+  async function enterGracePeriod() {
+    vi.mocked(startRoom).mockResolvedValue({
+      connectionId: 'live-connection',
+      heartbeatIntervalMs: INTERVAL_MS,
+      timer: timerOf({ status: 'IN_PROGRESS' }),
+    });
+    vi.mocked(heartbeat).mockResolvedValue(GRACE);
+    const view = renderSession();
+    await waitFor(() => expect(view.result.current.phase).toBe('ready'));
+    await act(() => view.result.current.start());
+    vi.mocked(getRoomState).mockResolvedValue(stateOf(GRACE));
+    await act(() => view.result.current.checkState());
+    return view;
+  }
+
+  it('채점 대기 화면이어도 서버가 진행 중이면 연결을 유지하고 하트비트를 계속 보낸다', async () => {
+    // given
+    const { result, unmount } = await enterGracePeriod();
+    const before = beats();
+
+    // when
+    await sleep(INTERVAL_MS * 4);
+
+    // then
+    expect(result.current.phase).toBe('awaitingGrading');
+    expect(result.current.hasConnection).toBe(true);
+    expect(beats()).toBeGreaterThan(before + 1);
+    unmount();
+  });
+
+  it.each<[string, Partial<RoomTimerResponse>, string]>([
+    [
+      '시간을 확정한 PAUSED(채점 대기)',
+      { status: 'PAUSED', remainingMs: 0, awaitingGrading: true },
+      'awaitingGrading',
+    ],
+    ['EXPIRED', { status: 'EXPIRED', remainingMs: 0 }, 'ended'],
+    ['CLEARED', { status: 'CLEARED', remainingMs: 0 }, 'ended'],
+  ])('하트비트 응답이 %s면 연결을 지우고 하트비트를 멈춘다', async (_, override, phase) => {
+    // given
+    const { result, unmount } = await enterGracePeriod();
+
+    // when
+    vi.mocked(heartbeat).mockResolvedValue(timerOf(override));
+    await waitFor(() => expect(result.current.hasConnection).toBe(false));
+    const stopped = beats();
+    await sleep(INTERVAL_MS * 4);
+
+    // then
+    expect(result.current.phase).toBe(phase);
+    expect(beats()).toBe(stopped);
+    unmount();
+  });
+
+  it('유예 구간에 채점이 끝나도 맵으로 돌아가지 않고, 다음 하트비트가 종료를 확정할 때까지 기다린다', async () => {
+    // given
+    const { result, unmount } = await enterGracePeriod();
+    const resolved = timerOf({ status: 'IN_PROGRESS', remainingMs: 0 });
+    vi.mocked(heartbeat).mockResolvedValue(resolved);
+    vi.mocked(getRoomState).mockResolvedValue(stateOf(resolved));
+
+    // when
+    await act(() => result.current.checkState());
+    await sleep(INTERVAL_MS * 3);
+
+    // then
+    expect(result.current.phase).toBe('awaitingGrading');
+    expect(result.current.hasConnection).toBe(true);
+
+    // when
+    vi.mocked(heartbeat).mockResolvedValue(timerOf({ status: 'EXPIRED', remainingMs: 0 }));
+
+    // then
+    await waitFor(() => expect(result.current.phase).toBe('ended'));
+    unmount();
+  });
+
+  it('연결 없이 들어온 유예 구간(새로고침·다른 화면)은 하트비트를 보내지 않는다', async () => {
+    // given
+    vi.mocked(getRoomState).mockResolvedValue(stateOf(GRACE));
+
+    // when
+    const { result } = renderSession();
+    await waitFor(() => expect(result.current.phase).toBe('awaitingGrading'));
+    await sleep(INTERVAL_MS * 3);
+
+    // then
+    expect(result.current.hasConnection).toBe(false);
+    expect(heartbeat).not.toHaveBeenCalled();
   });
 });
