@@ -34,6 +34,7 @@ public class DevSeedService {
 
     private final ResourcePatternResolver resourcePatternResolver;
     private final DevSeedImporter devSeedImporter;
+    private final DevSeedCoverImageChecker devSeedCoverImageChecker;
 
     /**
      * 반영 결과 건수
@@ -86,6 +87,10 @@ public class DevSeedService {
         }
 
         List<String> reasons = DevSeedValidator.validate(seed);
+        // 파일 검사는 경로 형식이 올바를 때만 한다
+        if (reasons.isEmpty()) {
+            reasons = devSeedCoverImageChecker.check(seed);
+        }
         if (!reasons.isEmpty()) {
             log.warn("개발용 시드 건너뜀: file={}, reasons={}", fileName, reasons);
             return Outcome.FAILED;

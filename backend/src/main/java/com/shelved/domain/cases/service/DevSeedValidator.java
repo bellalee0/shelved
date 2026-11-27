@@ -7,8 +7,10 @@ import com.shelved.domain.cases.dto.DevSeedFile;
 import com.shelved.domain.cases.dto.DevSeedFile.DevSeedHotspot;
 import com.shelved.domain.cases.dto.DevSeedFile.DevSeedMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -18,6 +20,8 @@ import java.util.Set;
 final class DevSeedValidator {
 
     private static final int PUBLIC_INTRO_MAX_LENGTH = 200;
+    private static final String COVER_IMAGE_FOLDER = "covers/";
+    private static final Set<String> COVER_IMAGE_EXTENSIONS = Set.of("webp", "png", "jpg", "jpeg");
 
     private DevSeedValidator() {
     }
@@ -38,6 +42,7 @@ final class DevSeedValidator {
         Set<String> evidenceKeys = validateEvidences(seed.evidenceList(), reasons);
         validateTrick(seed, suspectKeys, evidenceKeys, reasons);
         validateMap(seed, suspectKeys, evidenceKeys, reasons);
+        validateCoverImagePath(seed, reasons);
 
         return reasons;
     }
@@ -192,6 +197,30 @@ final class DevSeedValidator {
             if (!placedEvidenceKeys.contains(evidence.key())) {
                 reasons.add("물증 미배치: " + evidence.key());
             }
+        }
+    }
+
+    // 문자열 형식만 검사한다. 파일 존재·크기·실제 위치는 DevSeedCoverImageChecker가 검사한다
+    private static void validateCoverImagePath(DevSeedFile seed, List<String> reasons) {
+        if (!seed.hasCoverImage()) {
+            return;
+        }
+        String path = seed.coverImagePath();
+        // 절대 경로와 URL(http: 등)도 이 조건에서 걸러진다
+        if (!path.startsWith(COVER_IMAGE_FOLDER)) {
+            reasons.add("coverImagePath는 " + COVER_IMAGE_FOLDER + "로 시작하는 상대 경로여야 함");
+        }
+        if (path.contains("\\")) {
+            reasons.add("coverImagePath에 역슬래시 사용 불가");
+        }
+        boolean hasInvalidSegment = Arrays.stream(path.split("/", -1))
+                .anyMatch(segment -> segment.isEmpty() || segment.equals(".") || segment.equals(".."));
+        if (hasInvalidSegment) {
+            reasons.add("coverImagePath에 빈 구간·'.'·'..' 사용 불가");
+        }
+        String extension = path.substring(path.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        if (!COVER_IMAGE_EXTENSIONS.contains(extension)) {
+            reasons.add("coverImagePath 확장자는 webp·png·jpg·jpeg만 허용");
         }
     }
 

@@ -41,6 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DevSeedImporter {
 
+    // 프론트엔드가 정적 에셋 폴더를 제공하는 URL 경로
+    private static final String ASSETS_URL_PREFIX = "/assets/";
+
     private final MysteryCaseRepository mysteryCaseRepository;
     private final SuspectRepository suspectRepository;
     private final EvidenceRepository evidenceRepository;
@@ -71,6 +74,9 @@ public class DevSeedImporter {
         Draft.Briefing briefing = seed.briefing();
         mysteryCase.updateBriefing(briefing.introduction(), briefing.investigationGoal(), briefing.backgroundKnowledge());
         mysteryCase.updateGlossary(seed.glossary());
+        if (seed.hasCoverImage()) {
+            mysteryCase.updateCoverImageUrl(ASSETS_URL_PREFIX + seed.coverImagePath());
+        }
         mysteryCaseRepository.save(mysteryCase);
 
         Map<String, Suspect> suspectByKey = new LinkedHashMap<>();

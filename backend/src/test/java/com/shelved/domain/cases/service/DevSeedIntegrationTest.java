@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.shelved.IntegrationTestSupport;
+import com.shelved.common.config.AssetsProperties;
+import com.shelved.common.config.CasebuilderProperties;
 import com.shelved.common.entity.CaseDraft;
 import com.shelved.common.entity.CaseMap;
 import com.shelved.common.entity.CaseTrickElement;
@@ -26,8 +28,12 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -46,6 +52,15 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
     private DevSeedService devSeedService;
 
     @Autowired
+    private DevSeedImporter devSeedImporter;
+
+    @Autowired
+    private ResourcePatternResolver resourcePatternResolver;
+
+    @Autowired
+    private CasebuilderProperties casebuilderProperties;
+
+    @Autowired
     private EntityManager entityManager;
 
     @Autowired
@@ -53,6 +68,9 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
 
     @TempDir
     private Path seedDir;
+
+    @TempDir
+    private Path tempDir;
 
     @Test
     void loadAll_가상예시시드_사건과하위엔티티반영() throws IOException {
@@ -75,6 +93,7 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
             assertThat(mysteryCase.getRevealExplanation()).isNotBlank();
             assertThat(mysteryCase.getSourceNovelTitle()).isEqualTo("The Last Chime");
             assertThat(mysteryCase.getGlossary()).hasSize(4);
+            assertThat(mysteryCase.getCoverImageUrl()).isNull();
             assertThat(mysteryCase.getContentUpdatedAt()).isNotNull();
             assertThat(mysteryCase.getTestVerifiedAt()).isNotNull();
             assertThat(mysteryCase.getCulpritSuspect().getName()).isEqualTo("해리스");
@@ -216,6 +235,91 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void loadAll_표지경로지정_에셋URL로저장() throws IOException {
+
+        // given: 한도와 같은 크기의 파일까지 허용
+        Path assetsDir = createAssetsDir();
+        writeImage(assetsDir.resolve("covers/clocktower-sample.webp"), 16);
+        writeImage(assetsDir.resolve("covers/limit.PNG"), maxCoverImageBytes());
+        String webp = writeSeed("1-cover.json",
+                seed -> seed.put("coverImagePath", "covers/clocktower-sample.webp"));
+        String limit = writeSeed("2-limit.json", seed -> seed.put("coverImagePath", "covers/limit.PNG"));
+
+        // when
+        DevSeedLoadResult result = serviceWithAssets(assetsDir).loadAll(seedPath());
+
+        // then
+        assertThat(result).isEqualTo(new DevSeedLoadResult(2, 0, 0));
+        transactionTemplate.executeWithoutResult(status -> {
+            assertThat(findPublishedCases(webp).getFirst().getCoverImageUrl())
+                    .isEqualTo("/assets/covers/clocktower-sample.webp");
+            assertThat(findPublishedCases(limit).getFirst().getCoverImageUrl())
+                    .isEqualTo("/assets/covers/limit.PNG");
+        });
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "  "})
+    void loadAll_표지경로비어있음_null로저장(String coverImagePath) throws IOException {
+
+        // given
+        String title = writeSeed("no-cover.json", seed -> seed.put("coverImagePath", coverImagePath));
+
+        // when
+        DevSeedLoadResult result = devSeedService.loadAll(seedPath());
+
+        // then
+        assertThat(result).isEqualTo(new DevSeedLoadResult(1, 0, 0));
+        transactionTemplate.executeWithoutResult(status ->
+                assertThat(findPublishedCases(title).getFirst().getCoverImageUrl()).isNull());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "covers/../outside.webp",
+            "covers/../covers/ok.webp",
+            "covers/./ok.webp",
+            "covers//ok.webp",
+            "covers\\ok.webp",
+            "/covers/ok.webp",
+            "other/ok.webp",
+            "https://example.com/covers/ok.webp",
+            "covers/ok.gif",
+            "covers/missing.webp",
+            "covers/folder.webp",
+            "covers/too-large.webp",
+            "covers/link.webp",
+            "covers/\u0000.webp"
+    })
+    void loadAll_허용하지않는표지경로_그파일만건너뜀(String coverImagePath) throws IOException {
+
+        // given: 형식 검사만으로 거부되는지 확인하도록 대상 파일은 만들어 둔다
+        Path assetsDir = createAssetsDir();
+        writeImage(assetsDir.resolve("covers/ok.webp"), 16);
+        writeImage(assetsDir.resolve("covers/ok.gif"), 16);
+        writeImage(assetsDir.resolve("other/ok.webp"), 16);
+        writeImage(assetsDir.resolve("outside.webp"), 16);
+        writeImage(assetsDir.resolve("covers/too-large.webp"), maxCoverImageBytes() + 1);
+        Files.createDirectory(assetsDir.resolve("covers/folder.webp"));
+        Path outsideAssets = tempDir.resolve("secret.webp");
+        writeImage(outsideAssets, 16);
+        Files.createSymbolicLink(assetsDir.resolve("covers/link.webp"), outsideAssets);
+        String invalid = writeSeed("1-invalid.json", seed -> seed.put("coverImagePath", coverImagePath));
+        String valid = writeSeed("2-valid.json", seed -> seed.put("coverImagePath", "covers/ok.webp"));
+
+        // when
+        DevSeedLoadResult result = serviceWithAssets(assetsDir).loadAll(seedPath());
+
+        // then
+        assertThat(result).isEqualTo(new DevSeedLoadResult(1, 0, 1));
+        transactionTemplate.executeWithoutResult(status -> {
+            assertThat(findPublishedCases(invalid)).isEmpty();
+            assertThat(findPublishedCases(valid)).hasSize(1);
+        });
+    }
+
+    @Test
     void loadAll_폴더없음_반영없이종료() {
 
         // given
@@ -246,6 +350,27 @@ class DevSeedIntegrationTest extends IntegrationTestSupport {
         Files.writeString(seedDir.resolve(fileName), JSON_MAPPER.writeValueAsString(seed));
 
         return title;
+    }
+
+    // 공개 저장소의 frontend/public/assets를 건드리지 않도록 임시 폴더를 에셋 폴더로 쓴다
+    private Path createAssetsDir() throws IOException {
+        return Files.createDirectories(tempDir.resolve("assets/covers")).getParent();
+    }
+
+    // 에셋 폴더만 바꾼 로더. 컨텍스트를 새로 만들지 않도록 직접 조립한다
+    private DevSeedService serviceWithAssets(Path assetsDir) {
+        DevSeedCoverImageChecker checker = new DevSeedCoverImageChecker(
+                new AssetsProperties(assetsDir.toString()), casebuilderProperties);
+        return new DevSeedService(resourcePatternResolver, devSeedImporter, checker);
+    }
+
+    private int maxCoverImageBytes() {
+        return Math.toIntExact(casebuilderProperties.coverImageMaxSize().toBytes());
+    }
+
+    private static void writeImage(Path path, int size) throws IOException {
+        Files.createDirectories(path.getParent());
+        Files.write(path, new byte[size]);
     }
 
     private static ObjectNode object(ObjectNode node, String field) {
