@@ -2,6 +2,7 @@
 export { AccusationPanel } from './components/AccusationPanel';
 export { AccusationRecordList } from './components/AccusationRecordList';
 export type { AccusationSuspect } from './components/AccusationRecordList';
+export { AwaitingGradingStatus } from './components/AwaitingGradingStatus';
 export { GradingRetry, GRADING_FAILED_MESSAGE } from './components/GradingRetry';
 export { useAccusation, type AccusationController } from './hooks/useAccusation';
 export { gradingRetryBlockReason, secondsUntilRetry } from './accusations';
