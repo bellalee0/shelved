@@ -176,8 +176,9 @@ set -a; source .env; set +a
 
 - 위치: `backend/src/main/resources/dev-data/*.json` (파일 하나 = 사건 하나). 실제 사건 정보가 들어가므로 **Git에서 제외**되어 있으며 커밋하지 않습니다.
 - 형식: 관리자 제작 초안([docs/api/admin-draft-schema.md](docs/api/admin-draft-schema.md))과 같은 JSON에 최상위 `map` 블록(맵 경로·시작 위치·충돌 레이어·상호작용 반경·`hotspots`)을 더한 형태입니다. 가상 사건으로 쓴 예시: [`backend/src/test/resources/dev-seed/clocktower-sample.json`](backend/src/test/resources/dev-seed/clocktower-sample.json)
+- 표지(선택): 최상위(`map`과 같은 층) `coverImagePath`에 정적 에셋 폴더(`shelved.assets.base-path`) 기준 상대 경로를 쓰면(예: `covers/sample.webp`) `/assets/covers/sample.webp`로 저장합니다. `covers/` 아래에 실제로 있는 `webp`·`png`·`jpg`·`jpeg` 파일(5MB 이하)만 허용하며, 원작 표지는 쓰지 않습니다. 이미 넣은 사건의 표지를 바꾸려면 아래 방법으로 다시 넣습니다.
 - 같은 표시명(`card.displayTitle`)의 공개 사건이 이미 있으면 건너뜁니다. 그래서 다시 기동해도 중복으로 들어가지 않고, **시드 파일을 고쳐도 자동으로 반영되지 않습니다.**
-- 검사(범인 1명, 없는 키 참조, 대화 가능 인물·모든 물증 배치, 좌표 0 이상, 배치된 인물의 `spriteKey`, 대화 가능 인물의 `persona.statements`·`pressureResponse`)를 통과하지 못한 파일은 건너뛰고, 서버 로그에 파일 이름과 실패 사유만 남깁니다.
+- 검사(범인 1명, 없는 키 참조, 대화 가능 인물·모든 물증 배치, 좌표 0 이상, 배치된 인물의 `spriteKey`, 대화 가능 인물의 `persona.statements`·`pressureResponse`, 지정한 `coverImagePath`)를 통과하지 못한 파일은 건너뛰고, 서버 로그에 파일 이름과 실패 사유만 남깁니다.
 - 폴더를 바꾸려면 `shelved.dev-seed.path`(기본 `classpath:dev-data/`, 예: `file:/절대/경로/`)를 지정합니다.
 
 - 대화 가능 인물의 `persona`는 넣을 때 NPC 설정 텍스트(`suspects.persona_prompt`)로 변환됩니다(원문 근거 `sourceRefs`는 제외). persona를 고친 경우에도 아래처럼 다시 넣어야 반영됩니다.
