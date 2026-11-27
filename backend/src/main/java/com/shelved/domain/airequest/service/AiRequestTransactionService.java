@@ -5,12 +5,14 @@ import static com.shelved.common.exception.ErrorCode.AI_REQUEST_IN_PROGRESS;
 import static com.shelved.common.exception.ErrorCode.AI_REQUEST_NOT_FOUND;
 import static com.shelved.common.exception.ErrorCode.AI_REQUEST_SUPERSEDED;
 import static com.shelved.common.exception.ErrorCode.ROOM_ENDED_DURING_REQUEST;
+import static com.shelved.common.exception.ErrorCode.ROOM_NOT_IN_PROGRESS;
 
 import com.shelved.common.config.GameProperties;
 import com.shelved.common.entity.AiRequest;
 import com.shelved.common.entity.Room;
 import com.shelved.common.enums.AiRequestStatus;
 import com.shelved.common.enums.AiRequestType;
+import com.shelved.common.enums.RoomStatus;
 import com.shelved.common.exception.CustomException;
 import com.shelved.common.exception.ErrorCode;
 import com.shelved.common.jwt.AuthUser;
@@ -49,12 +51,14 @@ public class AiRequestTransactionService {
     private final RoomRepository roomRepository;
     private final RoomAccessService roomAccessService;
     private final RoomPlayService roomPlayService;
+    private final AiRequestHandlerRegistry aiRequestHandlerRegistry;
     private final GameProperties gameProperties;
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
     /**
-     * 접수 (docs/api/README.md AI 요청 처리). 같은 requestId 판정 → 플레이 공통 검사 → 대상별 동시 1건 → 도메인 검사·컨텍스트 → 접수·재실행
+     * 접수 (docs/api/README.md AI 요청 처리). 같은 requestId 판정 → 플레이 공통 검사 → 대상별 동시 1건 → 도메인 검사·컨텍스트 → 접수·재실행.
+     * 실패한 요청의 재시도는 유형이 정한 정책을 따른다(AiRequestHandler.retryRequiresPlayableRoom)
      */
     @Transactional
     public <C> AiRequestAcceptance<C> accept(AuthUser authUser, AiRequestCommand command, AiRequestHandler<C> handler) {
@@ -80,7 +84,11 @@ public class AiRequestTransactionService {
             }
         }
 
-        roomPlayService.acquirePlayableRoom(room.getId(), authUser, command.connectionId());
+        if (existing.isPresent() && !handler.retryRequiresPlayableRoom()) {
+            validateRoomNotEnded(room);
+        } else {
+            roomPlayService.acquirePlayableRoom(room.getId(), authUser, command.connectionId());
+        }
         validateTargetIdle(room.getId(), requestType, command.targetId());
         C context = handler.prepare(room, command);
 
@@ -119,6 +127,7 @@ public class AiRequestTransactionService {
         if (RoomStatusFilter.isEnded(room.getStatus())) {
             if (currentExecution) {
                 aiRequest.fail(ROOM_ENDED_DURING_REQUEST, now);
+                handler.onFailed(aiRequest);
             }
             return new AiRequestCompletion.RoomEnded();
         }
@@ -134,12 +143,12 @@ public class AiRequestTransactionService {
     }
 
     /**
-     * 실행 실패. 최신 실행이고 PROCESSING일 때만 FAILED로 바꾸며(임시 확보 해제), 이전 실행의 늦은 실패는 무시한다
+     * 실행 실패. 최신 실행이고 PROCESSING일 때만 FAILED로 바꾸고(임시 확보 해제) 유형별 실패 후처리를 하며, 이전 실행의 늦은 실패는 무시한다
      *
      * @return 반영했으면 true
      */
     @Transactional
-    public boolean fail(AiRequestExecution<?> execution, ErrorCode errorCode) {
+    public boolean fail(AiRequestExecution<?> execution, AiRequestHandler<?> handler, ErrorCode errorCode) {
 
         roomRepository.findRoomWithLockById(execution.roomId());
         AiRequest aiRequest = findAiRequest(execution.aiRequestId());
@@ -148,6 +157,7 @@ public class AiRequestTransactionService {
         }
 
         aiRequest.fail(errorCode, LocalDateTime.now(clock));
+        handler.onFailed(aiRequest);
 
         return true;
     }
@@ -176,6 +186,9 @@ public class AiRequestTransactionService {
         }
 
         aiRequest.fail(aiRequest.getRequestType().getFailureCode(), LocalDateTime.now(clock));
+        // 복구 경로에는 실행 중인 핸들러가 없으므로 유형으로 찾는다
+        aiRequestHandlerRegistry.find(aiRequest.getRequestType())
+                .ifPresent(handler -> handler.onFailed(aiRequest));
 
         return true;
     }
@@ -193,6 +206,13 @@ public class AiRequestTransactionService {
             case PROCESSING -> new AiRequestResult.Processing(statusOf(aiRequest));
             case FAILED -> throw failedException(aiRequest, handler, execution.context());
         };
+    }
+
+    // 재시도에 플레이 공통 검사를 하지 않는 유형(지목 재채점)도 종료된 세션에서는 받지 않는다
+    private static void validateRoomNotEnded(Room room) {
+        if (RoomStatusFilter.isEnded(room.getStatus()) || room.getStatus() == RoomStatus.READY) {
+            throw new CustomException(ROOM_NOT_IN_PROGRESS);
+        }
     }
 
     private void validateTargetIdle(Long roomId, AiRequestType requestType, Long targetId) {

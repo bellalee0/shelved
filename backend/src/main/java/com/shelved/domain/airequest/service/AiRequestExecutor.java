@@ -107,7 +107,7 @@ public class AiRequestExecutor {
     private <C> AiRequestResult failExecution(AiRequestExecution<C> execution, AiRequestHandler<C> handler) {
 
         ErrorCode failureCode = handler.type().getFailureCode();
-        if (aiRequestTransactionService.fail(execution, failureCode)) {
+        if (aiRequestTransactionService.fail(execution, handler, failureCode)) {
             throw new CustomException(failureCode, handler.failureDetail(execution.requestId(), execution.context()));
         }
 
@@ -120,7 +120,7 @@ public class AiRequestExecutor {
                 execution.requestId(), handler.type(), execution.executionNo(),
                 SafeExceptionLog.causeChain(cause), SafeExceptionLog.rootCauseFrames(cause));
         try {
-            aiRequestTransactionService.fail(execution, handler.type().getFailureCode());
+            aiRequestTransactionService.fail(execution, handler, handler.type().getFailureCode());
         } catch (RuntimeException e) {
             log.error("AI 요청 실패 정리 실패 requestId={} exception={}", execution.requestId(), SafeExceptionLog.causeChain(e));
         }
