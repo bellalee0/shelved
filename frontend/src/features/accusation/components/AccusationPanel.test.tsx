@@ -568,3 +568,62 @@ describe('AccusationPanel 복원', () => {
     expect(posts).toHaveLength(0);
   });
 });
+
+describe('AccusationPanel 채점 중 영역 스크롤', () => {
+  /** 부드러운 스크롤을 요청받은 요소의 글. jsdom에는 scrollIntoView가 없어 목으로 둔다 */
+  let smoothScrolled: string[] = [];
+  const original = Element.prototype.scrollIntoView;
+
+  beforeEach(() => {
+    smoothScrolled = [];
+    Element.prototype.scrollIntoView = function (this: Element, options) {
+      if (typeof options === 'object' && options.behavior === 'smooth') {
+        smoothScrolled.push(this.textContent ?? '');
+      }
+    };
+  });
+
+  afterEach(() => {
+    Element.prototype.scrollIntoView = original;
+  });
+
+  it('지목을 제출하면 채점 중 영역으로 스크롤하고, 창을 닫았다 열 때는 다시 옮기지 않는다', async () => {
+    // given
+    setScenario('accusationSlow', true);
+    renderHarness();
+
+    // when
+    await submitAnswer('마거릿', PARTIAL);
+
+    // then
+    await waitFor(() => expect(smoothScrolled).toEqual(['채점 중입니다…']));
+
+    // when 채점 중에 창을 다시 연다
+    fireEvent.click(screen.getByRole('button', { name: '패널 닫기' }));
+    fireEvent.click(screen.getByRole('button', { name: '지목 창 열기' }));
+    await screen.findByRole('list', { name: '지목 기록' });
+
+    // then
+    expect(smoothScrolled).toHaveLength(1);
+  });
+
+  it('"같은 답안 다시 채점"을 눌러도 채점 중 영역으로 스크롤한다', async () => {
+    // given
+    setScenario('accusationFail', true);
+    const view = renderHarness();
+    await submitAnswer('마거릿', PARTIAL);
+    await screen.findByText('채점에 실패했습니다. 지목 기회는 차감되지 않았습니다.');
+    const base = currentTimeMs();
+    setMockClock(() => base + 11_000);
+    view.rerenderWith({ serverClockOffsetMs: 11_000 });
+    const retry = screen.getByRole('button', { name: '같은 답안 다시 채점' });
+    await waitFor(() => expect(retry).toBeEnabled());
+    smoothScrolled = [];
+
+    // when
+    fireEvent.click(retry);
+
+    // then
+    await waitFor(() => expect(smoothScrolled).toEqual(['채점 중입니다…']));
+  });
+});

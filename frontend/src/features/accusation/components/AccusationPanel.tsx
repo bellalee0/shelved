@@ -103,6 +103,17 @@ export function AccusationPanel({
   }, [resyncKey, refetch]);
 
   const { state, isBusy, latestResult } = accusation;
+
+  // 제출·재채점을 누르면 채점 중 표시가 창 위쪽에 있어 보이지 않으므로 그 위치로 옮긴다.
+  // 이미 채점 중인 창을 열 때(처음 값이 true)는 옮기지 않는다
+  const gradingRef = useRef<HTMLDivElement>(null);
+  const wasBusyRef = useRef(isBusy);
+  useEffect(() => {
+    if (isBusy && !wasBusyRef.current) {
+      gradingRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    }
+    wasBusyRef.current = isBusy;
+  }, [isBusy]);
   const activeRequestId = state.phase === 'idle' ? null : state.requestId;
   const records = listQuery.data?.accusations ?? [];
 
@@ -136,7 +147,11 @@ export function AccusationPanel({
   /** 이 화면이 다루는 지목(채점 중·실패)의 상태. 실패면 재채점 영역을 붙인다 */
   function renderActiveStatus() {
     if (isBusy) {
-      return <LoadingIndicator label="채점 중입니다…" />;
+      return (
+        <div ref={gradingRef}>
+          <LoadingIndicator label="채점 중입니다…" />
+        </div>
+      );
     }
     return (
       <GradingRetry
