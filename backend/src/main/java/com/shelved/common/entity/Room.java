@@ -138,6 +138,22 @@ public class Room {
         closeActiveSegment(timeLimitMs());
     }
 
+    /**
+     * 정답 지목으로 종료. 누적 시간은 종료 시점 값(제한시간 상한)으로 확정한다 (기록 시간은 PLAY_RESULTS가 접수 시점 값으로 따로 가진다)
+     */
+    public void clear(long settledElapsedMs) {
+        this.status = RoomStatus.CLEARED;
+        closeActiveSegment(settledElapsedMs);
+    }
+
+    /**
+     * 지목 기회 소진으로 종료. 누적 시간은 종료 시점 값(제한시간 상한)으로 확정한다
+     */
+    public void fail(long settledElapsedMs) {
+        this.status = RoomStatus.FAILED;
+        closeActiveSegment(settledElapsedMs);
+    }
+
     public long timeLimitMs() {
         return timeLimitSec * 1000L;
     }
