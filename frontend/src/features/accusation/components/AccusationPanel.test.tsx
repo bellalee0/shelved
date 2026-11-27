@@ -597,13 +597,41 @@ describe('AccusationPanel 이번 지목 기록 스크롤', () => {
     }
   }
 
+  /** "제출" → 확인 상자의 스크롤 기록을 지우고 → "제출하기" */
+  async function submitAnswerAfterConfirmScroll() {
+    await fillAnswer('마거릿', PARTIAL);
+    const submit = screen.getByRole('button', { name: '제출' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+    scrolled = [];
+    fireEvent.click(screen.getByRole('button', { name: '제출하기' }));
+  }
+
+  it('"제출"을 누르면 확인 상자가 보이도록 창 아래로 스크롤한다', async () => {
+    // given
+    renderHarness();
+    await fillAnswer('마거릿', PARTIAL);
+    const submit = screen.getByRole('button', { name: '제출' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    expect(scrolled).toEqual([]);
+
+    // when
+    fireEvent.click(submit);
+
+    // then
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0].block).toBe('end');
+    expect(scrolled[0].text).toContain('제출하기');
+    expect(posts).toHaveLength(0);
+  });
+
   it('지목을 제출하면 이번 기록을 위에 맞추고, 창을 닫았다 열 때는 다시 옮기지 않는다', async () => {
     // given
     setScenario('accusationSlow', true);
     renderHarness();
 
     // when
-    await submitAnswer('마거릿', PARTIAL);
+    await submitAnswerAfterConfirmScroll();
 
     // then
     await waitFor(() => expect(scrolled).toHaveLength(1));
@@ -624,7 +652,7 @@ describe('AccusationPanel 이번 지목 기록 스크롤', () => {
     renderHarness();
 
     // when
-    await submitAnswer('마거릿', PARTIAL);
+    await submitAnswerAfterConfirmScroll();
     await screen.findByText('방금 받은 결과');
 
     // then

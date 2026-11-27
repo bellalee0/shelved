@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Button } from '../../../shared/components/Button';
 import { TRICK_EXPLANATION_MAX_LENGTH } from '../../../shared/constants/accusation';
 import {
@@ -47,6 +47,15 @@ export function AccusationForm({
   const length = countTrickLength(draft.trickExplanation);
   const selected = suspects.find((suspect) => suspect.suspectId === draft.suspectId) ?? null;
   const canSubmit = !locked && blockReason === null;
+  const confirmRef = useRef<HTMLDivElement>(null);
+
+  // 확인 상자는 "제출" 버튼보다 커서 창 아래로 밀리므로, 열리면 "제출하기"가 보이도록 아래로 스크롤한다
+  // (jsdom에는 scrollIntoView가 없다)
+  useEffect(() => {
+    if (confirming) {
+      confirmRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' });
+    }
+  }, [confirming]);
 
   function handleConfirm() {
     if (!canSubmit) {
@@ -120,6 +129,7 @@ export function AccusationForm({
 
       {confirming && selected ? (
         <div
+          ref={confirmRef}
           role="group"
           aria-label="제출 확인"
           className="flex flex-col gap-2 rounded-md border border-accent bg-paper px-3 py-3 text-sm"
