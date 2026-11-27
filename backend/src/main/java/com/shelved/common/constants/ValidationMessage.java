@@ -35,6 +35,12 @@ public final class ValidationMessage {
     public static final String QUESTION_NOT_BLANK = "질문 내용은 필수입니다.";
     public static final String QUESTION_SIZE = "질문은 500자 이하로 입력해 주세요.";
 
+    // --- 지목 ---
+    public static final String SUSPECT_ID_NOT_NULL = "지목할 인물을 선택해 주세요.";
+    public static final String TRICK_EXPLANATION_NOT_BLANK = "트릭 설명은 필수입니다.";
+    // 글자 수는 앞뒤 공백을 뺀 길이로 센다 (화면의 text.trim().length와 같은 기준)
+    public static final String TRICK_EXPLANATION_SIZE = "트릭 설명은 10~3000자로 입력해 주세요.";
+
     // --- 노트 ---
     public static final String NOTE_CONTENT_NOT_NULL = "노트 내용은 필수입니다.";
     public static final String NOTE_REVISION_NOT_NULL = "노트 버전은 필수입니다.";

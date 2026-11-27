@@ -153,6 +153,13 @@ public class AiRequest {
         this.updatedAt = updatedAt;
     }
 
+    /**
+     * 채점 실패한 지목이 새 답안으로 대체됨 (ACCUSATION). 이후 같은 requestId로 재채점할 수 없다
+     */
+    public void supersede(LocalDateTime supersededAt) {
+        this.supersededAt = supersededAt;
+    }
+
     public void fail(ErrorCode errorCode, LocalDateTime updatedAt) {
         this.status = AiRequestStatus.FAILED;
         this.errorCode = errorCode.name();

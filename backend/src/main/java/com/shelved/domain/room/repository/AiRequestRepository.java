@@ -23,6 +23,8 @@ public interface AiRequestRepository extends JpaRepository<AiRequest, Long> {
 
     List<AiRequest> findByRoomIdOrderByIdAsc(Long roomId);
 
+    List<AiRequest> findByRoomIdAndRequestType(Long roomId, AiRequestType requestType);
+
     @Query("select a.room.id from AiRequest a where a.id = :id")
     Optional<Long> findRoomIdById(@Param("id") Long id);
 

@@ -1,15 +1,17 @@
 package com.shelved.domain.room.dto;
 
 import com.shelved.common.enums.Difficulty;
+import com.shelved.domain.accusation.dto.AccusationResponse;
 import com.shelved.domain.airequest.dto.AiRequestStatusResponse;
 import com.shelved.domain.npc.dto.NpcConversationSummaryResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 세션 상태 (재접속 복원). pendingAccusation은 형식이 정해지는 W4에서 채운다
+ * 세션 상태 (재접속 복원)
  *
- * @param pendingAccusation 채점 중·채점 실패 지목 (W4: AccusationResponse). 아직 null
+ * @param accusationCount   지목 횟수 (used = 정상 채점 완료, reserved = 채점 중)
+ * @param pendingAccusation 채점 중(PENDING)이거나 채점 실패(ERROR)한, 대체되지 않은 지목. 없으면 null
  * @param aiRequests        처리 중이거나 재시도 대기 중인 AI 요청 (AiRequestQueryService.getActiveAiRequestList)
  * @param conversations     대화 기록이 있는 NPC 목록 (suspectId 오름차순)
  */
@@ -24,7 +26,7 @@ public record RoomStateResponse(
         long heartbeatIntervalMs,
         RoomUsageCount hintCount,
         RoomUsageCount accusationCount,
-        Object pendingAccusation,
+        AccusationResponse pendingAccusation,
         List<AiRequestStatusResponse> aiRequests,
         List<NpcConversationSummaryResponse> conversations
 ) {
