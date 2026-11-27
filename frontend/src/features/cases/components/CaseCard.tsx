@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { DIFFICULTY_LABELS } from '../../../shared/constants/labels';
 import { Button } from '../../../shared/components/Button';
 import { formatTimeLimit } from '../../../shared/utils/formatTime';
@@ -39,13 +40,23 @@ export function CaseCard({ caseCard, hasActiveRoom, onStart }: CaseCardProps) {
           제한시간 {formatTimeLimit(caseCard.timeLimitSec)} · 힌트 {caseCard.hintLimit}회 · 지목{' '}
           {caseCard.accusationLimit}회
         </p>
-        <Button
-          className="mt-auto"
-          aria-label={`${caseCard.displayTitle} 수사 시작`}
-          onClick={() => onStart(caseCard.caseId)}
-        >
-          수사 시작
-        </Button>
+        <div className="mt-auto flex gap-2">
+          <Button
+            className="flex-1"
+            aria-label={`${caseCard.displayTitle} 수사 시작`}
+            onClick={() => onStart(caseCard.caseId)}
+          >
+            수사 시작
+          </Button>
+          {/* 비로그인도 보인다. 랭킹 화면의 보호막(RequireLogin)이 로그인 화면으로 보낸다 */}
+          <Link
+            to={`/cases/${caseCard.caseId}/ranking`}
+            aria-label={`${caseCard.displayTitle} 랭킹`}
+            className="inline-flex items-center rounded-md px-4 py-2 text-sm font-medium text-ink hover:bg-line/40"
+          >
+            랭킹
+          </Link>
+        </div>
       </div>
     </article>
   );

@@ -10,6 +10,7 @@ import { EventBus } from '../game/EventBus';
 import { GameEvents } from '../game/events';
 import { server } from '../mocks/node';
 import { acceptAccusation } from '../mocks/accusationDb';
+import { seedAccusation } from '../mocks/testing/seedAccusation';
 import { acceptNpcAsk, finishMockAiRequest } from '../mocks/aiRequestDb';
 import { setScenario } from '../mocks/scenarios';
 import {
@@ -17,6 +18,7 @@ import {
   pauseMockRoom,
   saveMockRoomDb,
   seedMockRoom,
+  setMockClock,
   startMockRoom,
 } from '../mocks/roomDb';
 import { loginMockUser, resetLoginState } from '../mocks/testing/loginMockUser';
@@ -176,7 +178,7 @@ describe('게임 화면 입장 흐름', () => {
     const router = renderAt(`/rooms/${room.roomId}`);
 
     // then
-    expect(await screen.findByRole('heading', { name: '수사 결과' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '사건을 해결했습니다' })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}/result`);
     expect(mockPhaser.receivedMapData).toHaveLength(0);
   });
@@ -195,7 +197,7 @@ describe('게임 화면 입장 흐름', () => {
     renderAt(`/rooms/${room.roomId}`);
 
     // then
-    expect(await screen.findByText('채점 결과를 기다리고 있습니다')).toBeInTheDocument();
+    expect(await screen.findByText('제한시간이 끝났습니다')).toBeInTheDocument();
     expect(screen.queryByTestId('phaser-game-mock')).not.toBeInTheDocument();
   });
 
@@ -719,5 +721,161 @@ describe('게임 화면 범인 지목', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(findMockRoom(room.roomId, user.userId)?.status).toBe('PAUSED');
     expect(findMockRoom(room.roomId, user.userId)?.pendingGradingStatus).toBe('ERROR');
+  });
+});
+
+describe('게임 화면 · 시간 종료·채점 대기', () => {
+  const ANSWER = '종소리로 시계의 시각을 착각하게 했다고 생각합니다.';
+
+  /** 마감 전에 낸 지목이 남은 채 시간이 끝난 세션. acceptedAgoMs만큼 전에 접수한 것으로 만든다 */
+  async function enterAwaiting(outcome: 'pending' | 'error', acceptedAgoMs = 0) {
+    const user = await loginMockUser();
+    const room = seedMockRoom(user.userId, { caseId: 1, status: 'PAUSED', remainingMs: 0 });
+    setMockClock(() => Date.now() - acceptedAgoMs);
+    const request = seedAccusation(room, {
+      suspectId: 2,
+      trickExplanation: ANSWER,
+      outcome,
+    });
+    setMockClock(null);
+    saveMockRoomDb();
+    const router = renderAt(`/rooms/${room.roomId}`);
+    await screen.findByText('제한시간이 끝났습니다');
+    return { user, room, router, request };
+  }
+
+  const NEW_ACTIONS = ['수사 시작', '수사 이어하기', '제출', '힌트 받기'];
+
+  function expectNoNewActions() {
+    for (const name of NEW_ACTIONS) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+    const forbidden = /\/(start|resume|heartbeat|ask|inspect|hints)$/;
+    expect(requestedPaths.filter((path) => forbidden.test(path))).toEqual([]);
+    expect(requestedPaths.filter((path) => path.startsWith('PUT '))).toEqual([]);
+  }
+
+  it('채점 중이면 안내를 보여 주고, 확인이 끝나면 GET state 뒤 "결과 보기"로만 결과 화면에 간다', async () => {
+    // given
+    const { room, router } = await enterAwaiting('pending');
+
+    // then
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText('채점 중입니다…')).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('제출한 답안 · 마거릿');
+    expect(dialog).toHaveTextContent(ANSWER);
+    expect(
+      within(dialog).queryByRole('button', { name: '같은 답안 다시 채점' }),
+    ).not.toBeInTheDocument();
+    expectNoNewActions();
+
+    // when 처리 중 확인(폴링)이 끝난다
+    const showResult = await screen.findByRole('button', { name: '결과 보기' }, { timeout: 6000 });
+
+    // then 자동으로 이동하지 않는다
+    expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}`);
+    expectNoNewActions();
+
+    // when
+    fireEvent.click(showResult);
+
+    // then
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}/result`),
+    );
+  }, 10_000);
+
+  it('채점 실패면 최소 간격 전에는 재채점할 수 없고 자동으로 보내지 않는다', async () => {
+    // given
+    await enterAwaiting('error');
+
+    // then
+    const retry = await screen.findByRole('button', { name: '같은 답안 다시 채점' });
+    expect(retry).toBeDisabled();
+    expect(screen.getByRole('dialog')).toHaveTextContent('지목 기회는 차감되지 않았습니다');
+    expect(screen.getByText(/초 후 다시 채점할 수 있습니다/)).toBeInTheDocument();
+    expect(requestedPaths.filter((path) => /^POST .*accusations$/.test(path))).toEqual([]);
+    expectNoNewActions();
+  });
+
+  it('간격이 지나면 연결 헤더 없이 같은 requestId·답안으로 재채점하고 "결과 보기"를 보여 준다', async () => {
+    // given
+    const { request } = await enterAwaiting('error', 60_000);
+    const sent: { connectionId: string | null; body: unknown }[] = [];
+    const record = ({ request: outgoing }: { request: Request }) => {
+      if (outgoing.method === 'POST' && outgoing.url.endsWith('/accusations')) {
+        const connectionId = outgoing.headers.get('X-Connection-Id');
+        void outgoing
+          .clone()
+          .json()
+          .then((body) => sent.push({ connectionId, body }));
+      }
+    };
+    server.events.on('request:start', record);
+    const retry = await screen.findByRole('button', { name: '같은 답안 다시 채점' });
+    expect(retry).toBeEnabled();
+
+    // when
+    fireEvent.click(retry);
+
+    // then
+    expect(await screen.findByRole('button', { name: '결과 보기' })).toBeInTheDocument();
+    expect(sent).toEqual([
+      {
+        connectionId: null,
+        body: { requestId: request.requestId, suspectId: 2, trickExplanation: ANSWER },
+      },
+    ]);
+    expectNoNewActions();
+    server.events.removeListener('request:start', record);
+  });
+
+  it('"나중에 다시 시도"는 저장·일시정지 요청 없이 메인으로 간다', async () => {
+    // given
+    const { router } = await enterAwaiting('error');
+    const pauseCount = () => requestedPaths.filter((path) => path.endsWith('/pause')).length;
+    const before = pauseCount();
+
+    // when
+    fireEvent.click(await screen.findByRole('button', { name: '나중에 다시 시도' }));
+
+    // then
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(pauseCount()).toBe(before);
+    expectNoNewActions();
+  });
+
+  it('채점 대기 화면에서 수사 기록을 보고 돌아올 수 있다', async () => {
+    // given
+    const { room, router } = await enterAwaiting('error');
+
+    // when
+    fireEvent.click(screen.getByRole('link', { name: '수사 기록 보기 · 읽기 전용' }));
+
+    // then
+    expect(
+      await screen.findByRole('heading', { name: '수사 기록 · 읽기 전용' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}/records`);
+
+    // when
+    fireEvent.click(screen.getByRole('button', { name: '이전 화면으로' }));
+
+    // then
+    expect(await screen.findByText('제한시간이 끝났습니다')).toBeInTheDocument();
+  });
+
+  it('일시정지 화면에는 수사 기록 보기가 있고 준비 화면에는 없다', async () => {
+    // given
+    const { room, router } = await enterRoom('PAUSED');
+    await screen.findByText('수사를 이어서 진행합니다');
+
+    // when
+    fireEvent.click(screen.getByRole('link', { name: '수사 기록 보기 · 읽기 전용' }));
+
+    // then
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/rooms/${room.roomId}/records`),
+    );
   });
 });

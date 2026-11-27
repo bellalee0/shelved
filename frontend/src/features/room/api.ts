@@ -7,6 +7,7 @@ import type {
   RoomCreateResponse,
   RoomListParams,
   RoomMapResponse,
+  RoomResultResponse,
   RoomStateResponse,
   RoomSummaryResponse,
   RoomTimerResponse,
@@ -78,6 +79,14 @@ export async function pauseRoom(roomId: number) {
 export async function resumeRoom(roomId: number) {
   const response = await apiClient.post<CommonResponse<RoomConnectionResponse>>(
     `/api/rooms/${roomId}/resume`,
+  );
+  return response.data.data;
+}
+
+/** 종료 세션의 리빌·플레이 기록. 종료 전(채점 대기 포함)에는 409 ROOM_NOT_ENDED */
+export async function getResult(roomId: number) {
+  const response = await apiClient.get<CommonResponse<RoomResultResponse>>(
+    `/api/rooms/${roomId}/result`,
   );
   return response.data.data;
 }
