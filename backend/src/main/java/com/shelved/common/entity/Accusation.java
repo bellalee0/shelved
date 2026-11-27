@@ -131,4 +131,11 @@ public class Accusation {
     public void markGradingError() {
         this.gradingStatus = GradingStatus.ERROR;
     }
+
+    /**
+     * 채점 실패한 지목의 재채점 접수. 접수 시각·접수 시점 누적 시간(원래 접수 시점의 유효성)은 바꾸지 않는다
+     */
+    public void restartGrading() {
+        this.gradingStatus = GradingStatus.PENDING;
+    }
 }

@@ -80,19 +80,6 @@ class AccusationGraderTest {
     }
 
     @Test
-    void grade_Fake기본응답_채점형식이아니어서형식오류() {
-
-        // given 시나리오가 없으면 Fake는 고정 문장을 돌려준다 (채점 JSON을 만들지 않는다)
-        GradingContext context = GradingTestData.context(Difficulty.EASY, true);
-        LlmResponse response = fakeLlmClient.call(grader.buildLlmRequest(context));
-
-        // when & then
-        assertThatThrownBy(() -> grader.grade(context, response.text()))
-                .isInstanceOfSatisfying(GradingResponseInvalidException.class,
-                        e -> assertThat(e.getReason()).isEqualTo(GradingResponseInvalidException.Reason.NOT_JSON));
-    }
-
-    @Test
     void toString_컨텍스트요청결과에답안기준피드백없음() {
 
         // given

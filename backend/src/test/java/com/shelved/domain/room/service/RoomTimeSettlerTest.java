@@ -2,21 +2,23 @@ package com.shelved.domain.room.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.shelved.common.config.GameProperties;
+import com.shelved.common.entity.Accusation;
 import com.shelved.common.entity.PlayResult;
 import com.shelved.common.entity.Room;
 import com.shelved.common.enums.RoomStatus;
+import com.shelved.common.enums.Verdict;
 import com.shelved.domain.accusation.repository.AccusationRepository;
 import com.shelved.domain.hint.repository.HintRepository;
 import com.shelved.domain.room.dto.RoomTimerResponse;
 import com.shelved.domain.room.repository.PlayResultRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -94,7 +96,7 @@ class RoomTimeSettlerTest {
         // given: 제한시간 직후(1201초)에 마지막 접속 확인, 그 뒤 끊김
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC + 1));
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
         given(hintRepository.countByRoomId(any())).willReturn(2L);
 
         // when
@@ -155,7 +157,7 @@ class RoomTimeSettlerTest {
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC - 5));
         LocalDateTime now = T0.plusSeconds(LIMIT_SEC + 5);
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
 
         // when
         settler.settle(room, now);
@@ -222,7 +224,7 @@ class RoomTimeSettlerTest {
         // given
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC - 5));
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
 
         // when
         settler.pause(room, T0.plusSeconds(LIMIT_SEC + 5));
@@ -239,7 +241,7 @@ class RoomTimeSettlerTest {
         // given
         Room room = startedRoom();
         room.touch(T0.plusSeconds(LIMIT_SEC - 5));
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(true);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(true);
         LocalDateTime now = T0.plusSeconds(LIMIT_SEC + 5);
 
         // when
@@ -280,7 +282,7 @@ class RoomTimeSettlerTest {
 
         // given
         Room room = startedRoom();
-        given(accusationRepository.existsByRoomIdAndGradingStatusIn(any(), anyCollection())).willReturn(false);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
         given(playResultRepository.existsByRoomId(any())).willReturn(true);
 
         // when
@@ -289,6 +291,89 @@ class RoomTimeSettlerTest {
         // then
         assertThat(room.getStatus()).isEqualTo(RoomStatus.EXPIRED);
         verify(playResultRepository, never()).save(any());
+    }
+
+    // --- 6. 채점 결과 반영 ---
+
+    @Test
+    void applyGradingResult_정답_채점대기중이어도CLEARED_기록은접수시점() {
+
+        // given: 1195.9초에 접수, 채점 중 시간 소진으로 채점 대기(PAUSED, 제한시간 고정)
+        Room room = startedRoom();
+        room.pause(LIMIT_MS);
+        Accusation accusation = completedAccusation(Verdict.CORRECT, LIMIT_MS - 4_100L);
+
+        // when
+        LocalDateTime now = T0.plusSeconds(LIMIT_SEC + 40);
+        settler.applyGradingResult(room, accusation, now);
+
+        // then
+        assertThat(room.getStatus()).isEqualTo(RoomStatus.CLEARED);
+        assertThat(room.getElapsedActiveMs()).isEqualTo(LIMIT_MS);
+        ArgumentCaptor<PlayResult> captor = ArgumentCaptor.forClass(PlayResult.class);
+        verify(playResultRepository).save(captor.capture());
+        assertThat(captor.getValue().isCleared()).isTrue();
+        assertThat(captor.getValue().getDurationSec()).isEqualTo(LIMIT_SEC - 5);
+        assertThat(captor.getValue().getEndedAt()).isEqualTo(now);
+    }
+
+    @Test
+    void applyGradingResult_한도번째비정답_FAILED_기록은종료시점() {
+
+        // given
+        Room room = startedRoom();
+        given(accusationRepository.countByRoomIdAndGradingStatus(any(), any())).willReturn(3L);
+
+        // when
+        settler.applyGradingResult(room, completedAccusation(Verdict.PARTIAL, 100_000L), T0.plusSeconds(300));
+
+        // then
+        assertThat(room.getStatus()).isEqualTo(RoomStatus.FAILED);
+        assertThat(room.getElapsedActiveMs()).isEqualTo(300_000L);
+        ArgumentCaptor<PlayResult> captor = ArgumentCaptor.forClass(PlayResult.class);
+        verify(playResultRepository).save(captor.capture());
+        assertThat(captor.getValue().isCleared()).isFalse();
+        assertThat(captor.getValue().getDurationSec()).isEqualTo(300);
+    }
+
+    @Test
+    void applyGradingResult_채점대기중비정답_다른미해결없음_EXPIRED() {
+
+        // given
+        Room room = startedRoom();
+        room.pause(LIMIT_MS);
+        given(accusationRepository.countByRoomIdAndGradingStatus(any(), any())).willReturn(1L);
+        given(accusationRepository.existsUnresolvedByRoomId(any())).willReturn(false);
+
+        // when
+        settler.applyGradingResult(room, completedAccusation(Verdict.PARTIAL, LIMIT_MS - 1L), T0.plusSeconds(LIMIT_SEC + 10));
+
+        // then
+        assertThat(room.getStatus()).isEqualTo(RoomStatus.EXPIRED);
+        ArgumentCaptor<PlayResult> captor = ArgumentCaptor.forClass(PlayResult.class);
+        verify(playResultRepository).save(captor.capture());
+        assertThat(captor.getValue().getDurationSec()).isEqualTo(LIMIT_SEC);
+    }
+
+    @Test
+    void applyGradingResult_진행중비정답_상태유지_결과없음() {
+
+        // given
+        Room room = startedRoom();
+        given(accusationRepository.countByRoomIdAndGradingStatus(any(), any())).willReturn(1L);
+
+        // when
+        settler.applyGradingResult(room, completedAccusation(Verdict.INCORRECT, 10_000L), T0.plusSeconds(20));
+
+        // then
+        assertThat(room.getStatus()).isEqualTo(RoomStatus.IN_PROGRESS);
+        verify(playResultRepository, never()).save(any());
+    }
+
+    private static Accusation completedAccusation(Verdict verdict, long submittedActiveMs) {
+        Accusation accusation = new Accusation(null, null, null, "request", "가상 답안", T0, submittedActiveMs);
+        accusation.completeGrading(verdict != Verdict.INCORRECT, verdict, List.of(), "피드백");
+        return accusation;
     }
 
     private static Room startedRoom() {

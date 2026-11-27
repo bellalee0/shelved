@@ -1,10 +1,12 @@
 package com.shelved.domain.room.service;
 
 import com.shelved.common.config.GameProperties;
+import com.shelved.common.entity.Accusation;
 import com.shelved.common.entity.PlayResult;
 import com.shelved.common.entity.Room;
 import com.shelved.common.enums.GradingStatus;
 import com.shelved.common.enums.RoomStatus;
+import com.shelved.common.enums.Verdict;
 import com.shelved.domain.accusation.repository.AccusationRepository;
 import com.shelved.domain.hint.repository.HintRepository;
 import com.shelved.domain.room.dto.RoomStatusFilter;
@@ -12,8 +14,6 @@ import com.shelved.domain.room.dto.RoomTimerResponse;
 import com.shelved.domain.room.repository.PlayResultRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -28,15 +28,14 @@ import org.springframework.transaction.annotation.Transactional;
  * 3. 접속 확인(하트비트·유효한 플레이 요청): lastSeen = now, 소진이면 만료
  * 4. 명시적 pause: lastSeen 갱신 없이 1을 먼저 적용, 아니면 now까지 누적 → 소진이면 만료, 아니면 PAUSED
  * 5. 만료: 미해결 지목이 있으면 제한시간으로 고정한 PAUSED(채점 대기), 없으면 EXPIRED + PlayResult 1건
+ * 6. 채점 결과 반영: 정답 → CLEARED, 기회 소진 → FAILED, 채점 대기 중이고 다른 미해결 지목이 없으면 → EXPIRED, 그 외 상태 유지
+ * PlayResult는 세션당 1건: 모든 종료 경로가 rooms 잠금 안에서 종료 전 상태일 때만 종료하고, 저장 전에 존재를 확인한다 (saveResultOnce)
  * PAUSED·READY·종료 상태에서는 시간이 흐르지 않으며 여기서 바꾸지 않는다.
  */
 @Component
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class RoomTimeSettler {
-
-    // 마감 전 접수됐지만 채점이 끝나지 않은 지목
-    private static final Set<GradingStatus> UNRESOLVED_GRADING_STATUSES = EnumSet.of(GradingStatus.PENDING, GradingStatus.ERROR);
 
     private final AccusationRepository accusationRepository;
     private final HintRepository hintRepository;
@@ -91,21 +90,49 @@ public class RoomTimeSettler {
     }
 
     /**
-     * 5. 시간 만료 처리. 소진이 확인된 IN_PROGRESS 세션에만 호출한다
+     * 5. 시간 만료 처리. 소진이 확인된 IN_PROGRESS 세션, 또는 채점 대기(제한시간으로 고정된 PAUSED) 세션에만 호출한다
      */
     public void expire(Room room, LocalDateTime now) {
         if (hasUnresolvedAccusation(room)) {
-            // 마감 전 접수 지목의 채점이 끝날 때까지 최종 종료를 보류한다 (W4 채점 확정에서 종료)
+            // 마감 전 접수 지목의 채점이 끝날 때까지 최종 종료를 보류한다 (채점 결과 반영 6에서 종료)
             room.pause(room.timeLimitMs());
             return;
         }
 
         room.expire();
         // 처리 중(PROCESSING) AI 요청의 늦은 응답은 결과 확정 시 세션 종료를 확인해 반영하지 않는다 (AiRequestTransactionService.complete)
-        if (!playResultRepository.existsByRoomId(room.getId())) {
-            int hintUsedCount = Math.toIntExact(hintRepository.countByRoomId(room.getId()));
-            playResultRepository.save(new PlayResult(
-                    room, room.getMysteryCase(), false, room.getTimeLimitSec(), hintUsedCount, now));
+        saveResultOnce(room, false, room.getTimeLimitSec(), now);
+    }
+
+    /**
+     * 6. 채점 결과 반영. 확정 트랜잭션에서 settle(now)을 지목이 아직 PENDING일 때 먼저 적용하고(채점 중 시간이 다 됐으면 채점 대기),
+     * 지목을 COMPLETED로 바꾼 뒤 호출한다. 종료되지 않은 세션에만 호출한다
+     *
+     * <ul>
+     *     <li>CORRECT → CLEARED. 기록 시간은 접수 시점 누적 시간(초 내림). 접수 시점에 유효했으므로 이미 시간이 소진됐어도 정답이다</li>
+     *     <li>아니고 COMPLETED 수가 한도 → FAILED. 기록 시간은 종료 시점 누적 시간(제한시간 상한)</li>
+     *     <li>아니고 채점 대기(시간 소진으로 보류된 PAUSED)이면 → expire (다른 미해결 지목이 없으면 EXPIRED)</li>
+     *     <li>그 외 → 상태 유지. 유예 구간의 IN_PROGRESS는 다음 접속 확인·정산이 만료를 확정한다</li>
+     * </ul>
+     */
+    public void applyGradingResult(Room room, Accusation accusation, LocalDateTime now) {
+
+        if (accusation.getVerdict() == Verdict.CORRECT) {
+            room.clear(settledElapsedMs(room, now));
+            saveResultOnce(room, true, RoomTimeCalculator.toDurationSec(accusation.getSubmittedActiveMs()), now);
+            return;
+        }
+
+        long completedCount = accusationRepository.countByRoomIdAndGradingStatus(room.getId(), GradingStatus.COMPLETED);
+        if (completedCount >= gameProperties.accusationLimit()) {
+            long elapsedMs = settledElapsedMs(room, now);
+            room.fail(elapsedMs);
+            saveResultOnce(room, false, RoomTimeCalculator.toDurationSec(elapsedMs), now);
+            return;
+        }
+
+        if (room.getStatus() == RoomStatus.PAUSED && room.getElapsedActiveMs() >= room.timeLimitMs()) {
+            expire(room, now);
         }
     }
 
@@ -135,8 +162,24 @@ public class RoomTimeSettler {
         );
     }
 
+    // 마감 전 접수됐지만 채점이 끝나지 않은 지목(채점 중·채점 실패). 새 답안으로 대체된 실패 지목은 재채점할 수 없으므로 세지 않는다
     private boolean hasUnresolvedAccusation(Room room) {
-        return accusationRepository.existsByRoomIdAndGradingStatusIn(room.getId(), UNRESOLVED_GRADING_STATUSES);
+        return accusationRepository.existsUnresolvedByRoomId(room.getId());
+    }
+
+    // 종료 결과는 세션당 1건 (uk_play_results_room_id). 호출하는 쪽이 rooms 잠금 안에서 종료 전 상태를 확인했으므로 중복 경로가 없고,
+    // 그래도 이미 있으면 새로 만들지 않는다. 제약 위반이 나면 트랜잭션 전체가 실패해 두 번째 결과가 남지 않는다
+    private void saveResultOnce(Room room, boolean cleared, int durationSec, LocalDateTime now) {
+        if (playResultRepository.existsByRoomId(room.getId())) {
+            return;
+        }
+        int hintUsedCount = Math.toIntExact(hintRepository.countByRoomId(room.getId()));
+        playResultRepository.save(new PlayResult(room, room.getMysteryCase(), cleared, durationSec, hintUsedCount, now));
+    }
+
+    // 종료 시점 누적 시간. 제한시간을 넘지 않는다
+    private static long settledElapsedMs(Room room, LocalDateTime now) {
+        return Math.min(elapsedAt(room, now), room.timeLimitMs());
     }
 
     private static long elapsedAt(Room room, LocalDateTime at) {

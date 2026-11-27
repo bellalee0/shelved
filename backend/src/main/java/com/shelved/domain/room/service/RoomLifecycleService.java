@@ -9,12 +9,12 @@ import static com.shelved.common.exception.ErrorCode.ROOM_TIME_EXPIRED;
 import com.shelved.common.config.GameProperties;
 import com.shelved.common.entity.MysteryCase;
 import com.shelved.common.entity.Room;
-import com.shelved.common.enums.GradingStatus;
 import com.shelved.common.enums.RoomStatus;
 import com.shelved.common.exception.CustomException;
 import com.shelved.common.jwt.AuthUser;
 import com.shelved.common.utils.SafeExceptionLog;
-import com.shelved.domain.accusation.repository.AccusationRepository;
+import com.shelved.domain.accusation.service.AccusationQueryService;
+import com.shelved.domain.accusation.service.AccusationUsageCounter;
 import com.shelved.domain.airequest.service.AiRequestQueryService;
 import com.shelved.domain.hint.service.HintUsageCounter;
 import com.shelved.domain.room.dto.RoomConnectionResponse;
@@ -42,7 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RoomLifecycleService {
 
     private final RoomRepository roomRepository;
-    private final AccusationRepository accusationRepository;
+    private final AccusationUsageCounter accusationUsageCounter;
+    private final AccusationQueryService accusationQueryService;
     private final HintUsageCounter hintUsageCounter;
     private final AiRequestQueryService aiRequestQueryService;
     private final NpcMessageRepository npcMessageRepository;
@@ -64,10 +65,7 @@ public class RoomLifecycleService {
 
         MysteryCase mysteryCase = room.getMysteryCase();
         RoomUsageCount hintCount = hintUsageCounter.countHintUsage(roomId, mysteryCase.getDifficulty());
-        RoomUsageCount accusationCount = new RoomUsageCount(
-                gameProperties.accusationLimit(),
-                accusationRepository.countByRoomIdAndGradingStatus(roomId, GradingStatus.COMPLETED),
-                accusationRepository.countByRoomIdAndGradingStatus(roomId, GradingStatus.PENDING));
+        RoomUsageCount accusationCount = accusationUsageCounter.countAccusationUsage(roomId);
 
         return new RoomStateResponse(
                 room.getId(),
@@ -80,7 +78,7 @@ public class RoomLifecycleService {
                 heartbeatIntervalMs(),
                 hintCount,
                 accusationCount,
-                null,
+                accusationQueryService.getPendingAccusation(roomId),
                 aiRequestQueryService.getActiveAiRequestList(roomId),
                 npcMessageRepository.findConversationSummaryList(roomId)
         );
