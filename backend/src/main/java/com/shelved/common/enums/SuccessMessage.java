@@ -35,6 +35,9 @@ public enum SuccessMessage {
     ROOM_RESUME_SUCCESS("수사 이어하기 성공"),
     ROOM_RESULT_GET_SUCCESS("세션 결과 조회 성공"),
 
+    // 랭킹
+    RANKING_GET_SUCCESS("랭킹 조회 성공"),
+
     // AI 요청
     AI_REQUEST_GET_SUCCESS("AI 요청 상태 조회 성공"),
     // 같은 requestId가 아직 처리 중일 때의 202 응답
