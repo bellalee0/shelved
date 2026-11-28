@@ -203,6 +203,7 @@
   "maps": {
     "clocktower-mansion": "/assets/maps/clocktower-mansion.json",
     "townhouse-quarter": "/assets/maps/townhouse-quarter.json",
-    "country-estate": "/assets/maps/country-estate.json"
+    "country-estate": "/assets/maps/country-estate.json",
+    "rural-lodge": "/assets/maps/rural-lodge.json"
   }
 }
