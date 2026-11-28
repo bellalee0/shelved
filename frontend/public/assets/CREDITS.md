@@ -32,6 +32,7 @@
 | `clocktower-mansion.json` | 프로젝트 자체 제작 Tiled 맵. 위 타일셋의 타일을 배치한 것이며 타일 이미지를 수정하지 않았다. 각 타일셋의 조건은 위 표를 따른다.                                                                                                                                                                                                           |
 | `townhouse-quarter.json`  | 프로젝트 자체 제작 Tiled 맵. `interior-floors`·`interior-walls`·`interior-furniture`·`outdoor-grass`·`outdoor-dirt`·`collision-marker` 타일을 배치한 것이며 타일 이미지를 수정하지 않았다. 각 타일셋의 조건은 위 표를 따른다.                                                                                                             |
 | `country-estate.json`     | 프로젝트 자체 제작 Tiled 맵. `interior-floors`·`interior-walls`·`interior-furniture`·`outdoor-grass`·`outdoor-dirt`·`outdoor-ruins`·`outdoor-trees`·`outdoor-shrubs`·`outdoor-props`·`outdoor-fences`·`exterior-stone-building`·`collision-marker` 타일을 배치한 것이며 타일 이미지를 수정하지 않았다. 각 타일셋의 조건은 위 표를 따른다. |
+| `rural-lodge.json`        | 프로젝트 자체 제작 Tiled 맵. `interior-floors`·`interior-walls`·`interior-furniture`·`outdoor-grass`·`outdoor-dirt`·`outdoor-ruins`·`outdoor-trees`·`outdoor-shrubs`·`outdoor-props`·`outdoor-fences`·`collision-marker` 타일을 배치한 것이며 타일 이미지를 수정하지 않았다. 각 타일셋의 조건은 위 표를 따른다.                           |
 
 ## 캐릭터 스프라이트 (`sprites/`)
 
