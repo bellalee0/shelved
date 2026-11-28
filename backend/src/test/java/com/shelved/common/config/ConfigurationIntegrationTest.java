@@ -63,6 +63,7 @@ class ConfigurationIntegrationTest extends IntegrationTestSupport {
         assertThat(gameProperties.heartbeatTimeout()).isEqualTo(Duration.ofSeconds(15));
         assertThat(gameProperties.gradingRetryMinInterval()).isEqualTo(Duration.ofSeconds(10));
         assertThat(gameProperties.disconnectCheckInterval()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(gameProperties.grading().elementPassRatio()).isEqualByComparingTo("0.5");
         assertThat(noteProperties.maxLength()).isEqualTo(5000);
         assertThat(llmProperties.gameTimeout()).isEqualTo(Duration.ofSeconds(60));
         assertThat(llmProperties.casebuilderChatTimeout()).isEqualTo(Duration.ofSeconds(300));

@@ -91,6 +91,10 @@ shelved:
     disconnect-check-interval: 5s
     # 채점 재시도 최소 간격 — 잠정, 사건 A 플레이테스트(W4) 후 조정
     grading-retry-min-interval: 10s
+    # 지목 판정 규칙
+    grading:
+      # 핵심 요소마다 충족(MET) 항목이 ceil(항목 수 × 이 값) 이상이어야 정답 (0 초과 1 이하) — 잠정
+      element-pass-ratio: 0.5
 
   note:
     # 개인 노트 최대 글자 수 (UTF-16 코드 단위) — 잠정, 사건 A 플레이테스트(W4) 후 조정

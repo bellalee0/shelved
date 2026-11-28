@@ -4,6 +4,7 @@ import static com.shelved.domain.accusation.service.GradingTestData.EXPECTED_KEY
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.shelved.common.config.GameProperties;
 import com.shelved.common.config.GradingProperties;
 import com.shelved.common.enums.Difficulty;
 import com.shelved.common.enums.Verdict;
@@ -14,6 +15,7 @@ import com.shelved.infra.llm.LlmRequest;
 import com.shelved.infra.llm.LlmResponse;
 import com.shelved.infra.llm.LlmThinking;
 import com.shelved.infra.llm.PromptTemplateLoader;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
 import tools.jackson.databind.json.JsonMapper;
@@ -27,6 +29,7 @@ class AccusationGraderTest {
     private final AccusationGrader grader = new AccusationGrader(
             new GradingPromptBuilder(new PromptTemplateLoader(new DefaultResourceLoader()), gradingProperties),
             gradingProperties,
+            gameProperties(),
             JsonMapper.builder().build());
     private final FakeLlmClient fakeLlmClient = new FakeLlmClient();
 
@@ -103,5 +106,11 @@ class AccusationGraderTest {
         fakeLlmClient.enqueue(FakeLlmScenario.respond(responseText));
         LlmResponse response = fakeLlmClient.call(grader.buildLlmRequest(context));
         return grader.grade(context, response.text());
+    }
+
+    // 판정 기준 비율만 쓰는 테스트용 게임 설정
+    private static GameProperties gameProperties() {
+        return new GameProperties(null, null, 3, null, null, null, null,
+                new GameProperties.Grading(new BigDecimal("0.5")));
     }
 }

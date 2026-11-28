@@ -1,7 +1,7 @@
 package com.shelved.domain.accusation.service;
 
+import com.shelved.common.config.GameProperties;
 import com.shelved.common.config.GradingProperties;
-import com.shelved.common.entity.json.ElementResult;
 import com.shelved.common.enums.Verdict;
 import com.shelved.infra.llm.LlmRequest;
 import org.springframework.stereotype.Component;
@@ -24,10 +24,17 @@ public class AccusationGrader {
     private final GradingPromptBuilder gradingPromptBuilder;
     private final GradingResponseParser gradingResponseParser;
     private final GradingProperties gradingProperties;
+    private final GameProperties gameProperties;
 
-    public AccusationGrader(GradingPromptBuilder gradingPromptBuilder, GradingProperties gradingProperties, JsonMapper jsonMapper) {
+    public AccusationGrader(
+            GradingPromptBuilder gradingPromptBuilder,
+            GradingProperties gradingProperties,
+            GameProperties gameProperties,
+            JsonMapper jsonMapper
+    ) {
         this.gradingPromptBuilder = gradingPromptBuilder;
         this.gradingProperties = gradingProperties;
+        this.gameProperties = gameProperties;
         this.gradingResponseParser = new GradingResponseParser(jsonMapper);
     }
 
@@ -47,7 +54,8 @@ public class AccusationGrader {
 
         Verdict verdict = VerdictCalculator.calculate(
                 context.culpritCorrect(),
-                parsed.elementResultList().stream().map(ElementResult::result).toList());
+                parsed.elementResultList(),
+                gameProperties.grading().elementPassRatio());
 
         return new GradingResult(context.culpritCorrect(), verdict, parsed.elementResultList(), parsed.feedback());
     }

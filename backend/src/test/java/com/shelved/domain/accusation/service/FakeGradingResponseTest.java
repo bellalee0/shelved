@@ -2,6 +2,7 @@ package com.shelved.domain.accusation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.shelved.common.config.GameProperties;
 import com.shelved.common.config.GradingProperties;
 import com.shelved.common.entity.json.ElementResult;
 import com.shelved.common.enums.Difficulty;
@@ -12,6 +13,7 @@ import com.shelved.infra.llm.FakeLlmScenario;
 import com.shelved.infra.llm.LlmRequest;
 import com.shelved.infra.llm.LlmThinking;
 import com.shelved.infra.llm.PromptTemplateLoader;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -27,7 +29,8 @@ class FakeGradingResponseTest {
     private final GradingProperties gradingProperties = new GradingProperties(LlmThinking.MODEL_DEFAULT, null, 4000, 1500);
     private final GradingPromptBuilder builder = new GradingPromptBuilder(
             new PromptTemplateLoader(new DefaultResourceLoader()), gradingProperties);
-    private final AccusationGrader grader = new AccusationGrader(builder, gradingProperties, JsonMapper.builder().build());
+    private final AccusationGrader grader = new AccusationGrader(
+            builder, gradingProperties, gameProperties(), JsonMapper.builder().build());
     private final FakeLlmClient fakeLlmClient = new FakeLlmClient();
 
     @ParameterizedTest
@@ -77,5 +80,11 @@ class FakeGradingResponseTest {
 
         // then
         assertThat(result.verdict()).isEqualTo(Verdict.PARTIAL);
+    }
+
+    // 판정 기준 비율만 쓰는 테스트용 게임 설정
+    private static GameProperties gameProperties() {
+        return new GameProperties(null, null, 3, null, null, null, null,
+                new GameProperties.Grading(new BigDecimal("0.5")));
     }
 }

@@ -16,6 +16,7 @@ import com.shelved.domain.accusation.repository.AccusationRepository;
 import com.shelved.domain.hint.repository.HintRepository;
 import com.shelved.domain.room.dto.RoomTimerResponse;
 import com.shelved.domain.room.repository.PlayResultRepository;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,7 +54,8 @@ class RoomTimeSettlerTest {
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(15),
                 Duration.ofSeconds(10),
-                Duration.ofSeconds(5));
+                Duration.ofSeconds(5),
+                new GameProperties.Grading(new BigDecimal("0.5")));
         settler = new RoomTimeSettler(accusationRepository, hintRepository, playResultRepository, gameProperties);
     }
 
