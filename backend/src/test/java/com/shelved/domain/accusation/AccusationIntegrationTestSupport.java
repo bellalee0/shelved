@@ -88,7 +88,7 @@ public abstract class AccusationIntegrationTestSupport extends HintIntegrationTe
     }
 
     protected String partialGrading() {
-        return grading("MET", "MISSING");
+        return grading("MET", "INCORRECT");
     }
 
     protected String allMetGrading() {
